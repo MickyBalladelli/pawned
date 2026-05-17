@@ -28,6 +28,17 @@ const pool = new Pool({
   port: 5432,
 });
 
+// Test database connection on startup
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Database connection error:', err.stack);
+    console.error('Please ensure PostgreSQL is running and the database "vela" exists.');
+    console.error('You may need to run: ./scripts/init-db.sh');
+  } else {
+    console.log('Database connected successfully');
+  }
+});
+
 // Serve static files from client directory
 app.use(express.static(path.join(__dirname, 'client')));
 

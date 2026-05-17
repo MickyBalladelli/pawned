@@ -24,6 +24,7 @@ A real-time chat server for the Vela MMO game built with Node.js, Socket.IO, and
    ```
 
 3. Set up PostgreSQL database:
+   - Make sure PostgreSQL is installed and running
    - Create a database named `vela`
    - Update database connection settings in `server/server.js` if needed
    - Run database initialization script:
@@ -35,6 +36,28 @@ A real-time chat server for the Vela MMO game built with Node.js, Socket.IO, and
    ```bash
    npm start
    ```
+
+## Database Setup Instructions
+
+If you don't have PostgreSQL installed:
+
+### macOS (Homebrew)
+```bash
+brew install postgresql
+brew services start postgresql
+```
+
+### Ubuntu/Debian
+```bash
+sudo apt-get install postgresql postgresql-contrib
+sudo systemctl start postgresql
+```
+
+### CentOS/RHEL
+```bash
+sudo yum install postgresql-server postgresql-contrib
+sudo systemctl start postgresql
+```
 
 ## API Endpoints
 
