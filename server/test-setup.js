@@ -6,10 +6,10 @@ console.log('Vela MMO Server Setup Verification');
 
 // Check if required files exist
 const requiredFiles = [
-  'server/server.js',
+  'server.js',
   'package.json',
-  'client/index.html',
-  'README.md'
+  '../client/index.html',
+  '../README.md'
 ];
 
 let allFilesExist = true;

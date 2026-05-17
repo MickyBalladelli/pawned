@@ -28,7 +28,7 @@ A real-time chat server for the Vela MMO game built with Node.js, Socket.IO, and
    - Update database connection settings in `server/server.js` if needed
    - Run database initialization script:
      ```bash
-     ./scripts/init-db.sh
+     ./server/scripts/init-db.sh
      ```
 
 4. Start the server:

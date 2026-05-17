@@ -8,15 +8,18 @@ This is a real-time chat server for the Vela MMO game, built with Node.js, Expre
 ```
 vela/
 ├── server/
-│   └── server.js          # Main server implementation
+│   ├── server.js          # Main server implementation
+│   ├── package.json       # Node.js dependencies
+│   ├── DATABASE-SCHEMA.md # Database schema documentation
+│   ├── SERVER-STRUCTURE.md # Server structure documentation
+│   ├── scripts/
+│   │   ├── init-db.js     # Database initialization script
+│   │   └── init-db.sh     # Database initialization shell script
+│   ├── test-setup.js      # Setup verification script
+│   └── images/            # Client images
 ├── client/
 │   └── index.html         # Client-side chat interface
-├── scripts/
-│   └── init-db.js         # Database initialization script
-├── install.sh             # Installation script
-├── package.json           # Node.js dependencies
-├── README.md              # Project documentation
-└── test-setup.js          # Setup verification script
+└── install.sh             # Installation script
 ```
 
 ## Server Implementation Details

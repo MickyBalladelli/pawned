@@ -53,3 +53,5 @@ Stores chat messages sent in channels.
 ## Initialization
 
 The database tables are automatically created when the server starts if they don't exist. The initialization script also populates the database with sample data for testing purposes.
+
+The initialization script is located at `scripts/init-db.js` in the server directory.
