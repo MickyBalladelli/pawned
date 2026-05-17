@@ -49,6 +49,8 @@ A real-time chat server for the Vela MMO game built with Node.js, Socket.IO, and
 
 ## Database Schema
 
+For detailed database schema information, please refer to [DATABASE-SCHEMA.md](server/DATABASE-SCHEMA.md) in the server directory.
+
 The server automatically creates the following tables:
 
 ### channels
@@ -84,7 +86,3 @@ The server automatically creates the following tables:
 - `channelCreated(channel)` - New channel created
 - `channelUpdated(channel)` - Channel updated
 - `channelDeleted(channelId)` - Channel deleted
-
-## License
-
-MIT
