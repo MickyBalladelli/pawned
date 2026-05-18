@@ -46,7 +46,7 @@ const App = () => {
   // Initialize the app
   useEffect(() => {
     // Connect to the server
-    const newSocket = io('http://localhost:3000');
+    const newSocket = io('http://localhost:8080');
     setSocket(newSocket);
 
     // Set up socket event listeners
@@ -161,7 +161,7 @@ const App = () => {
     if (!newChannelName.trim() || !socket) return;
 
     try {
-      const response = await fetch('http://localhost:3000/api/channels', {
+      const response = await fetch('/api/channels', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

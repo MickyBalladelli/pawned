@@ -39,15 +39,15 @@ pool.query('SELECT NOW()', (err, res) => {
   }
 });
 
-// Serve static files from client directory
-app.use(express.static(path.join(__dirname, 'client')));
+// Serve static files from client build directory
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Middleware for parsing JSON
 app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'client/index.html'));
+  res.sendFile(path.join(__dirname, '../client/build/index.html'));
 });
 
 // Get all channels
@@ -195,7 +195,7 @@ io.on('connection', (socket) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`Vela server running on port ${PORT}`);
 });
