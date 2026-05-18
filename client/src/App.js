@@ -17,7 +17,8 @@ import {
   AppBar,
   Toolbar,
   Avatar,
-  CircularProgress
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import { 
   Chat as ChatIcon, 
@@ -42,11 +43,16 @@ const App = () => {
   const [newChannelDescription, setNewChannelDescription] = useState('');
   const [socket, setSocket] = useState(null);
   const [userCount, setUserCount] = useState(0);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
 
   // Initialize the app
   useEffect(() => {
     // Connect to the server
-    const newSocket = io('http://localhost:8080');
+    const newSocket = io('http://localhost:4000');
     setSocket(newSocket);
 
     // Set up socket event listeners
@@ -80,19 +86,6 @@ const App = () => {
       setUserCount(count);
     });
 
-    // Initialize user
-    const user = {
-      id: Math.floor(Math.random() * 1000),
-      username: 'Player' + Math.floor(Math.random() * 100),
-      isAdmin: Math.random() > 0.9 // 10% chance of being admin for demo purposes
-    };
-    
-    setCurrentUser(user);
-    setIsAdmin(user.isAdmin);
-
-    // Load channels
-    loadChannels();
-
     // Cleanup
     return () => {
       newSocket.disconnect();
@@ -102,7 +95,7 @@ const App = () => {
   // Load all channels
   const loadChannels = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/channels');
+      const response = await fetch('/api/channels');
       const data = await response.json();
       setChannels(data);
       
@@ -134,7 +127,7 @@ const App = () => {
   // Load messages for a channel
   const loadMessages = async (channelId) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/channels/${channelId}/messages?limit=50`);
+      const response = await fetch(`/api/channels/${channelId}/messages?limit=50`);
       const data = await response.json();
       setMessages(data);
     } catch (error) {
@@ -183,10 +176,125 @@ const App = () => {
     }
   };
 
+  // Handle login
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setIsLoginLoading(true);
+    setLoginError('');
+
+    try {
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          username,
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Login successful
+        setCurrentUser({
+          id: data.user.id,
+          username: data.user.username,
+          isAdmin: data.user.is_admin
+        });
+        setIsAdmin(data.user.is_admin);
+        setIsLoggedIn(true);
+        loadChannels();
+      } else {
+        setLoginError(data.error || 'Invalid username or password');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setLoginError('An error occurred during login');
+    } finally {
+      setIsLoginLoading(false);
+    }
+  };
+
+  // Handle logout
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setIsLoggedIn(false);
+    setCurrentChannel(null);
+    setMessages([]);
+  };
+
   // Format timestamp
   const formatTime = (timestamp) => {
     return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
+
+  if (!isLoggedIn) {
+    return (
+      <Container maxWidth="sm" sx={{ mt: 8, mb: 4 }}>
+        <Paper sx={{ p: 4 }}>
+          <Box display="flex" justifyContent="center" mb={3}>
+            <ChatIcon sx={{ fontSize: 48, color: 'primary.main' }} />
+          </Box>
+          <Typography variant="h4" component="h1" align="center" gutterBottom>
+            Vela MMO Chat
+          </Typography>
+          <Typography variant="h6" component="h2" align="center" gutterBottom>
+            Login
+          </Typography>
+          
+          {loginError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {loginError}
+            </Alert>
+          )}
+          
+          <Box component="form" onSubmit={handleLogin} sx={{ mt: 3 }}>
+            <TextField
+              fullWidth
+              label="Username"
+              variant="outlined"
+              margin="normal"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+            />
+            <TextField
+              fullWidth
+              label="Password"
+              type="password"
+              variant="outlined"
+              margin="normal"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+            <Button
+              fullWidth
+              variant="contained"
+              color="primary"
+              type="submit"
+              size="large"
+              sx={{ mt: 2 }}
+              disabled={isLoginLoading}
+            >
+              {isLoginLoading ? 'Logging in...' : 'Login'}
+            </Button>
+          </Box>
+          
+          <Box mt={3} textAlign="center">
+            <Typography variant="body2" color="textSecondary">
+              Use one of the sample accounts:
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Admin / Admin123 or Player1 / Player123
+            </Typography>
+          </Box>
+        </Paper>
+      </Container>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -226,6 +334,14 @@ const App = () => {
                     color="secondary" 
                   />
                 )}
+                <Button 
+                  variant="outlined" 
+                  size="small" 
+                  onClick={handleLogout}
+                  sx={{ ml: 1 }}
+                >
+                  Logout
+                </Button>
               </Box>
             )}
           </Box>

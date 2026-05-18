@@ -32,13 +32,13 @@ A modern React/Material UI client for the Vela MMO chat server.
 
 ### Running the Application
 
-1. Make sure the server is running (on port 3000)
+1. Make sure the server is running (on port 4000)
 2. Start the client:
    ```bash
    npm run dev
    ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://localhost:5050`
 
 ## Project Structure
 

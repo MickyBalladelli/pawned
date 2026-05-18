@@ -28,6 +28,7 @@ vela/
 - Uses Express.js for HTTP routing
 - Implements Socket.IO for real-time communication
 - Integrates with PostgreSQL database
+- Runs on port 4000
 - Provides REST API endpoints for channels and messages
 - Handles user authentication and session management
 

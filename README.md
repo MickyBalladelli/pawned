@@ -10,9 +10,7 @@ vela/
 │   ├── server.js        # Main server file
 │   ├── package.json     # Server dependencies
 │   └── ...
-├── client/              # Original HTML/JS client
-│   └── index.html       # Original client interface
-└── client-react/        # New React/MUI client
+└── client/              # New React/MUI client
     ├── src/             # React source files
     ├── package.json     # React client dependencies
     └── ...
@@ -57,11 +55,11 @@ The server will be available at `http://localhost:3000`
 The original HTML/JS client is available in the `client/` directory.
 
 #### React Client
-The new React/MUI client is available in the `client-react/` directory.
+The new React/MUI client is available in the `client/` directory (replacing the original client).
 
 1. Navigate to the client directory:
    ```bash
-   cd client-react
+   cd client
    ```
 2. Install dependencies:
    ```bash
@@ -72,7 +70,7 @@ The new React/MUI client is available in the `client-react/` directory.
    npm run dev
    ```
 
-The React client will be available at `http://localhost:3000`
+The React client will be available at `http://localhost:5050`
 
 ## Server API Endpoints
 
