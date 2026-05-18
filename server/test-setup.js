@@ -52,7 +52,7 @@ if (allFilesExist) {
   console.log('\nTo start the server:');
   console.log('1. Make sure PostgreSQL is running');
   console.log('2. Create a database named "vela"');
-  console.log('3. Run: npm start');
+  console.log('3. Run: npm run dev');
 } else {
   console.log('\n❌ Some files are missing. Please check the setup.');
 }

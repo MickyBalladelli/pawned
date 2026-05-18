@@ -1,3 +1,3 @@
 #!/bin/bash
-cd /Users/micky/dev/vela/client-react
-npm start
+cd /Users/micky/dev/vela/client
+npm run dev

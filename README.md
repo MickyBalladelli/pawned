@@ -1,23 +1,96 @@
-# Vela MMO Game Server
+# Vela MMO Chat Server
 
-A real-time chat server for the Vela MMO game built with Node.js, Socket.IO, and PostgreSQL.
+A real-time chat server for an MMO game built with Node.js, Express, and Socket.IO.
+
+## Project Structure
+
+```
+vela/
+├── server/              # Main server application
+│   ├── server.js        # Main server file
+│   ├── package.json     # Server dependencies
+│   └── ...
+├── client/              # Original HTML/JS client
+│   └── index.html       # Original client interface
+└── client-react/        # New React/MUI client
+    ├── src/             # React source files
+    ├── package.json     # React client dependencies
+    └── ...
+```
 
 ## Features
 
 - Real-time messaging using Socket.IO
-- Multi-channel chat system
-- Admin panel for managing channels
-- PostgreSQL database integration
-- Responsive web interface
+- Channel management (create, join, leave)
+- User authentication simulation
+- Private channel support
+- Admin panel for channel management
+- Responsive design
 
-## Prerequisites
+## Getting Started
+
+### Prerequisites
 
 - Node.js (v14 or higher)
-- PostgreSQL database
+- npm or yarn
 
-## Installation
+### Server Setup
 
-1. Clone the repository
+1. Navigate to the server directory:
+   ```bash
+   cd server
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the server:
+   ```bash
+   npm run dev
+   ```
+
+The server will be available at `http://localhost:3000`
+
+### Client Setup
+
+#### Original Client
+The original HTML/JS client is available in the `client/` directory.
+
+#### React Client
+The new React/MUI client is available in the `client-react/` directory.
+
+1. Navigate to the client directory:
+   ```bash
+   cd client-react
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the client:
+   ```bash
+   npm run dev
+   ```
+
+The React client will be available at `http://localhost:3000`
+
+## Server API Endpoints
+
+- `GET /api/channels` - Get all channels
+- `POST /api/channels` - Create a new channel
+- `GET /api/channels/:id/messages` - Get messages for a channel
+- `POST /api/channels/:id/messages` - Send a message to a channel
+
+## Technology Stack
+
+- **Server**: Node.js, Express, Socket.IO
+- **Database**: PostgreSQL
+- **Client**: HTML/JS (original) and React/MUI (new)
+- **Real-time Communication**: Socket.IO
+
+## License
+
+This project is licensed under the MIT License.
 2. Install dependencies:
    ```bash
    npm install
@@ -34,7 +107,7 @@ A real-time chat server for the Vela MMO game built with Node.js, Socket.IO, and
 
 4. Start the server:
    ```bash
-   npm start
+   npm run dev
    ```
 
 ## Database Setup Instructions

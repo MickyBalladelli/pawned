@@ -75,7 +75,7 @@ The server automatically creates three tables:
 
 3. Start the server:
    ```bash
-   npm start
+   npm run dev
    ```
 
 4. Access the chat interface at:
