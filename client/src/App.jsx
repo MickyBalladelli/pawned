@@ -9,6 +9,21 @@ function App() {
   return (
     <Container maxWidth="md">
       <Box sx={{ my: 4 }}>
+        <Box
+          component="img"
+          src="/images/vela.png"
+          alt="Vela"
+          sx={{
+            display: 'block',
+            width: '100%',
+            maxWidth: 560,
+            height: 'auto',
+            mx: 'auto',
+            mb: 4,
+            borderRadius: 2,
+          }}
+        />
+
         <Typography variant="h2" component="h1" gutterBottom>
           Welcome to Vela Client
         </Typography>
