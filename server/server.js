@@ -40,14 +40,14 @@ pool.query('SELECT NOW()', (err, res) => {
 });
 
 // Serve static files from client build directory
-app.use(express.static(path.join(__dirname, '../client/build')));
+app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // Middleware for parsing JSON
 app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
 // Get all channels

@@ -1,66 +1,16 @@
-# Vela MMO Chat Client
+# React + Vite
 
-A modern React/Material UI client for the Vela MMO chat server.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-## Features
+Currently, two official plugins are available:
 
-- Real-time messaging using Socket.IO
-- Channel management (create, join, leave)
-- User authentication simulation
-- Admin panel for channel management
-- Responsive design for all screen sizes
-- Dark theme UI with Material Design components
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Getting Started
+## React Compiler
 
-### Prerequisites
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-- Node.js (v14 or higher)
-- npm or yarn
+## Expanding the ESLint configuration
 
-### Installation
-
-1. Clone the repository
-2. Navigate to the client directory:
-   ```bash
-   cd client-react
-   ```
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-### Running the Application
-
-1. Make sure the server is running (on port 4000)
-2. Start the client:
-   ```bash
-   npm run dev
-   ```
-
-The application will be available at `http://localhost:5050`
-
-## Project Structure
-
-```
-src/
-├── App.js              # Main application component
-├── index.js            # Entry point
-├── components/         # Reusable components
-└── styles/             # Custom styles
-```
-
-## Dependencies
-
-- React 18
-- Material UI 5
-- Socket.IO Client
-- React DOM
-
-## Development
-
-This client uses React with Material UI components for a modern, responsive interface. The application connects to the Vela server using Socket.IO for real-time communication.
-
-## License
-
-This project is licensed under the MIT License.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
