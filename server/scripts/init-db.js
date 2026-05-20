@@ -10,6 +10,10 @@ const pool = new Pool({
   port: 5432,
 });
 
+function hashPassword(password) {
+  return require('crypto').createHash('sha256').update(password).digest('hex');
+}
+
 async function initializeDatabase() {
   try {
     // Test database connection
@@ -50,14 +54,20 @@ async function initializeDatabase() {
     `);
     
     // Create sample users
-    await pool.query(`
-      INSERT INTO users (username, is_admin) VALUES 
-      ('Admin', true),
-      ('Player1', false),
-      ('Player2', false),
-      ('Player3', false)
-      ON CONFLICT (username) DO NOTHING;
-    `);
+    const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
+
+    await pool.query(
+      `
+        INSERT INTO users (username, password_hash, is_admin) VALUES
+        ('Admin', $1, true),
+        ('Player1', NULL, false),
+        ('Player2', NULL, false),
+        ('Player3', NULL, false)
+        ON CONFLICT (username) DO UPDATE
+        SET password_hash = COALESCE(users.password_hash, EXCLUDED.password_hash);
+      `,
+      [defaultAdminPasswordHash]
+    );
     
     // Create sample channels
     await pool.query(`
