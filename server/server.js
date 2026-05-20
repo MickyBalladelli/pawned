@@ -178,11 +178,16 @@ app.get('/api/channels', async (req, res) => {
 // Create a new channel
 app.post('/api/channels', authenticate, requireAdmin, async (req, res) => {
   const { name, description, is_private } = req.body;
+  const trimmedName = typeof name === 'string' ? name.trim() : '';
+
+  if (!trimmedName) {
+    return res.status(400).json({ error: 'Channel name is required' });
+  }
   
   try {
     const result = await pool.query(
       'INSERT INTO channels (name, description, is_private) VALUES ($1, $2, $3) RETURNING *',
-      [name, description, is_private || false]
+      [trimmedName, description || null, Boolean(is_private)]
     );
     res.status(201).json(result.rows[0]);
     
@@ -198,11 +203,16 @@ app.post('/api/channels', authenticate, requireAdmin, async (req, res) => {
 app.put('/api/channels/:id', authenticate, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { name, description, is_private } = req.body;
+  const trimmedName = typeof name === 'string' ? name.trim() : '';
+
+  if (!trimmedName) {
+    return res.status(400).json({ error: 'Channel name is required' });
+  }
   
   try {
     const result = await pool.query(
       'UPDATE channels SET name = $1, description = $2, is_private = $3 WHERE id = $4 RETURNING *',
-      [name, description, is_private, id]
+      [trimmedName, description || null, Boolean(is_private), id]
     );
     
     if (result.rows.length === 0) {

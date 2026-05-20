@@ -43,11 +43,11 @@ const emptyForm = {
 
 async function requestJson(url, options) {
   const response = await fetch(url, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options?.headers,
     },
-    ...options,
   });
 
   const payload = await response.json().catch(() => null);
@@ -356,7 +356,7 @@ function App() {
         <Stack
           direction={{ xs: 'column', md: 'row' }}
           spacing={3}
-          alignItems={{ xs: 'stretch', md: 'center' }}
+          sx={{ alignItems: { xs: 'stretch', md: 'center' } }}
         >
           <Box
             component="img"
@@ -370,7 +370,7 @@ function App() {
             }}
           />
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
               <Forum color="primary" />
               <Typography variant="overline" color="text.secondary">
                 Chat operations
@@ -385,7 +385,7 @@ function App() {
                 : 'Browse available chat channels from the server API.'}
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             {authUser && (
               <Button variant="outlined" onClick={handleLogout}>
                 Sign out
@@ -427,7 +427,10 @@ function App() {
         >
           <Card>
             <CardContent>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+              <Stack
+                direction="row"
+                sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
+              >
                 <Typography variant="h5" component="h2">
                   Channels
                 </Typography>
@@ -439,7 +442,7 @@ function App() {
               </Stack>
 
               {loadingChannels ? (
-                <Stack alignItems="center" sx={{ py: 6 }}>
+                <Stack sx={{ alignItems: 'center', py: 6 }}>
                   <CircularProgress />
                 </Stack>
               ) : channels.length === 0 ? (
@@ -457,7 +460,7 @@ function App() {
                     >
                       <ListItemText
                         primary={
-                          <Stack direction="row" spacing={1} alignItems="center">
+                          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                             <Typography fontWeight={700}>#{channel.name}</Typography>
                             <Chip
                               size="small"
@@ -540,7 +543,7 @@ function App() {
                       }
                       label="Private channel"
                     />
-                    <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
                       {editingId && (
                         <Button onClick={startCreate} disabled={saving}>
                           Cancel
@@ -596,9 +599,11 @@ function App() {
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
                   spacing={1}
-                  alignItems={{ xs: 'flex-start', sm: 'center' }}
-                  justifyContent="space-between"
-                  sx={{ mb: 2 }}
+                  sx={{
+                    alignItems: { xs: 'flex-start', sm: 'center' },
+                    justifyContent: 'space-between',
+                    mb: 2,
+                  }}
                 >
                   <Box>
                     <Typography variant="h5" component="h2">
@@ -623,7 +628,7 @@ function App() {
                 <Divider sx={{ mb: 2 }} />
 
                 {loadingMessages ? (
-                  <Stack alignItems="center" sx={{ py: 6 }}>
+                  <Stack sx={{ alignItems: 'center', py: 6 }}>
                     <CircularProgress />
                   </Stack>
                 ) : !selectedChannel ? (
@@ -637,9 +642,7 @@ function App() {
                         <Stack
                           direction="row"
                           spacing={1}
-                          alignItems="baseline"
-                          justifyContent="space-between"
-                          sx={{ mb: 0.5 }}
+                          sx={{ alignItems: 'baseline', justifyContent: 'space-between', mb: 0.5 }}
                         >
                           <Typography fontWeight={700}>{message.username}</Typography>
                           <Typography variant="caption" color="text.secondary">
