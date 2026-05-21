@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Alert,
   Box,
@@ -20,7 +20,7 @@ import {
   TextField,
   Tooltip,
   Typography,
-} from '@mui/material';
+} from '@mui/material'
 import {
   Add,
   Delete,
@@ -30,16 +30,17 @@ import {
   Public,
   Refresh,
   Save,
-} from '@mui/icons-material';
-import './App.css';
+} from '@mui/icons-material'
+import LoginPage from './LoginPage'
+import './App.css'
 
-const authTokenKey = 'velaAuthToken';
+const authTokenKey = 'velaAuthToken'
 
 const emptyForm = {
   name: '',
   description: '',
   is_private: false,
-};
+}
 
 async function requestJson(url, options) {
   const response = await fetch(url, {
@@ -48,20 +49,20 @@ async function requestJson(url, options) {
       'Content-Type': 'application/json',
       ...options?.headers,
     },
-  });
+  })
 
-  const payload = await response.json().catch(() => null);
+  const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(payload?.error || 'Request failed');
+    throw new Error(payload?.error || 'Request failed')
   }
 
-  return payload;
+  return payload
 }
 
 function formatDate(value) {
   if (!value) {
-    return 'Unknown';
+    return 'Unknown'
   }
 
   return new Intl.DateTimeFormat(undefined, {
@@ -69,187 +70,154 @@ function formatDate(value) {
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  }).format(new Date(value));
+  }).format(new Date(value))
 }
 
-function App() {
-  const [channels, setChannels] = useState([]);
-  const [selectedChannelId, setSelectedChannelId] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [form, setForm] = useState(emptyForm);
-  const [authForm, setAuthForm] = useState({ username: '', password: '' });
-  const [authToken, setAuthToken] = useState(() => localStorage.getItem(authTokenKey));
-  const [authUser, setAuthUser] = useState(null);
-  const [loadingAuth, setLoadingAuth] = useState(Boolean(localStorage.getItem(authTokenKey)));
-  const [authenticating, setAuthenticating] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  const [loadingChannels, setLoadingChannels] = useState(true);
-  const [loadingMessages, setLoadingMessages] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState(null);
-  const [notice, setNotice] = useState(null);
-  const [error, setError] = useState(null);
+function LoadingPage() {
+  return (
+    <Container maxWidth="sm" sx={{ py: 8 }}>
+      <Stack sx={{ alignItems: 'center' }} spacing={2}>
+        <CircularProgress />
+        <Typography color="text.secondary">Checking login</Typography>
+      </Stack>
+    </Container>
+  )
+}
+
+function AppContent({ authToken, authUser, onLogout }) {
+  const [channels, setChannels] = useState([])
+  const [selectedChannelId, setSelectedChannelId] = useState(null)
+  const [messages, setMessages] = useState([])
+  const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState(null)
+  const [loadingChannels, setLoadingChannels] = useState(true)
+  const [loadingMessages, setLoadingMessages] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
+  const [notice, setNotice] = useState(null)
+  const [error, setError] = useState(null)
 
   const selectedChannel = useMemo(
     () => channels.find((channel) => channel.id === selectedChannelId),
     [channels, selectedChannelId],
-  );
-  const isAdmin = Boolean(authUser?.is_admin);
+  )
+  const isAdmin = Boolean(authUser?.is_admin)
 
-  function getAuthHeaders() {
-    return authToken ? { Authorization: `Bearer ${authToken}` } : {};
-  }
+  const getAuthHeaders = useCallback(() => {
+    return authToken ? { Authorization: `Bearer ${authToken}` } : {}
+  }, [authToken])
 
-  function clearAuth() {
-    localStorage.removeItem(authTokenKey);
-    setAuthToken(null);
-    setAuthUser(null);
-    setLoadingAuth(false);
-    setEditingId(null);
-    setForm(emptyForm);
-  }
-
-  async function loadChannels() {
-    setLoadingChannels(true);
-    setError(null);
+  const loadChannels = useCallback(async () => {
+    setLoadingChannels(true)
+    setError(null)
 
     try {
-      const data = await requestJson('/api/channels');
-      setChannels(data);
+      const data = await requestJson('/api/channels', {
+        headers: getAuthHeaders(),
+      })
+      setChannels(data)
 
       if (data.length > 0) {
         setSelectedChannelId((currentId) => {
-          const stillExists = data.some((channel) => channel.id === currentId);
-          return stillExists ? currentId : data[0].id;
-        });
+          const stillExists = data.some((channel) => channel.id === currentId)
+          return stillExists ? currentId : data[0].id
+        })
       } else {
-        setSelectedChannelId(null);
+        setSelectedChannelId(null)
       }
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setLoadingChannels(false);
+      setLoadingChannels(false)
     }
-  }
+  }, [getAuthHeaders])
 
-  async function loadMessages(channelId) {
+  const loadMessages = useCallback(async (channelId) => {
     if (!channelId) {
-      setMessages([]);
-      return;
+      setMessages([])
+      return
     }
 
-    setLoadingMessages(true);
+    setLoadingMessages(true)
 
     try {
-      const data = await requestJson(`/api/channels/${channelId}/messages?limit=20`);
-      setMessages(data);
+      const data = await requestJson(`/api/channels/${channelId}/messages?limit=20`, {
+        headers: getAuthHeaders(),
+      })
+      setMessages(data)
     } catch (err) {
-      setError(err.message);
-      setMessages([]);
+      setError(err.message)
+      setMessages([])
     } finally {
-      setLoadingMessages(false);
+      setLoadingMessages(false)
     }
-  }
+  }, [getAuthHeaders])
 
   useEffect(() => {
-    const load = Promise.resolve().then(() => loadChannels());
+    const load = Promise.resolve().then(() => loadChannels())
     return () => {
-      load.catch(() => {});
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!authToken) {
-      return undefined;
+      load.catch(() => {})
     }
-
-    let isMounted = true;
-
-    const load = requestJson('/api/auth/me', {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    })
-      .then((data) => {
-        if (isMounted) {
-          setAuthUser(data.user);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          clearAuth();
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
-          setLoadingAuth(false);
-        }
-      });
-
-    return () => {
-      isMounted = false;
-      load.catch(() => {});
-    };
-  }, [authToken]);
+  }, [loadChannels])
 
   useEffect(() => {
-    const load = Promise.resolve().then(() => loadMessages(selectedChannelId));
+    const load = Promise.resolve().then(() => loadMessages(selectedChannelId))
     return () => {
-      load.catch(() => {});
-    };
-  }, [selectedChannelId]);
+      load.catch(() => {})
+    }
+  }, [loadMessages, selectedChannelId])
 
   function updateForm(field, value) {
     setForm((current) => ({
       ...current,
       [field]: value,
-    }));
+    }))
   }
 
   function startCreate() {
-    setEditingId(null);
-    setForm(emptyForm);
-    setNotice(null);
+    setEditingId(null)
+    setForm(emptyForm)
+    setNotice(null)
   }
 
   function startEdit(channel) {
     if (!isAdmin) {
-      return;
+      return
     }
 
-    setEditingId(channel.id);
+    setEditingId(channel.id)
     setForm({
       name: channel.name,
       description: channel.description || '',
       is_private: Boolean(channel.is_private),
-    });
-    setSelectedChannelId(channel.id);
-    setNotice(null);
+    })
+    setSelectedChannelId(channel.id)
+    setNotice(null)
   }
 
   async function handleSubmit(event) {
-    event.preventDefault();
+    event.preventDefault()
 
     if (!isAdmin) {
-      setError('Admin access required');
-      return;
+      setError('Admin access required')
+      return
     }
 
     if (!form.name.trim()) {
-      setError('Channel name is required');
-      return;
+      setError('Channel name is required')
+      return
     }
 
-    setSaving(true);
-    setError(null);
-    setNotice(null);
+    setSaving(true)
+    setError(null)
+    setNotice(null)
 
     try {
       const payload = {
         name: form.name.trim(),
         description: form.description.trim(),
         is_private: form.is_private,
-      };
+      }
 
       const channel = editingId
         ? await requestJson(`/api/channels/${editingId}`, {
@@ -261,93 +229,58 @@ function App() {
             method: 'POST',
             headers: getAuthHeaders(),
             body: JSON.stringify(payload),
-          });
+          })
 
-      setNotice(editingId ? 'Channel updated' : 'Channel created');
-      setSelectedChannelId(channel.id);
-      setEditingId(null);
-      setForm(emptyForm);
-      await loadChannels();
+      setNotice(editingId ? 'Channel updated' : 'Channel created')
+      setSelectedChannelId(channel.id)
+      setEditingId(null)
+      setForm(emptyForm)
+      await loadChannels()
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
   }
 
   async function handleDelete(channel) {
     if (!isAdmin) {
-      setError('Admin access required');
-      return;
+      setError('Admin access required')
+      return
     }
 
-    const confirmed = window.confirm(`Delete #${channel.name}?`);
+    const confirmed = window.confirm(`Delete #${channel.name}?`)
 
     if (!confirmed) {
-      return;
+      return
     }
 
-    setDeletingId(channel.id);
-    setError(null);
-    setNotice(null);
+    setDeletingId(channel.id)
+    setError(null)
+    setNotice(null)
 
     try {
       await requestJson(`/api/channels/${channel.id}`, {
         method: 'DELETE',
         headers: getAuthHeaders(),
-      });
-      setNotice('Channel deleted');
+      })
+      setNotice('Channel deleted')
 
       if (editingId === channel.id) {
-        startCreate();
+        startCreate()
       }
 
-      await loadChannels();
+      await loadChannels()
     } catch (err) {
-      setError(err.message);
+      setError(err.message)
     } finally {
-      setDeletingId(null);
+      setDeletingId(null)
     }
   }
 
-  async function handleLogin(event) {
-    event.preventDefault();
-
-    setAuthenticating(true);
-    setError(null);
-    setNotice(null);
-
-    try {
-      const data = await requestJson('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(authForm),
-      });
-
-      localStorage.setItem(authTokenKey, data.token);
-      setAuthToken(data.token);
-      setAuthUser(data.user);
-      setAuthForm({ username: '', password: '' });
-
-      if (data.user.is_admin) {
-        setNotice('Admin authenticated');
-      }
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setAuthenticating(false);
-    }
-  }
-
-  async function handleLogout() {
-    if (authToken) {
-      requestJson('/api/auth/logout', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      }).catch(() => {});
-    }
-
-    clearAuth();
-    setNotice(null);
+  function handleLogout() {
+    onLogout()
+    setNotice(null)
   }
 
   return (
@@ -386,11 +319,9 @@ function App() {
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            {authUser && (
-              <Button variant="outlined" onClick={handleLogout}>
-                Sign out
-              </Button>
-            )}
+            <Button variant="outlined" onClick={handleLogout}>
+              Sign out
+            </Button>
             <Tooltip title="Refresh channels">
               <span>
                 <IconButton
@@ -479,8 +410,8 @@ function App() {
                               edge="end"
                               size="small"
                               onClick={(event) => {
-                                event.stopPropagation();
-                                startEdit(channel);
+                                event.stopPropagation()
+                                startEdit(channel)
                               }}
                             >
                               <Edit fontSize="small" />
@@ -494,8 +425,8 @@ function App() {
                                 color="error"
                                 disabled={deletingId === channel.id}
                                 onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleDelete(channel);
+                                  event.stopPropagation()
+                                  handleDelete(channel)
                                 }}
                               >
                                 <Delete fontSize="small" />
@@ -512,7 +443,7 @@ function App() {
           </Card>
 
           <Stack spacing={3}>
-            {isAdmin ? (
+            {isAdmin && (
               <Card>
                 <CardContent component="form" onSubmit={handleSubmit}>
                   <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
@@ -561,38 +492,7 @@ function App() {
                   </Stack>
                 </CardContent>
               </Card>
-            ) : !authUser && !loadingAuth ? (
-              <Card>
-                <CardContent component="form" onSubmit={handleLogin}>
-                  <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-                    Admin sign in
-                  </Typography>
-                  <Stack spacing={2}>
-                    <TextField
-                      label="Username"
-                      value={authForm.username}
-                      onChange={(event) =>
-                        setAuthForm((current) => ({ ...current, username: event.target.value }))
-                      }
-                      fullWidth
-                      required
-                    />
-                    <TextField
-                      label="Password"
-                      type="password"
-                      value={authForm.password}
-                      onChange={(event) =>
-                        setAuthForm((current) => ({ ...current, password: event.target.value }))
-                      }
-                      fullWidth
-                    />
-                    <Button type="submit" variant="contained" disabled={authenticating}>
-                      {authenticating ? 'Signing in' : 'Sign in'}
-                    </Button>
-                  </Stack>
-                </CardContent>
-              </Card>
-            ) : null}
+            )}
 
             <Card>
               <CardContent>
@@ -660,7 +560,104 @@ function App() {
         </Box>
       </Stack>
     </Container>
-  );
+  )
 }
 
-export default App;
+function App() {
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem(authTokenKey))
+  const [authUser, setAuthUser] = useState(null)
+  const [loadingAuth, setLoadingAuth] = useState(Boolean(localStorage.getItem(authTokenKey)))
+  const [authenticating, setAuthenticating] = useState(false)
+  const [authError, setAuthError] = useState(null)
+
+  function clearAuth() {
+    localStorage.removeItem(authTokenKey)
+    setAuthToken(null)
+    setAuthUser(null)
+    setLoadingAuth(false)
+  }
+
+  async function handleLogin(authForm) {
+    setAuthenticating(true)
+    setAuthError(null)
+
+    try {
+      const data = await requestJson('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(authForm),
+      })
+
+      localStorage.setItem(authTokenKey, data.token)
+      setAuthToken(data.token)
+      setAuthUser(data.user)
+    } catch (err) {
+      setAuthError(err.message)
+    } finally {
+      setAuthenticating(false)
+    }
+  }
+
+  async function handleLogout() {
+    if (authToken) {
+      requestJson('/api/auth/logout', {
+        method: 'POST',
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      }).catch(() => {})
+    }
+
+    clearAuth()
+  }
+
+  useEffect(() => {
+    if (!authToken) {
+      return undefined
+    }
+
+    let isMounted = true
+
+    const load = requestJson('/api/auth/me', {
+      headers: {
+        Authorization: `Bearer ${authToken}`,
+      },
+    })
+      .then((data) => {
+        if (isMounted) {
+          setAuthUser(data.user)
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          clearAuth()
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoadingAuth(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+      load.catch(() => {})
+    }
+  }, [authToken])
+
+  if (loadingAuth) {
+    return <LoadingPage />
+  }
+
+  if (!authUser) {
+    return (
+      <LoginPage
+        authenticating={authenticating}
+        error={authError}
+        onClearError={() => setAuthError(null)}
+        onLogin={handleLogin}
+      />
+    )
+  }
+
+  return <AppContent authToken={authToken} authUser={authUser} onLogout={handleLogout} />
+}
+
+export default App
