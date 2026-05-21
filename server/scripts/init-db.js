@@ -35,12 +35,24 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE,
         username VARCHAR(50) UNIQUE NOT NULL,
         password_hash TEXT,
         is_admin BOOLEAN DEFAULT FALSE,
+        is_verified BOOLEAN DEFAULT TRUE,
+        verification_token TEXT UNIQUE,
+        verification_token_expires_at TIMESTAMP,
+        verified_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT UNIQUE')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP')
+    await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL')
     
     // Create messages table
     await pool.query(`

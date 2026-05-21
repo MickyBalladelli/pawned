@@ -30,6 +30,7 @@ const pool = new Pool({
 });
 
 const sessions = new Map();
+const verificationTokens = new Map()
 
 function getAuthToken(req) {
   const header = req.get('Authorization') || '';
@@ -43,6 +44,30 @@ function getAuthToken(req) {
 
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
+}
+
+function getPublicBaseUrl(req) {
+  return process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`
+}
+
+function normalizeEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : ''
+}
+
+function normalizeUsername(username) {
+  return typeof username === 'string' ? username.trim() : ''
+}
+
+function createVerificationToken() {
+  return crypto.randomBytes(32).toString('hex')
+}
+
+function getVerificationLink(req, token) {
+  return `${getPublicBaseUrl(req)}/verify-email?token=${token}`
+}
+
+function sendVerificationEmail(email, verificationLink) {
+  console.log(`Verification mail for ${email}: ${verificationLink}`)
 }
 
 function passwordMatches(password, passwordHash) {
@@ -71,7 +96,7 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, is_admin FROM users WHERE id = $1',
+      'SELECT id, username, is_admin FROM users WHERE id = $1 AND is_verified = true',
       [session.userId]
     );
 
@@ -116,6 +141,10 @@ app.use(express.json());
 
 // Routes
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'))
+})
+
+app.get('/verify-email', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
@@ -128,7 +157,7 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, password_hash, is_admin FROM users WHERE LOWER(username) = LOWER($1)',
+      'SELECT id, username, password_hash, is_admin, is_verified FROM users WHERE LOWER(username) = LOWER($1)',
       [username.trim()]
     );
 
@@ -136,6 +165,10 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!user || !passwordMatches(password, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    if (!user.is_verified) {
+      return res.status(403).json({ error: 'Account pending approval. Verify your email first.' })
     }
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -154,6 +187,129 @@ app.post('/api/auth/login', async (req, res) => {
     res.status(500).json({ error: 'Failed to log in' });
   }
 });
+
+app.get('/api/auth/username-available', async (req, res) => {
+  const username = normalizeUsername(req.query.username)
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' })
+  }
+
+  try {
+    const result = await pool.query(
+      'SELECT id FROM users WHERE LOWER(username) = LOWER($1)',
+      [username]
+    )
+
+    res.json({ available: result.rows.length === 0 })
+  } catch (err) {
+    console.error('Error checking username:', err)
+    res.status(500).json({ error: 'Failed to check username' })
+  }
+})
+
+app.post('/api/auth/signup', async (req, res) => {
+  const email = normalizeEmail(req.body.email)
+  const username = normalizeUsername(req.body.username)
+  const { password, confirmPassword } = req.body
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email is required' })
+  }
+
+  if (!username) {
+    return res.status(400).json({ error: 'Username is required' })
+  }
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  }
+
+  if (password !== confirmPassword) {
+    return res.status(400).json({ error: 'Passwords do not match' })
+  }
+
+  const verificationToken = createVerificationToken()
+  const verificationTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24)
+
+  try {
+    const existing = await pool.query(
+      'SELECT username, email FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2)',
+      [username, email]
+    )
+
+    if (existing.rows.some((user) => user.username.toLowerCase() === username.toLowerCase())) {
+      return res.status(409).json({ error: 'Username is already taken' })
+    }
+
+    if (existing.rows.some((user) => user.email?.toLowerCase() === email)) {
+      return res.status(409).json({ error: 'Email is already in use' })
+    }
+
+    await pool.query(
+      `
+        INSERT INTO users (
+          email,
+          username,
+          password_hash,
+          is_verified,
+          verification_token,
+          verification_token_expires_at
+        )
+        VALUES ($1, $2, $3, false, $4, $5)
+      `,
+      [email, username, `sha256:${hashPassword(password)}`, verificationToken, verificationTokenExpiresAt]
+    )
+
+    const verificationLink = getVerificationLink(req, verificationToken)
+    verificationTokens.set(verificationToken, { email, expiresAt: verificationTokenExpiresAt })
+    sendVerificationEmail(email, verificationLink)
+
+    res.status(201).json({
+      message: 'Account pending approval. Check your email to verify.',
+      verificationLink: process.env.NODE_ENV === 'production' ? undefined : verificationLink,
+    })
+  } catch (err) {
+    console.error('Error signing up:', err)
+    res.status(500).json({ error: 'Failed to sign up' })
+  }
+})
+
+app.post('/api/auth/verify-email', async (req, res) => {
+  const token = typeof req.body.token === 'string' ? req.body.token.trim() : ''
+
+  if (!token) {
+    return res.status(400).json({ error: 'Verification token is required' })
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE users
+        SET is_verified = true,
+            verified_at = CURRENT_TIMESTAMP,
+            verification_token = NULL,
+            verification_token_expires_at = NULL
+        WHERE verification_token = $1
+          AND is_verified = false
+          AND verification_token_expires_at > CURRENT_TIMESTAMP
+        RETURNING id, username
+      `,
+      [token]
+    )
+
+    verificationTokens.delete(token)
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({ error: 'Verification link is invalid or expired' })
+    }
+
+    res.json({ message: 'Email verified. You can log in now.' })
+  } catch (err) {
+    console.error('Error verifying email:', err)
+    res.status(500).json({ error: 'Failed to verify email' })
+  }
+})
 
 app.get('/api/auth/me', authenticate, (req, res) => {
   res.json({ user: req.user });
@@ -267,50 +423,87 @@ app.get('/api/channels/:id/messages', async (req, res) => {
   }
 });
 
+async function getUserFromToken(token) {
+  const session = token ? sessions.get(token) : null
+
+  if (!session) {
+    return null
+  }
+
+  const result = await pool.query(
+    'SELECT id, username, is_admin FROM users WHERE id = $1 AND is_verified = true',
+    [session.userId]
+  )
+
+  return result.rows[0] || null
+}
+
 // Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
+io.on('connection', async (socket) => {
+  console.log('User connected:', socket.id)
+
+  const token = socket.handshake.auth?.token
+  const user = await getUserFromToken(token)
+
+  if (!user) {
+    socket.emit('chatError', 'Authentication required')
+    socket.disconnect(true)
+    return
+  }
+
+  socket.data.user = user
   
   // Join a channel
   socket.on('joinChannel', (channelId) => {
-    socket.join(channelId);
-    console.log(`User ${socket.id} joined channel ${channelId}`);
-  });
+    socket.join(String(channelId))
+    console.log(`User ${socket.id} joined channel ${channelId}`)
+  })
   
   // Leave a channel
   socket.on('leaveChannel', (channelId) => {
-    socket.leave(channelId);
-    console.log(`User ${socket.id} left channel ${channelId}`);
-  });
+    socket.leave(String(channelId))
+    console.log(`User ${socket.id} left channel ${channelId}`)
+  })
   
   // Send a message to a channel
-  socket.on('sendMessage', async (data) => {
-    const { channelId, userId, message } = data;
+  socket.on('sendMessage', async (data, callback) => {
+    const { channelId, message } = data || {}
+    const trimmedMessage = typeof message === 'string' ? message.trim() : ''
+
+    if (!channelId || !trimmedMessage) {
+      callback?.({ error: 'Message is required' })
+      return
+    }
     
     try {
+      const channelResult = await pool.query('SELECT id FROM channels WHERE id = $1', [channelId])
+
+      if (channelResult.rows.length === 0) {
+        callback?.({ error: 'Channel not found' })
+        return
+      }
+
       // Insert message into database
       const result = await pool.query(
         'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING *',
-        [channelId, userId, message]
-      );
+        [channelId, socket.data.user.id, trimmedMessage]
+      )
       
-      const messageData = result.rows[0];
-      
-      // Fetch user details for the message
-      const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [userId]);
-      const user = userResult.rows[0];
+      const messageData = result.rows[0]
       
       // Emit the message to the channel
       const messageWithUser = {
         ...messageData,
-        username: user.username
-      };
+        username: socket.data.user.username
+      }
       
-      io.to(channelId).emit('receiveMessage', messageWithUser);
+      io.to(String(channelId)).emit('receiveMessage', messageWithUser)
+      callback?.({ message: messageWithUser })
     } catch (err) {
-      console.error('Error sending message:', err);
+      console.error('Error sending message:', err)
+      callback?.({ error: 'Failed to send message' })
     }
-  });
+  })
   
   // Handle user disconnect
   socket.on('disconnect', () => {
@@ -342,12 +535,24 @@ async function createTables() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE,
         username VARCHAR(50) UNIQUE NOT NULL,
         password_hash TEXT,
         is_admin BOOLEAN DEFAULT FALSE,
+        is_verified BOOLEAN DEFAULT TRUE,
+        verification_token TEXT UNIQUE,
+        verification_token_expires_at TIMESTAMP,
+        verified_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT UNIQUE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP');
+    await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
 
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
 

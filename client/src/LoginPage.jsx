@@ -12,7 +12,7 @@ import {
 } from '@mui/material'
 import { Lock } from '@mui/icons-material'
 
-function LoginPage({ authenticating, error, onClearError, onLogin }) {
+function LoginPage({ authenticating, error, onClearError, onLogin, onShowSignUp }) {
   const [authForm, setAuthForm] = useState({ username: '', password: '' })
 
   async function handleSubmit(event) {
@@ -76,6 +76,9 @@ function LoginPage({ authenticating, error, onClearError, onLogin }) {
               />
               <Button type="submit" variant="contained" disabled={authenticating}>
                 {authenticating ? 'Signing in' : 'Sign in'}
+              </Button>
+              <Button type="button" variant="text" onClick={onShowSignUp}>
+                Create account
               </Button>
             </Stack>
           </CardContent>
