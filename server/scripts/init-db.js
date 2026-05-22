@@ -27,6 +27,7 @@ async function initializeDatabase() {
         name VARCHAR(100) UNIQUE NOT NULL,
         description TEXT,
         is_private BOOLEAN DEFAULT FALSE,
+        owner_user_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -52,7 +53,9 @@ async function initializeDatabase() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT UNIQUE')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT')
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL')
+    await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
     
     // Create messages table
     await pool.query(`
@@ -64,6 +67,31 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS channel_members (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(20) NOT NULL DEFAULT 'member',
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, user_id)
+      );
+    `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS channel_membership_requests (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, user_id)
+      );
+    `)
     
     // Create sample users
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
@@ -90,6 +118,15 @@ async function initializeDatabase() {
       ('Private1', 'A private channel', true)
       ON CONFLICT (name) DO NOTHING;
     `);
+
+    await pool.query(`
+      INSERT INTO channel_members (channel_id, user_id, role, status)
+      SELECT c.id, c.owner_user_id, 'owner', 'active'
+      FROM channels c
+      WHERE c.is_private = true
+        AND c.owner_user_id IS NOT NULL
+      ON CONFLICT (channel_id, user_id) DO NOTHING;
+    `)
     
     // Create sample messages
     await pool.query(`
@@ -101,6 +138,12 @@ async function initializeDatabase() {
       (3, 1, 'New event starting soon!')
       ON CONFLICT DO NOTHING;
     `);
+
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON channel_members(channel_id)')
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON channel_members(user_id)')
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)')
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)')
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)')
     
     console.log('Database initialized successfully');
   } catch (err) {

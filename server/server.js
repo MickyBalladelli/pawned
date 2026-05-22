@@ -156,6 +156,89 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+async function getChannelAccess(channelId, user) {
+  const result = await pool.query(
+    `
+      SELECT c.*,
+             u.username AS owner_username,
+             cm.role AS membership_role,
+             cm.status AS membership_status,
+             cmr.status AS request_status
+      FROM channels c
+      LEFT JOIN users u ON u.id = c.owner_user_id
+      LEFT JOIN channel_members cm
+        ON cm.channel_id = c.id
+       AND cm.user_id = $2
+       AND cm.status = 'active'
+      LEFT JOIN channel_membership_requests cmr
+        ON cmr.channel_id = c.id
+       AND cmr.user_id = $2
+       AND cmr.status = 'pending'
+      WHERE c.id = $1
+    `,
+    [channelId, user.id]
+  )
+  const channel = result.rows[0]
+
+  if (!channel) {
+    return null
+  }
+
+  const isOwner = Number(channel.owner_user_id) === Number(user.id)
+  const isMember = Boolean(channel.membership_status)
+  const canManage = Boolean(user.is_admin || isOwner)
+  const canAccess = Boolean(user.is_admin || !channel.is_private || isOwner || isMember)
+
+  return {
+    channel,
+    isOwner,
+    isMember,
+    canManage,
+    canAccess,
+    requestStatus: channel.request_status || null,
+  }
+}
+
+async function requireChannelAccess(req, res, next) {
+  try {
+    const access = await getChannelAccess(req.params.id, req.user)
+
+    if (!access) {
+      return res.status(404).json({ error: 'Channel not found' })
+    }
+
+    if (!access.canAccess) {
+      return res.status(403).json({ error: 'Membership required' })
+    }
+
+    req.channelAccess = access
+    next()
+  } catch (err) {
+    console.error('Error checking channel access:', err)
+    res.status(500).json({ error: 'Failed to check channel access' })
+  }
+}
+
+async function requireChannelManager(req, res, next) {
+  try {
+    const access = await getChannelAccess(req.params.id, req.user)
+
+    if (!access) {
+      return res.status(404).json({ error: 'Channel not found' })
+    }
+
+    if (!access.canManage) {
+      return res.status(403).json({ error: 'Channel owner access required' })
+    }
+
+    req.channelAccess = access
+    next()
+  } catch (err) {
+    console.error('Error checking channel manager:', err)
+    res.status(500).json({ error: 'Failed to check channel manager' })
+  }
+}
+
 // Test database connection on startup
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
@@ -491,10 +574,56 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
 })
 
 // Get all channels
-app.get('/api/channels', async (req, res) => {
+app.get('/api/channels', authenticate, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM channels ORDER BY created_at DESC');
-    res.json(result.rows);
+    const result = await pool.query(
+      `
+        SELECT c.*,
+               u.username AS owner_username,
+               cm.role AS membership_role,
+               cm.status AS membership_status,
+               cmr.status AS request_status,
+               COALESCE(pending.pending_request_count, 0)::int AS pending_request_count
+        FROM channels c
+        LEFT JOIN users u ON u.id = c.owner_user_id
+        LEFT JOIN channel_members cm
+          ON cm.channel_id = c.id
+         AND cm.user_id = $1
+         AND cm.status = 'active'
+        LEFT JOIN channel_membership_requests cmr
+          ON cmr.channel_id = c.id
+         AND cmr.user_id = $1
+         AND cmr.status = 'pending'
+        LEFT JOIN LATERAL (
+          SELECT COUNT(*) AS pending_request_count
+          FROM channel_membership_requests requests
+          WHERE requests.channel_id = c.id
+            AND requests.status = 'pending'
+        ) pending ON true
+        ORDER BY c.created_at DESC
+      `,
+      [req.user.id]
+    )
+
+    res.json(result.rows.map((channel) => {
+      const isOwner = Number(channel.owner_user_id) === Number(req.user.id)
+      const canManage = Boolean(req.user.is_admin || isOwner)
+      const canAccess = Boolean(
+        req.user.is_admin ||
+        !channel.is_private ||
+        isOwner ||
+        channel.membership_status === 'active'
+      )
+
+      return {
+        ...channel,
+        membership_status: channel.membership_status || null,
+        request_status: channel.request_status || null,
+        can_manage: canManage,
+        can_access: canAccess,
+        pending_request_count: canManage ? channel.pending_request_count : 0,
+      }
+    }))
   } catch (err) {
     console.error('Error fetching channels:', err);
     res.status(500).json({ error: 'Failed to fetch channels' });
@@ -502,34 +631,73 @@ app.get('/api/channels', async (req, res) => {
 });
 
 // Create a new channel
-app.post('/api/channels', authenticate, requireAdmin, async (req, res) => {
+app.post('/api/channels', authenticate, async (req, res) => {
   const { name, description, is_private } = req.body;
   const trimmedName = typeof name === 'string' ? name.trim() : '';
+  const privateChannel = req.user.is_admin ? Boolean(is_private) : true
 
   if (!trimmedName) {
     return res.status(400).json({ error: 'Channel name is required' });
   }
   
   try {
-    const result = await pool.query(
-      'INSERT INTO channels (name, description, is_private) VALUES ($1, $2, $3) RETURNING *',
-      [trimmedName, description || null, Boolean(is_private)]
-    );
-    res.status(201).json(result.rows[0]);
+    await pool.query('BEGIN')
+    const channelResult = await pool.query(
+      'INSERT INTO channels (name, description, is_private, owner_user_id) VALUES ($1, $2, $3, $4) RETURNING *',
+      [trimmedName, description || null, privateChannel, req.user.id]
+    )
+    const channel = channelResult.rows[0]
+
+    if (privateChannel) {
+      await pool.query(
+        `
+          INSERT INTO channel_members (channel_id, user_id, role, status)
+          VALUES ($1, $2, 'owner', 'active')
+          ON CONFLICT (channel_id, user_id) DO UPDATE
+          SET role = 'owner',
+              status = 'active',
+              updated_at = CURRENT_TIMESTAMP
+        `,
+        [channel.id, req.user.id]
+      )
+    }
+
+    await pool.query('COMMIT')
+    res.status(201).json({
+      ...channel,
+      owner_username: req.user.username,
+      membership_role: privateChannel ? 'owner' : null,
+      membership_status: privateChannel ? 'active' : null,
+      request_status: null,
+      can_manage: true,
+      can_access: true,
+      pending_request_count: 0,
+    });
     
     // Notify all clients about the new channel
-    io.emit('channelCreated', result.rows[0]);
+    io.emit('channelCreated', {
+      ...channel,
+      owner_username: req.user.username,
+      membership_role: null,
+      membership_status: null,
+      request_status: null,
+      can_manage: false,
+      can_access: !privateChannel,
+      pending_request_count: 0,
+    });
   } catch (err) {
+    await pool.query('ROLLBACK').catch(() => {})
     console.error('Error creating channel:', err);
     res.status(500).json({ error: 'Failed to create channel' });
   }
 });
 
 // Update a channel
-app.put('/api/channels/:id', authenticate, requireAdmin, async (req, res) => {
+app.put('/api/channels/:id', authenticate, requireChannelManager, async (req, res) => {
   const { id } = req.params;
   const { name, description, is_private } = req.body;
   const trimmedName = typeof name === 'string' ? name.trim() : '';
+  const privateChannel = req.user.is_admin ? Boolean(is_private) : true
 
   if (!trimmedName) {
     return res.status(400).json({ error: 'Channel name is required' });
@@ -538,7 +706,7 @@ app.put('/api/channels/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(
       'UPDATE channels SET name = $1, description = $2, is_private = $3 WHERE id = $4 RETURNING *',
-      [trimmedName, description || null, Boolean(is_private), id]
+      [trimmedName, description || null, privateChannel, id]
     );
     
     if (result.rows.length === 0) {
@@ -556,7 +724,7 @@ app.put('/api/channels/:id', authenticate, requireAdmin, async (req, res) => {
 });
 
 // Delete a channel
-app.delete('/api/channels/:id', authenticate, requireAdmin, async (req, res) => {
+app.delete('/api/channels/:id', authenticate, requireChannelManager, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -576,8 +744,196 @@ app.delete('/api/channels/:id', authenticate, requireAdmin, async (req, res) => 
   }
 });
 
+app.post('/api/channels/:id/membership-requests', authenticate, async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const access = await getChannelAccess(id, req.user)
+
+    if (!access) {
+      return res.status(404).json({ error: 'Channel not found' })
+    }
+
+    if (!access.channel.is_private) {
+      return res.status(400).json({ error: 'Public channels do not need membership' })
+    }
+
+    if (access.canAccess) {
+      return res.status(400).json({ error: 'You are already a member' })
+    }
+
+    const result = await pool.query(
+      `
+        INSERT INTO channel_membership_requests (channel_id, user_id, status)
+        VALUES ($1, $2, 'pending')
+        ON CONFLICT (channel_id, user_id) DO UPDATE
+        SET updated_at = CURRENT_TIMESTAMP,
+            status = 'pending'
+        RETURNING *
+      `,
+      [id, req.user.id]
+    )
+
+    const request = result.rows[0]
+    const payload = {
+      ...request,
+      username: req.user.username,
+      channel_name: access.channel.name,
+    }
+
+    const target = access.channel.owner_user_id
+      ? io.to(`user:${access.channel.owner_user_id}`).to('admins')
+      : io.to('admins')
+
+    target.emit('membershipRequestCreated', payload)
+
+    res.status(201).json(payload)
+  } catch (err) {
+    console.error('Error creating membership request:', err)
+    res.status(500).json({ error: 'Failed to request membership' })
+  }
+})
+
+app.get('/api/channels/:id/members', authenticate, requireChannelManager, async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT cm.id,
+               cm.channel_id,
+               cm.user_id,
+               cm.role,
+               cm.status,
+               cm.created_at,
+               u.username,
+               u.avatar_url
+        FROM channel_members cm
+        JOIN users u ON u.id = cm.user_id
+        WHERE cm.channel_id = $1
+          AND cm.status = 'active'
+        ORDER BY
+          CASE cm.role WHEN 'owner' THEN 0 ELSE 1 END,
+          u.username ASC
+      `,
+      [id]
+    )
+
+    res.json(result.rows)
+  } catch (err) {
+    console.error('Error fetching channel members:', err)
+    res.status(500).json({ error: 'Failed to fetch members' })
+  }
+})
+
+app.delete('/api/channels/:id/members/:userId', authenticate, requireChannelManager, async (req, res) => {
+  const { id, userId } = req.params
+
+  if (Number(userId) === Number(req.channelAccess.channel.owner_user_id)) {
+    return res.status(400).json({ error: 'Owner cannot be removed' })
+  }
+
+  try {
+    await pool.query(
+      'DELETE FROM channel_members WHERE channel_id = $1 AND user_id = $2',
+      [id, userId]
+    )
+
+    io.to(`user:${userId}`).emit('channelMembershipRemoved', { channel_id: Number(id) })
+    res.json({ message: 'Member removed' })
+  } catch (err) {
+    console.error('Error removing channel member:', err)
+    res.status(500).json({ error: 'Failed to remove member' })
+  }
+})
+
+app.get('/api/channels/:id/membership-requests', authenticate, requireChannelManager, async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const result = await pool.query(
+      `
+        SELECT cmr.id,
+               cmr.channel_id,
+               cmr.user_id,
+               cmr.status,
+               cmr.created_at,
+               cmr.updated_at,
+               u.username,
+               u.avatar_url
+        FROM channel_membership_requests cmr
+        JOIN users u ON u.id = cmr.user_id
+        WHERE cmr.channel_id = $1
+          AND cmr.status = 'pending'
+        ORDER BY cmr.created_at ASC
+      `,
+      [id]
+    )
+
+    res.json(result.rows)
+  } catch (err) {
+    console.error('Error fetching membership requests:', err)
+    res.status(500).json({ error: 'Failed to fetch membership requests' })
+  }
+})
+
+app.post('/api/channels/:id/membership-requests/:requestId/:action', authenticate, requireChannelManager, async (req, res) => {
+  const { id, requestId, action } = req.params
+
+  if (!['approve', 'reject'].includes(action)) {
+    return res.status(400).json({ error: 'Unknown membership action' })
+  }
+
+  try {
+    await pool.query('BEGIN')
+    const requestResult = await pool.query(
+      `
+        UPDATE channel_membership_requests
+        SET status = $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+          AND channel_id = $3
+          AND status = 'pending'
+        RETURNING *
+      `,
+      [action === 'approve' ? 'approved' : 'rejected', requestId, id]
+    )
+    const request = requestResult.rows[0]
+
+    if (!request) {
+      await pool.query('ROLLBACK')
+      return res.status(404).json({ error: 'Membership request not found' })
+    }
+
+    if (action === 'approve') {
+      await pool.query(
+        `
+          INSERT INTO channel_members (channel_id, user_id, role, status)
+          VALUES ($1, $2, 'member', 'active')
+          ON CONFLICT (channel_id, user_id) DO UPDATE
+          SET role = CASE WHEN channel_members.role = 'owner' THEN 'owner' ELSE 'member' END,
+              status = 'active',
+              updated_at = CURRENT_TIMESTAMP
+        `,
+        [id, request.user_id]
+      )
+    }
+
+    await pool.query('COMMIT')
+    io.to(`user:${request.user_id}`).emit('membershipRequestUpdated', {
+      channel_id: Number(id),
+      status: action === 'approve' ? 'approved' : 'rejected',
+    })
+    res.json({ message: action === 'approve' ? 'Member approved' : 'Request rejected' })
+  } catch (err) {
+    await pool.query('ROLLBACK').catch(() => {})
+    console.error('Error updating membership request:', err)
+    res.status(500).json({ error: 'Failed to update membership request' })
+  }
+})
+
 // Get messages for a specific channel
-app.get('/api/channels/:id/messages', async (req, res) => {
+app.get('/api/channels/:id/messages', authenticate, requireChannelAccess, async (req, res) => {
   const { id } = req.params;
   const { limit = 50 } = req.query;
   
@@ -654,11 +1010,29 @@ io.on('connection', async (socket) => {
   }
 
   socket.data.user = user
+  socket.join(`user:${user.id}`)
+
+  if (user.is_admin) {
+    socket.join('admins')
+  }
   
   // Join a channel
-  socket.on('joinChannel', (channelId) => {
-    socket.join(String(channelId))
-    console.log(`User ${socket.id} joined channel ${channelId}`)
+  socket.on('joinChannel', async (channelId, callback) => {
+    try {
+      const access = await getChannelAccess(channelId, socket.data.user)
+
+      if (!access || !access.canAccess) {
+        callback?.({ error: 'Membership required' })
+        return
+      }
+
+      socket.join(String(channelId))
+      callback?.({ ok: true })
+      console.log(`User ${socket.id} joined channel ${channelId}`)
+    } catch (err) {
+      console.error('Error joining channel:', err)
+      callback?.({ error: 'Failed to join channel' })
+    }
   })
   
   // Leave a channel
@@ -678,10 +1052,15 @@ io.on('connection', async (socket) => {
     }
     
     try {
-      const channelResult = await pool.query('SELECT id FROM channels WHERE id = $1', [channelId])
+      const access = await getChannelAccess(channelId, socket.data.user)
 
-      if (channelResult.rows.length === 0) {
+      if (!access) {
         callback?.({ error: 'Channel not found' })
+        return
+      }
+
+      if (!access.canAccess) {
+        callback?.({ error: 'Membership required' })
         return
       }
 
@@ -728,6 +1107,7 @@ async function createTables() {
         name VARCHAR(100) UNIQUE NOT NULL,
         description TEXT,
         is_private BOOLEAN DEFAULT FALSE,
+        owner_user_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -756,6 +1136,7 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
+    await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
 
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
 
@@ -779,11 +1160,50 @@ async function createTables() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS channel_members (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        role VARCHAR(20) NOT NULL DEFAULT 'member',
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, user_id)
+      )
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS channel_membership_requests (
+        id SERIAL PRIMARY KEY,
+        channel_id INTEGER REFERENCES channels(id) ON DELETE CASCADE,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(channel_id, user_id)
+      )
+    `);
+
+    await pool.query(`
+      INSERT INTO channel_members (channel_id, user_id, role, status)
+      SELECT c.id, c.owner_user_id, 'owner', 'active'
+      FROM channels c
+      WHERE c.is_private = true
+        AND c.owner_user_id IS NOT NULL
+      ON CONFLICT (channel_id, user_id) DO NOTHING
+    `);
     
     // Create indexes
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON channel_members(channel_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON channel_members(user_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)');
     
     console.log('Database tables created successfully');
   } catch (err) {

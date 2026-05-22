@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Avatar,
+  Badge,
   Box,
   Button,
   Card,
@@ -34,6 +35,7 @@ import {
   DarkMode,
   Edit,
   Forum,
+  Group,
   LightMode,
   Lock,
   Public,
@@ -44,6 +46,7 @@ import {
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
 import ChannelMessageList from './ChannelMessageList'
+import ChannelMembershipDialog from './ChannelMembershipDialog'
 import { requestJson } from './requestJson'
 
 const emptyForm = {
@@ -105,12 +108,14 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const [draftMessage, setDraftMessage] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [channelDialogOpen, setChannelDialogOpen] = useState(false)
+  const [membershipDialogOpen, setMembershipDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [loadingChannels, setLoadingChannels] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sendingMessage, setSendingMessage] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [requestingChannelId, setRequestingChannelId] = useState(null)
   const [notice, setNotice] = useState(null)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -124,10 +129,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     [channels, selectedChannelId],
   )
   const isAdmin = Boolean(authUser?.is_admin)
+  const canUseSelectedChannel = Boolean(selectedChannel?.can_access)
+  const canManageSelectedChannel = Boolean(selectedChannel?.can_manage)
 
   const getAuthHeaders = useCallback(() => {
     return authToken ? { Authorization: `Bearer ${authToken}` } : {}
   }, [authToken])
+  const authHeaders = useMemo(() => getAuthHeaders(), [getAuthHeaders])
 
   const loadChannels = useCallback(async () => {
     setLoadingChannels(true)
@@ -160,6 +168,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       return
     }
 
+    const channel = channels.find((item) => item.id === channelId)
+
+    if (channel && !channel.can_access) {
+      setMessages([])
+      return
+    }
+
     setLoadingMessages(true)
 
     try {
@@ -173,7 +188,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     } finally {
       setLoadingMessages(false)
     }
-  }, [getAuthHeaders])
+  }, [channels, getAuthHeaders])
 
   useEffect(() => {
     const load = Promise.resolve().then(() => loadChannels())
@@ -245,6 +260,34 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           setMessages((current) => current.filter((item) => item.id !== message.id))
         })
 
+        liveSocket.on('channelCreated', () => {
+          loadChannels()
+        })
+
+        liveSocket.on('channelUpdated', () => {
+          loadChannels()
+        })
+
+        liveSocket.on('channelDeleted', () => {
+          loadChannels()
+        })
+
+        liveSocket.on('membershipRequestCreated', (request) => {
+          setNotice(`${request.username} wants to join #${request.channel_name}`)
+          loadChannels()
+        })
+
+        liveSocket.on('membershipRequestUpdated', (request) => {
+          setNotice(request.status === 'approved' ? 'Membership approved' : 'Membership rejected')
+          loadChannels()
+        })
+
+        liveSocket.on('channelMembershipRemoved', () => {
+          setNotice('You were removed from a private channel')
+          setMessages([])
+          loadChannels()
+        })
+
         setSocket(liveSocket)
       })
       .catch((err) => {
@@ -259,7 +302,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       setSocket(null)
       setSocketConnected(false)
     }
-  }, [authToken])
+  }, [authToken, loadChannels])
 
   useEffect(() => {
     const load = Promise.resolve().then(() => loadMessages(selectedChannelId))
@@ -273,12 +316,20 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       return undefined
     }
 
-    socket.emit('joinChannel', selectedChannelId)
+    if (!canUseSelectedChannel) {
+      return undefined
+    }
+
+    socket.emit('joinChannel', selectedChannelId, (response) => {
+      if (response?.error) {
+        setError(response.error)
+      }
+    })
 
     return () => {
       socket.emit('leaveChannel', selectedChannelId)
     }
-  }, [selectedChannelId, socket])
+  }, [canUseSelectedChannel, selectedChannelId, socket])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
@@ -293,7 +344,10 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
 
   function startCreate() {
     setEditingId(null)
-    setForm(emptyForm)
+    setForm({
+      ...emptyForm,
+      is_private: !isAdmin,
+    })
     setChannelDialogOpen(true)
     setNotice(null)
   }
@@ -309,7 +363,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }
 
   function startEdit(channel) {
-    if (!isAdmin) {
+    if (!channel.can_manage) {
       return
     }
 
@@ -327,11 +381,6 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   async function handleSubmit(event) {
     event.preventDefault()
 
-    if (!isAdmin) {
-      setError('Admin access required')
-      return
-    }
-
     if (!form.name.trim()) {
       setError('Channel name is required')
       return
@@ -345,7 +394,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       const payload = {
         name: form.name.trim(),
         description: form.description.trim(),
-        is_private: form.is_private,
+        is_private: isAdmin ? form.is_private : true,
       }
 
       const channel = editingId
@@ -374,8 +423,8 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }
 
   async function handleDelete(channel) {
-    if (!isAdmin) {
-      setError('Admin access required')
+    if (!channel.can_manage) {
+      setError('Channel owner access required')
       return
     }
 
@@ -450,6 +499,25 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       setMessages((current) => current.filter((item) => item.id !== message.id))
     } catch (err) {
       setError(err.message)
+    }
+  }
+
+  async function handleRequestMembership(channel) {
+    setRequestingChannelId(channel.id)
+    setError(null)
+    setNotice(null)
+
+    try {
+      await requestJson(`/api/channels/${channel.id}/membership-requests`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      })
+      setNotice('Request sent')
+      await loadChannels()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setRequestingChannelId(null)
     }
   }
 
@@ -550,11 +618,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            {isAdmin && (
-              <Button variant="contained" startIcon={<Add />} onClick={startCreate}>
-                New channel
-              </Button>
-            )}
+            <Button variant="contained" startIcon={<Add />} onClick={startCreate}>
+              {isAdmin ? 'New channel' : 'New private'}
+            </Button>
             <Tooltip title="Refresh channels">
               <span>
                 <IconButton
@@ -686,12 +752,48 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                               label={channel.is_private ? 'Private' : 'Public'}
                               variant="outlined"
                             />
+                            {channel.request_status === 'pending' && (
+                              <Chip size="small" label="Requested" variant="outlined" />
+                            )}
+                            {channel.can_manage && channel.pending_request_count > 0 && (
+                              <Badge badgeContent={channel.pending_request_count} color="error">
+                                <Group fontSize="small" />
+                              </Badge>
+                            )}
                           </Stack>
                         }
                         secondary={channel.description || 'No description'}
                       />
-                      {isAdmin && (
+                      {!channel.can_access && channel.is_private && !channel.request_status && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          disabled={requestingChannelId === channel.id}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            handleRequestMembership(channel)
+                          }}
+                        >
+                          Request
+                        </Button>
+                      )}
+                      {channel.can_manage && (
                         <Stack direction="row" spacing={0.5}>
+                          <Tooltip title="Members">
+                            <IconButton
+                              edge="end"
+                              size="small"
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setSelectedChannelId(channel.id)
+                                setMembershipDialogOpen(true)
+                              }}
+                            >
+                              <Badge badgeContent={channel.pending_request_count} color="error">
+                                <Group fontSize="small" />
+                              </Badge>
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Edit channel">
                             <IconButton
                               edge="end"
@@ -764,6 +866,26 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                   </Box>
                   {selectedChannel && (
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      {canManageSelectedChannel && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<Group />}
+                          onClick={() => setMembershipDialogOpen(true)}
+                        >
+                          Members
+                        </Button>
+                      )}
+                      {!canUseSelectedChannel && selectedChannel.is_private && !selectedChannel.request_status && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={requestingChannelId === selectedChannel.id}
+                          onClick={() => handleRequestMembership(selectedChannel)}
+                        >
+                          Request access
+                        </Button>
+                      )}
                       <Chip
                         label={socketConnected ? 'Live' : 'Offline'}
                         color={socketConnected ? 'success' : 'default'}
@@ -788,6 +910,10 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                   </Stack>
                 ) : !selectedChannel ? (
                   <Typography color="text.secondary">Select a channel</Typography>
+                ) : !canUseSelectedChannel ? (
+                  <Typography color="text.secondary">
+                    Request access to read this private channel
+                  </Typography>
                 ) : messages.length === 0 ? (
                   <Typography color="text.secondary">No messages in this channel</Typography>
                 ) : (
@@ -800,7 +926,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 )}
                 </Box>
 
-                {selectedChannel && (
+                {selectedChannel && canUseSelectedChannel && (
                   <Box
                     component="form"
                     onSubmit={handleSendMessage}
@@ -840,33 +966,33 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         )}
       </Stack>
 
-      {isAdmin && (
-        <Dialog
-          open={channelDialogOpen}
-          onClose={closeChannelDialog}
-          fullWidth
-          maxWidth="sm"
-        >
-          <DialogTitle>{editingId ? 'Edit Channel' : 'Create Channel'}</DialogTitle>
-          <DialogContent component="form" id="channel-form" onSubmit={handleSubmit}>
-            <Stack spacing={2} sx={{ pt: 1 }}>
-              <TextField
-                label="Name"
-                value={form.name}
-                onChange={(event) => updateForm('name', event.target.value)}
-                size="small"
-                fullWidth
-                required
-              />
-              <TextField
-                label="Description"
-                value={form.description}
-                onChange={(event) => updateForm('description', event.target.value)}
-                size="small"
-                fullWidth
-                multiline
-                minRows={3}
-              />
+      <Dialog
+        open={channelDialogOpen}
+        onClose={closeChannelDialog}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{editingId ? 'Edit Channel' : 'Create Channel'}</DialogTitle>
+        <DialogContent component="form" id="channel-form" onSubmit={handleSubmit}>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              label="Name"
+              value={form.name}
+              onChange={(event) => updateForm('name', event.target.value)}
+              size="small"
+              fullWidth
+              required
+            />
+            <TextField
+              label="Description"
+              value={form.description}
+              onChange={(event) => updateForm('description', event.target.value)}
+              size="small"
+              fullWidth
+              multiline
+              minRows={3}
+            />
+            {isAdmin ? (
               <FormControlLabel
                 control={
                   <Switch
@@ -876,24 +1002,37 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 }
                 label="Private channel"
               />
-            </Stack>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={closeChannelDialog} disabled={saving}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="channel-form"
-              variant="contained"
-              startIcon={<Save />}
-              disabled={saving}
-            >
-              {saving ? 'Saving' : editingId ? 'Save' : 'Create'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
+            ) : (
+              <Alert severity="info">New channels are private</Alert>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeChannelDialog} disabled={saving}>
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            form="channel-form"
+            variant="contained"
+            startIcon={<Save />}
+            disabled={saving}
+          >
+            {saving ? 'Saving' : editingId ? 'Save' : 'Create'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <ChannelMembershipDialog
+        open={membershipDialogOpen}
+        channel={selectedChannel}
+        authUser={authUser}
+        authHeaders={authHeaders}
+        onClose={() => setMembershipDialogOpen(false)}
+        onChanged={loadChannels}
+        onError={setError}
+        onNotice={setNotice}
+      />
     </Container>
   )
 }
