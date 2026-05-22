@@ -421,6 +421,12 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     setNotice(null)
   }
 
+  function focusMessageInput() {
+    window.requestAnimationFrame(() => {
+      messageInputRef.current?.focus()
+    })
+  }
+
   function handleUserUpdated(user) {
     onUserUpdated(user)
     setMessages((current) =>
@@ -449,6 +455,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
 
   async function handleSendMessage(event) {
     event.preventDefault()
+    focusMessageInput()
 
     const message = draftMessage.trim()
 
@@ -497,23 +504,22 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           return [...current, response.message]
         })
         setDraftMessage('')
-        window.requestAnimationFrame(() => {
-          messageInputRef.current?.focus()
-        })
+        focusMessageInput()
       }
     } catch (err) {
       setError(err.message)
     } finally {
       setSendingMessage(false)
+      focusMessageInput()
     }
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 3, md: 5 } }}>
-      <Stack spacing={3}>
+    <Container maxWidth="lg" sx={{ py: { xs: 1.5, md: 2 } }}>
+      <Stack spacing={1.5}>
         <Stack
           direction={{ xs: 'column', md: 'row' }}
-          spacing={3}
+          spacing={1.5}
           sx={{ alignItems: { xs: 'stretch', md: 'center' } }}
         >
           <Box
@@ -521,8 +527,8 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             src="/images/vela.png"
             alt="Vela"
             sx={{
-              width: { xs: '100%', md: 260 },
-              maxHeight: 180,
+              width: { xs: '100%', sm: 180, md: 160 },
+              maxHeight: { xs: 92, md: 72 },
               objectFit: 'cover',
               borderRadius: 2,
             }}
@@ -538,14 +544,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               variant="h3"
               component="h1"
               color="text.primary"
-              sx={{ fontWeight: 900, mb: 1 }}
+              sx={{ fontSize: { xs: 30, md: 34 }, fontWeight: 900, mb: 0 }}
             >
               {isAdmin ? 'Channel Admin' : 'Channels'}
-            </Typography>
-            <Typography color="text.secondary">
-              {isAdmin
-                ? 'Manage public and private chat channels from the server API.'
-                : 'Browse available chat channels from the server API.'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -623,7 +624,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             sx={{
               display: 'grid',
               gridTemplateColumns: { xs: '1fr', md: 'minmax(320px, 0.95fr) minmax(0, 1.35fr)' },
-              gap: 3,
+              gap: 2,
               alignItems: 'start',
             }}
           >
@@ -728,9 +729,16 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             </CardContent>
           </Card>
 
-          <Stack spacing={3}>
-            <Card>
-              <CardContent>
+          <Stack spacing={2}>
+            <Card sx={{ height: { md: 'calc(100vh - 145px)' } }}>
+              <CardContent
+                sx={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  height: '100%',
+                  minHeight: { xs: 420, md: 0 },
+                }}
+              >
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
                   spacing={1}
@@ -773,6 +781,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
 
                 <Divider sx={{ mb: 2 }} />
 
+                <Box sx={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
                 {loadingMessages ? (
                   <Stack sx={{ alignItems: 'center', py: 6 }}>
                     <CircularProgress />
@@ -789,9 +798,20 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                     onDeleteMessage={handleDeleteMessage}
                   />
                 )}
+                </Box>
 
                 {selectedChannel && (
-                  <Box component="form" onSubmit={handleSendMessage} sx={{ mt: 2 }}>
+                  <Box
+                    component="form"
+                    onSubmit={handleSendMessage}
+                    sx={{
+                      mt: 1.5,
+                      pt: 1.5,
+                      borderTop: 1,
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                    }}
+                  >
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                       <TextField
                         inputRef={messageInputRef}
@@ -800,7 +820,6 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                         onChange={(event) => setDraftMessage(event.target.value)}
                         size="small"
                         fullWidth
-                        disabled={sendingMessage}
                       />
                       <Button
                         type="submit"

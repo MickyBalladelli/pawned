@@ -82,7 +82,7 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
   return (
     <Box
       sx={{
-        maxHeight: { xs: 360, md: 460 },
+        height: '100%',
         overflowY: 'auto',
         pr: 0.5,
         mx: -1,
