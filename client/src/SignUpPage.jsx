@@ -154,6 +154,7 @@ function SignUpPage({
                 type="email"
                 value={form.email}
                 onChange={(event) => updateField('email', event.target.value)}
+                size="small"
                 fullWidth
                 required
               />
@@ -166,6 +167,7 @@ function SignUpPage({
                 InputProps={{
                   endAdornment: usernameState.checking ? <CircularProgress size={18} /> : null,
                 }}
+                size="small"
                 fullWidth
                 required
               />

@@ -102,6 +102,7 @@ function LoginPage({
                 onChange={(event) =>
                   setAuthForm((current) => ({ ...current, username: event.target.value }))
                 }
+                size="small"
                 fullWidth
                 required
               />

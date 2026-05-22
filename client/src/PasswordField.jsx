@@ -12,7 +12,12 @@ function PasswordField(props) {
       spacing={1}
       sx={{ alignItems: 'flex-start', width: fullWidth ? '100%' : 'auto' }}
     >
-      <TextField {...textFieldProps} type={visible ? 'text' : 'password'} fullWidth={fullWidth} />
+      <TextField
+        {...textFieldProps}
+        type={visible ? 'text' : 'password'}
+        fullWidth={fullWidth}
+        size={textFieldProps.size || 'small'}
+      />
       <Button
         type="button"
         variant="outlined"

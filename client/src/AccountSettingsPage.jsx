@@ -165,6 +165,7 @@ function AccountSettingsPage({ authToken, user, onBack, onUserUpdated }) {
             type="email"
             value={form.email}
             onChange={(event) => updateField('email', event.target.value)}
+            size="small"
             fullWidth
             required
           />
@@ -174,6 +175,7 @@ function AccountSettingsPage({ authToken, user, onBack, onUserUpdated }) {
               label="Current password"
               value={form.currentPassword}
               onChange={(event) => updateField('currentPassword', event.target.value)}
+              size="small"
               fullWidth
             />
             <Stack spacing={1.5}>

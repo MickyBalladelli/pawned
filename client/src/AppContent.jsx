@@ -703,6 +703,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                         label={`Message #${selectedChannel.name}`}
                         value={draftMessage}
                         onChange={(event) => setDraftMessage(event.target.value)}
+                        size="small"
                         fullWidth
                         multiline
                         maxRows={4}
@@ -741,6 +742,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 label="Name"
                 value={form.name}
                 onChange={(event) => updateForm('name', event.target.value)}
+                size="small"
                 fullWidth
                 required
               />
@@ -748,6 +750,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 label="Description"
                 value={form.description}
                 onChange={(event) => updateForm('description', event.target.value)}
+                size="small"
                 fullWidth
                 multiline
                 minRows={3}
