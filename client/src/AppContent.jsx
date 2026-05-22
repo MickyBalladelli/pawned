@@ -511,7 +511,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 New channel
               </Button>
             )}
-                        <Tooltip title="Refresh channels">
+            <Tooltip title="Refresh channels">
               <span>
                 <IconButton
                   color="primary"
