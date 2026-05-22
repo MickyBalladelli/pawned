@@ -599,7 +599,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 1.5, md: 2 } }}>
+    <Container maxWidth={false} sx={{ px: { xs: 1.5, md: 2 }, py: { xs: 1.5, md: 2 } }}>
       <Stack spacing={1.5}>
         <Stack
           direction={{ xs: 'column', md: 'row' }}
@@ -705,12 +705,12 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           <Box
             sx={{
               display: 'grid',
-              gridTemplateColumns: { xs: '1fr', md: 'minmax(320px, 0.95fr) minmax(0, 1.35fr)' },
+              gridTemplateColumns: { xs: '1fr', md: '420px minmax(0, 1fr)' },
               gap: 2,
               alignItems: 'start',
             }}
           >
-          <Card>
+          <Card sx={{ width: { xs: '100%', md: 420 }, maxWidth: '100%', justifySelf: 'start' }}>
             <CardContent>
               <Stack
                 direction="row"
