@@ -1,0 +1,8 @@
+{
+	"SourceFiles": [
+		"/Users/micky/dev/vela/unreal-client/Source/VelaUnrealClient/VelaUnrealClient.Build.cs",
+		"/Users/micky/dev/vela/unreal-client/Source/VelaUnrealClient/VelaUnrealClient.Target.cs",
+		"/Users/micky/dev/vela/unreal-client/Source/VelaUnrealClient/VelaUnrealClientEditor.Target.cs"
+	],
+	"EngineVersion": "5.5.4"
+}

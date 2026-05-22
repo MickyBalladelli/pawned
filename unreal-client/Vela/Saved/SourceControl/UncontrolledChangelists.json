@@ -1,0 +1,14 @@
+{
+	"version": 1,
+	"changelists": [
+		{
+			"guid": "00000000000000000000000000000000",
+			"description": "Default Uncontrolled Changelist",
+			"files": [
+				"/Users/micky/dev/vela/unreal-client/Vela/Content/StarterContent/Architecture/Wall_Door_400x400.uasset",
+				"/Users/micky/dev/vela/unreal-client/Vela/Content/__ExternalActors__/FirstPerson/Maps/FirstPersonMap/E/MX/R1GV431P5FDO08OFULRA01.uasset",
+				"/Users/micky/dev/vela/unreal-client/Vela/Content/FirstPerson/Maps/FirstPersonMap.umap"
+			]
+		}
+	]
+}

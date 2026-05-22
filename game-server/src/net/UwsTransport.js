@@ -58,6 +58,11 @@ class UwsTransport {
         )
       },
       open: (socket) => {
+        console.log('Game client connected:', {
+          socketId: socket.id,
+          userId: socket.user?.id,
+          username: socket.user?.username,
+        })
         this.world.addConnection(socket, socket.user)
       },
       message: (socket, rawMessage) => {
@@ -78,10 +83,19 @@ class UwsTransport {
             socket.send(encodeMessage({ type: MessageType.PONG, at: Date.now() }))
           }
         } catch (err) {
+          console.error('Game message failed:', {
+            socketId: socket.id,
+            error: err.message,
+            rawMessage: Buffer.from(rawMessage).toString('utf8'),
+          })
           socket.send(encodeMessage({ type: MessageType.ERROR, error: err.message }))
         }
       },
       close: (socket) => {
+        console.log('Game client disconnected:', {
+          socketId: socket.id,
+          userId: socket.user?.id,
+        })
         this.world.removeConnection(socket)
       },
     })

@@ -30,6 +30,8 @@ void AVelaHeroCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    UE_LOG(LogTemp, Display, TEXT("Vela hero spawned"));
+
     if (UVelaGameInstance* VelaGameInstance = GetGameInstance<UVelaGameInstance>())
     {
         VelaGameInstance->ConnectToGameServer();

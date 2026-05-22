@@ -13,6 +13,9 @@ void UVelaGameInstance::Init()
     {
         FModuleManager::Get().LoadModule("WebSockets");
     }
+
+    UE_LOG(LogTemp, Display, TEXT("Vela game instance ready"));
+    ConnectToGameServer();
 }
 
 void UVelaGameInstance::Shutdown()
@@ -28,11 +31,14 @@ void UVelaGameInstance::ConnectToGameServer()
         return;
     }
 
-    Socket = FWebSocketsModule::Get().CreateWebSocket(GetServerUrl());
+    const FString ServerUrl = GetServerUrl();
+    UE_LOG(LogTemp, Display, TEXT("Connecting to Vela game server: %s"), *ServerUrl);
+
+    Socket = FWebSocketsModule::Get().CreateWebSocket(ServerUrl);
 
     Socket->OnConnected().AddLambda([this]()
     {
-        UE_LOG(LogTemp, Log, TEXT("Connected to Vela game server"));
+        UE_LOG(LogTemp, Display, TEXT("Connected to Vela game server"));
         OnConnectionStateChanged.Broadcast(TEXT("Connected"));
     });
 
