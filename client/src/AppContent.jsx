@@ -19,6 +19,8 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  Menu,
+  MenuItem,
   Paper,
   Stack,
   Switch,
@@ -110,6 +112,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
   const [notice, setNotice] = useState(null)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [accountMenuAnchor, setAccountMenuAnchor] = useState(null)
   const selectedChannelIdRef = useRef(null)
   const messagesEndRef = useRef(null)
 
@@ -393,7 +396,15 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
   }
 
   function handleLogout() {
+    setAccountMenuAnchor(null)
     onLogout()
+    setNotice(null)
+  }
+
+  function handleShowSettings() {
+    setAccountMenuAnchor(null)
+    setShowSettings(true)
+    setError(null)
     setNotice(null)
   }
 
@@ -500,27 +511,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 New channel
               </Button>
             )}
-            <Button
-              variant={showSettings ? 'contained' : 'outlined'}
-              startIcon={<Settings />}
-              onClick={() => {
-                setShowSettings((current) => !current)
-                setError(null)
-                setNotice(null)
-              }}
-            >
-              Settings
-            </Button>
-            <Avatar
-              src={authUser.avatar_url || undefined}
-              sx={{ width: 36, height: 36, fontSize: 15, fontWeight: 800, bgcolor: 'primary.main' }}
-            >
-              {getInitial(authUser.username)}
-            </Avatar>
-            <Button variant="outlined" onClick={handleLogout}>
-              Sign out
-            </Button>
-            <Tooltip title="Refresh channels">
+                        <Tooltip title="Refresh channels">
               <span>
                 <IconButton
                   color="primary"
@@ -532,6 +523,32 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 </IconButton>
               </span>
             </Tooltip>
+            <Tooltip title="Account">
+              <IconButton
+                onClick={(event) => setAccountMenuAnchor(event.currentTarget)}
+                sx={{ p: 0.25 }}
+              >
+                <Avatar
+                  src={authUser.avatar_url || undefined}
+                  sx={{ width: 36, height: 36, fontSize: 15, fontWeight: 800, bgcolor: 'primary.main' }}
+                >
+                  {getInitial(authUser.username)}
+                </Avatar>
+              </IconButton>
+            </Tooltip>
+            <Menu
+              anchorEl={accountMenuAnchor}
+              open={Boolean(accountMenuAnchor)}
+              onClose={() => setAccountMenuAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <MenuItem onClick={handleShowSettings}>
+                <Settings fontSize="small" sx={{ mr: 1 }} />
+                Settings
+              </MenuItem>
+              <MenuItem onClick={handleLogout}>Sign out</MenuItem>
+            </Menu>
           </Stack>
         </Stack>
 
