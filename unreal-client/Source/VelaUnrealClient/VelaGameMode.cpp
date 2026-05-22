@@ -3,7 +3,6 @@
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMeshActor.h"
 #include "Engine/World.h"
-#include "UObject/ConstructorHelpers.h"
 #include "VelaHeroCharacter.h"
 
 AVelaGameMode::AVelaGameMode()
@@ -21,8 +20,8 @@ void AVelaGameMode::BeginPlay()
         return;
     }
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> FloorAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
-    if (!FloorAsset.Succeeded())
+    UStaticMesh* FloorMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!FloorMesh)
     {
         return;
     }
@@ -34,6 +33,6 @@ void AVelaGameMode::BeginPlay()
     }
 
     Floor->SetActorLabel(TEXT("VelaDebugFloor"));
-    Floor->GetStaticMeshComponent()->SetStaticMesh(FloorAsset.Object);
+    Floor->GetStaticMeshComponent()->SetStaticMesh(FloorMesh);
     Floor->GetStaticMeshComponent()->SetRelativeScale3D(FVector(20.0f, 20.0f, 0.1f));
 }

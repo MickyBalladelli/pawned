@@ -25,7 +25,7 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     BodyMesh->SetRelativeScale3D(FVector(0.75f, 0.75f, 1.85f));
     BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyAsset(TEXT("/Engine/BasicShapes/Capsule.Capsule"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyAsset(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (BodyAsset.Succeeded())
     {
         BodyMesh->SetStaticMesh(BodyAsset.Object);
