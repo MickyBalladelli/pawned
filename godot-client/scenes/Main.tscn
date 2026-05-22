@@ -1,7 +1,7 @@
-[gd_scene load_steps=13 format=3 uid="uid://vela_main"]
+[gd_scene load_steps=13 format=3 uid="uid://m8kga4hqpbki"]
 
-[ext_resource type="Script" path="res://scripts/Main.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/Player.gd" id="2_player"]
+[ext_resource type="Script" uid="uid://jjxtne70uedt" path="res://scripts/Main.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://88535m60gg5e" path="res://scripts/Player.gd" id="2_player"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -14,40 +14,40 @@ ambient_light_energy = 0.6
 albedo_color = Color(0.12, 0.2, 0.16, 1)
 roughness = 0.85
 
-[sub_resource type="StandardMaterial3D" id="Material_body"]
-albedo_color = Color(0.18, 0.55, 0.95, 1)
-roughness = 0.55
-
-[sub_resource type="StandardMaterial3D" id="Material_skin"]
-albedo_color = Color(0.86, 0.7, 0.56, 1)
-roughness = 0.5
-
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
-size = Vector2(60, 60)
 material = SubResource("Material_ground")
+size = Vector2(60, 60)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_player"]
 radius = 0.42
 height = 1.8
 
+[sub_resource type="StandardMaterial3D" id="Material_body"]
+albedo_color = Color(0.18, 0.55, 0.95, 1)
+roughness = 0.55
+
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
+material = SubResource("Material_body")
 radius = 0.38
 height = 1.25
-material = SubResource("Material_body")
+
+[sub_resource type="StandardMaterial3D" id="Material_skin"]
+albedo_color = Color(0.86, 0.7, 0.56, 1)
+roughness = 0.5
 
 [sub_resource type="SphereMesh" id="SphereMesh_head"]
+material = SubResource("Material_skin")
 radius = 0.28
 height = 0.56
-material = SubResource("Material_skin")
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_limb"]
+material = SubResource("Material_skin")
 radius = 0.09
 height = 0.8
-material = SubResource("Material_skin")
 
 [sub_resource type="BoxMesh" id="BoxMesh_marker"]
-size = Vector3(0.08, 0.08, 0.5)
 material = SubResource("Material_skin")
+size = Vector3(0.08, 0.08, 0.5)
 
 [node name="Main" type="Node3D"]
 script = ExtResource("1_main")
@@ -78,7 +78,6 @@ script = ExtResource("2_player")
 shape = SubResource("CapsuleShape_player")
 
 [node name="Body" type="MeshInstance3D" parent="Player"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0, 0)
 mesh = SubResource("CapsuleMesh_body")
 
 [node name="Head" type="MeshInstance3D" parent="Player"]

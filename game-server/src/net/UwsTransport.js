@@ -65,6 +65,11 @@ class UwsTransport {
           const message = parseMessage(Buffer.from(rawMessage))
 
           if (message.type === MessageType.INPUT) {
+            console.log('Game input received:', {
+              socketId: socket.id,
+              userId: socket.user?.id,
+              input: message.input,
+            })
             this.world.handleInput(socket, message.input)
             return
           }

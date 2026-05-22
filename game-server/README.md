@@ -49,3 +49,4 @@ Server sends:
 - Keep chat server separate
 - Keep database writes batched and coarse; do not persist every tick
 - Move CPU-heavy AI/pathfinding to worker threads or dedicated zone workers
+
