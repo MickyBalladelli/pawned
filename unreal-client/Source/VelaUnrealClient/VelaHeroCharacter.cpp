@@ -6,6 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Engine/SkeletalMesh.h"
 #include "UObject/ConstructorHelpers.h"
 #include "VelaGameInstance.h"
 
@@ -19,11 +20,23 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
     bUseControllerRotationYaw = false;
 
+    bool bHasHumanoidMesh = false;
+    static ConstructorHelpers::FObjectFinder<USkeletalMesh> HumanoidAsset(TEXT("/Game/Character/Mesh/SK_Mannequin.SK_Mannequin"));
+    if (HumanoidAsset.Succeeded())
+    {
+        GetMesh()->SetSkeletalMesh(HumanoidAsset.Object);
+        GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
+        GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
+        GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        bHasHumanoidMesh = true;
+    }
+
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
     BodyMesh->SetupAttachment(RootComponent);
     BodyMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
     BodyMesh->SetRelativeScale3D(FVector(0.75f, 0.75f, 1.85f));
     BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    BodyMesh->SetHiddenInGame(bHasHumanoidMesh);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyAsset(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
     if (BodyAsset.Succeeded())
@@ -36,6 +49,7 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     HeadMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));
     HeadMesh->SetRelativeScale3D(FVector(0.55f, 0.55f, 0.55f));
     HeadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    HeadMesh->SetHiddenInGame(bHasHumanoidMesh);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> HeadAsset(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
     if (HeadAsset.Succeeded())
@@ -49,6 +63,7 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     DirectionMesh->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
     DirectionMesh->SetRelativeScale3D(FVector(0.35f, 0.35f, 0.55f));
     DirectionMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    DirectionMesh->SetHiddenInGame(bHasHumanoidMesh);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> DirectionAsset(TEXT("/Engine/BasicShapes/Cone.Cone"));
     if (DirectionAsset.Succeeded())
@@ -82,10 +97,6 @@ void AVelaHeroCharacter::BeginPlay()
 
     UE_LOG(LogTemp, Display, TEXT("Vela hero spawned"));
 
-    if (UVelaGameInstance* VelaGameInstance = GetGameInstance<UVelaGameInstance>())
-    {
-        VelaGameInstance->ConnectToGameServer();
-    }
 }
 
 void AVelaHeroCharacter::Tick(float DeltaSeconds)

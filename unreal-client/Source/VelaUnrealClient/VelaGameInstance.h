@@ -32,6 +32,7 @@ public:
     bool IsConnected() const;
 
 private:
+    void BroadcastConnectionState(const FString& State);
     FString GetServerUrl() const;
     void SendJson(const TSharedRef<FJsonObject>& Payload);
 

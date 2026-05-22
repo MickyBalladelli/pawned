@@ -1,5 +1,6 @@
 #include "VelaGameInstance.h"
 
+#include "Async/Async.h"
 #include "Json.h"
 #include "JsonUtilities.h"
 #include "Modules/ModuleManager.h"
@@ -39,19 +40,19 @@ void UVelaGameInstance::ConnectToGameServer()
     Socket->OnConnected().AddLambda([this]()
     {
         UE_LOG(LogTemp, Display, TEXT("Connected to Vela game server"));
-        OnConnectionStateChanged.Broadcast(TEXT("Connected"));
+        BroadcastConnectionState(TEXT("Connected"));
     });
 
     Socket->OnConnectionError().AddLambda([this](const FString& Error)
     {
         UE_LOG(LogTemp, Warning, TEXT("Vela game server connection failed: %s"), *Error);
-        OnConnectionStateChanged.Broadcast(TEXT("Offline"));
+        BroadcastConnectionState(TEXT("Offline"));
     });
 
     Socket->OnClosed().AddLambda([this](int32 StatusCode, const FString& Reason, bool bWasClean)
     {
         UE_LOG(LogTemp, Log, TEXT("Vela game server closed: %d %s clean=%s"), StatusCode, *Reason, bWasClean ? TEXT("true") : TEXT("false"));
-        OnConnectionStateChanged.Broadcast(TEXT("Disconnected"));
+        BroadcastConnectionState(TEXT("Disconnected"));
     });
 
     Socket->OnMessage().AddLambda([](const FString& Message)
@@ -60,7 +61,7 @@ void UVelaGameInstance::ConnectToGameServer()
     });
 
     Socket->Connect();
-    OnConnectionStateChanged.Broadcast(TEXT("Connecting"));
+    BroadcastConnectionState(TEXT("Connecting"));
 }
 
 void UVelaGameInstance::DisconnectFromGameServer()
@@ -114,6 +115,24 @@ FString UVelaGameInstance::GetServerUrl() const
     }
 
     return Url;
+}
+
+void UVelaGameInstance::BroadcastConnectionState(const FString& State)
+{
+    if (IsInGameThread())
+    {
+        OnConnectionStateChanged.Broadcast(State);
+        return;
+    }
+
+    TWeakObjectPtr<UVelaGameInstance> WeakThis(this);
+    AsyncTask(ENamedThreads::GameThread, [WeakThis, State]()
+    {
+        if (UVelaGameInstance* GameInstance = WeakThis.Get())
+        {
+            GameInstance->OnConnectionStateChanged.Broadcast(State);
+        }
+    });
 }
 
 void UVelaGameInstance::SendJson(const TSharedRef<FJsonObject>& Payload)
