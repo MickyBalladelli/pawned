@@ -639,17 +639,19 @@ app.post('/api/channels', authenticate, async (req, res) => {
   if (!trimmedName) {
     return res.status(400).json({ error: 'Channel name is required' });
   }
-  
+
+  const client = await pool.connect()
+
   try {
-    await pool.query('BEGIN')
-    const channelResult = await pool.query(
+    await client.query('BEGIN')
+    const channelResult = await client.query(
       'INSERT INTO channels (name, description, is_private, owner_user_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [trimmedName, description || null, privateChannel, req.user.id]
     )
     const channel = channelResult.rows[0]
 
     if (privateChannel) {
-      await pool.query(
+      await client.query(
         `
           INSERT INTO channel_members (channel_id, user_id, role, status)
           VALUES ($1, $2, 'owner', 'active')
@@ -662,7 +664,7 @@ app.post('/api/channels', authenticate, async (req, res) => {
       )
     }
 
-    await pool.query('COMMIT')
+    await client.query('COMMIT')
     res.status(201).json({
       ...channel,
       owner_username: req.user.username,
@@ -686,9 +688,11 @@ app.post('/api/channels', authenticate, async (req, res) => {
       pending_request_count: 0,
     });
   } catch (err) {
-    await pool.query('ROLLBACK').catch(() => {})
+    await client.query('ROLLBACK').catch(() => {})
     console.error('Error creating channel:', err);
     res.status(500).json({ error: 'Failed to create channel' });
+  } finally {
+    client.release()
   }
 });
 
@@ -884,9 +888,11 @@ app.post('/api/channels/:id/membership-requests/:requestId/:action', authenticat
     return res.status(400).json({ error: 'Unknown membership action' })
   }
 
+  const client = await pool.connect()
+
   try {
-    await pool.query('BEGIN')
-    const requestResult = await pool.query(
+    await client.query('BEGIN')
+    const requestResult = await client.query(
       `
         UPDATE channel_membership_requests
         SET status = $1,
@@ -901,12 +907,12 @@ app.post('/api/channels/:id/membership-requests/:requestId/:action', authenticat
     const request = requestResult.rows[0]
 
     if (!request) {
-      await pool.query('ROLLBACK')
+      await client.query('ROLLBACK')
       return res.status(404).json({ error: 'Membership request not found' })
     }
 
     if (action === 'approve') {
-      await pool.query(
+      await client.query(
         `
           INSERT INTO channel_members (channel_id, user_id, role, status)
           VALUES ($1, $2, 'member', 'active')
@@ -919,16 +925,18 @@ app.post('/api/channels/:id/membership-requests/:requestId/:action', authenticat
       )
     }
 
-    await pool.query('COMMIT')
+    await client.query('COMMIT')
     io.to(`user:${request.user_id}`).emit('membershipRequestUpdated', {
       channel_id: Number(id),
       status: action === 'approve' ? 'approved' : 'rejected',
     })
     res.json({ message: action === 'approve' ? 'Member approved' : 'Request rejected' })
   } catch (err) {
-    await pool.query('ROLLBACK').catch(() => {})
+    await client.query('ROLLBACK').catch(() => {})
     console.error('Error updating membership request:', err)
     res.status(500).json({ error: 'Failed to update membership request' })
+  } finally {
+    client.release()
   }
 })
 

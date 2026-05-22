@@ -973,54 +973,55 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         maxWidth="sm"
       >
         <DialogTitle>{editingId ? 'Edit Channel' : 'Create Channel'}</DialogTitle>
-        <DialogContent component="form" id="channel-form" onSubmit={handleSubmit}>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <TextField
-              label="Name"
-              value={form.name}
-              onChange={(event) => updateForm('name', event.target.value)}
-              size="small"
-              fullWidth
-              required
-            />
-            <TextField
-              label="Description"
-              value={form.description}
-              onChange={(event) => updateForm('description', event.target.value)}
-              size="small"
-              fullWidth
-              multiline
-              minRows={3}
-            />
-            {isAdmin ? (
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.is_private}
-                    onChange={(event) => updateForm('is_private', event.target.checked)}
-                  />
-                }
-                label="Private channel"
+        <Box component="form" id="channel-form" onSubmit={handleSubmit}>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              <TextField
+                label="Name"
+                value={form.name}
+                onChange={(event) => updateForm('name', event.target.value)}
+                size="small"
+                fullWidth
+                required
               />
-            ) : (
-              <Alert severity="info">New channels are private</Alert>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeChannelDialog} disabled={saving}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="channel-form"
-            variant="contained"
-            startIcon={<Save />}
-            disabled={saving}
-          >
-            {saving ? 'Saving' : editingId ? 'Save' : 'Create'}
-          </Button>
-        </DialogActions>
+              <TextField
+                label="Description"
+                value={form.description}
+                onChange={(event) => updateForm('description', event.target.value)}
+                size="small"
+                fullWidth
+                multiline
+                minRows={3}
+              />
+              {isAdmin ? (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={form.is_private}
+                      onChange={(event) => updateForm('is_private', event.target.checked)}
+                    />
+                  }
+                  label="Private channel"
+                />
+              ) : (
+                <Alert severity="info">New channels are private</Alert>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={closeChannelDialog} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<Save />}
+              disabled={saving}
+            >
+              {saving ? 'Saving' : editingId ? 'Save' : 'Create'}
+            </Button>
+          </DialogActions>
+        </Box>
       </Dialog>
 
       <ChannelMembershipDialog
