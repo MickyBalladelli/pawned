@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.5",
+	"EngineAssociation": "5.7",
 	"Category": "Games",
 	"Description": "Unreal client for the Vela MMO universe",
 	"Modules": [
@@ -9,11 +9,11 @@
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
 		}
-  ],
-  "Plugins": [
-    {
-      "Name": "EnhancedInput",
-      "Enabled": true
-    }
+	],
+	"Plugins": [
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		}
 	]
 }

@@ -141,3 +141,13 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Unreal generated files
+**/Binaries/
+**/DerivedDataCache/
+**/Intermediate/
+**/Saved/
+*.xcworkspace/
+
+# Accidental local Unreal template project
+unreal-client/Vela/

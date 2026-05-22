@@ -2,8 +2,10 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "VelaGameInstance.h"
 
 AVelaHeroCharacter::AVelaHeroCharacter()
@@ -13,13 +15,29 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     GetCapsuleComponent()->InitCapsuleSize(42.0f, 96.0f);
     GetCharacterMovement()->MaxWalkSpeed = 520.0f;
     GetCharacterMovement()->bOrientRotationToMovement = true;
+    GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
     bUseControllerRotationYaw = false;
+
+    BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
+    BodyMesh->SetupAttachment(RootComponent);
+    BodyMesh->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
+    BodyMesh->SetRelativeScale3D(FVector(0.75f, 0.75f, 1.85f));
+    BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyAsset(TEXT("/Engine/BasicShapes/Capsule.Capsule"));
+    if (BodyAsset.Succeeded())
+    {
+        BodyMesh->SetStaticMesh(BodyAsset.Object);
+    }
 
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
     SpringArm->SetupAttachment(RootComponent);
-    SpringArm->TargetArmLength = 420.0f;
-    SpringArm->SetRelativeRotation(FRotator(-35.0f, 0.0f, 0.0f));
+    SpringArm->TargetArmLength = 360.0f;
+    SpringArm->SocketOffset = FVector(0.0f, 0.0f, 75.0f);
+    SpringArm->SetRelativeRotation(FRotator(-18.0f, 0.0f, 0.0f));
     SpringArm->bUsePawnControlRotation = true;
+    SpringArm->bEnableCameraLag = true;
+    SpringArm->CameraLagSpeed = 12.0f;
 
     Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
     Camera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);

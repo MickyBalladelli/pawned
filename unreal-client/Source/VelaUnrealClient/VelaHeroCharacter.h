@@ -29,6 +29,9 @@ private:
     UPROPERTY(VisibleAnywhere)
     class UCameraComponent* Camera;
 
+    UPROPERTY(VisibleAnywhere)
+    class UStaticMeshComponent* BodyMesh;
+
     float ForwardInput = 0.0f;
     float RightInput = 0.0f;
     float SendAccumulator = 0.0f;
