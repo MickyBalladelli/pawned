@@ -2,6 +2,7 @@
 
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -29,6 +30,37 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     {
         BodyMesh->SetStaticMesh(BodyAsset.Object);
     }
+
+    HeadMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeadMesh"));
+    HeadMesh->SetupAttachment(RootComponent);
+    HeadMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 70.0f));
+    HeadMesh->SetRelativeScale3D(FVector(0.55f, 0.55f, 0.55f));
+    HeadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> HeadAsset(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+    if (HeadAsset.Succeeded())
+    {
+        HeadMesh->SetStaticMesh(HeadAsset.Object);
+    }
+
+    DirectionMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DirectionMesh"));
+    DirectionMesh->SetupAttachment(RootComponent);
+    DirectionMesh->SetRelativeLocation(FVector(55.0f, 0.0f, 10.0f));
+    DirectionMesh->SetRelativeRotation(FRotator(0.0f, 90.0f, 0.0f));
+    DirectionMesh->SetRelativeScale3D(FVector(0.35f, 0.35f, 0.55f));
+    DirectionMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> DirectionAsset(TEXT("/Engine/BasicShapes/Cone.Cone"));
+    if (DirectionAsset.Succeeded())
+    {
+        DirectionMesh->SetStaticMesh(DirectionAsset.Object);
+    }
+
+    HeroLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("HeroLight"));
+    HeroLight->SetupAttachment(RootComponent);
+    HeroLight->SetRelativeLocation(FVector(-80.0f, 0.0f, 120.0f));
+    HeroLight->Intensity = 2500.0f;
+    HeroLight->AttenuationRadius = 500.0f;
 
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
     SpringArm->SetupAttachment(RootComponent);

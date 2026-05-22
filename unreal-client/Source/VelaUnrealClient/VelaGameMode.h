@@ -11,4 +11,7 @@ class VELAUNREALCLIENT_API AVelaGameMode : public AGameModeBase
 
 public:
     AVelaGameMode();
+
+protected:
+    virtual void BeginPlay() override;
 };

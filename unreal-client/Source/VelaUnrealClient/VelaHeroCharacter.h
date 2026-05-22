@@ -32,6 +32,15 @@ private:
     UPROPERTY(VisibleAnywhere)
     class UStaticMeshComponent* BodyMesh;
 
+    UPROPERTY(VisibleAnywhere)
+    class UStaticMeshComponent* HeadMesh;
+
+    UPROPERTY(VisibleAnywhere)
+    class UStaticMeshComponent* DirectionMesh;
+
+    UPROPERTY(VisibleAnywhere)
+    class UPointLightComponent* HeroLight;
+
     float ForwardInput = 0.0f;
     float RightInput = 0.0f;
     float SendAccumulator = 0.0f;
