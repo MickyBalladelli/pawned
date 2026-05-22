@@ -31,8 +31,10 @@ import {
 import {
   Add,
   Delete,
+  DarkMode,
   Edit,
   Forum,
+  LightMode,
   Lock,
   Public,
   Refresh,
@@ -94,7 +96,7 @@ function getInitial(username) {
   return username?.trim().charAt(0).toUpperCase() || '?'
 }
 
-function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
+function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, onUserUpdated }) {
   const [channels, setChannels] = useState([])
   const [selectedChannelId, setSelectedChannelId] = useState(null)
   const [messages, setMessages] = useState([])
@@ -115,6 +117,7 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null)
   const selectedChannelIdRef = useRef(null)
   const messagesEndRef = useRef(null)
+  const messageInputRef = useRef(null)
 
   const selectedChannel = useMemo(
     () => channels.find((channel) => channel.id === selectedChannelId),
@@ -486,7 +489,17 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
       })
 
       if (response?.message) {
+        setMessages((current) => {
+          if (current.some((item) => item.id === response.message.id)) {
+            return current
+          }
+
+          return [...current, response.message]
+        })
         setDraftMessage('')
+        window.requestAnimationFrame(() => {
+          messageInputRef.current?.focus()
+        })
       }
     } catch (err) {
       setError(err.message)
@@ -521,7 +534,12 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 Chat operations
               </Typography>
             </Stack>
-            <Typography variant="h3" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
+            <Typography
+              variant="h3"
+              component="h1"
+              color="text.primary"
+              sx={{ fontWeight: 900, mb: 1 }}
+            >
               {isAdmin ? 'Channel Admin' : 'Channels'}
             </Typography>
             <Typography color="text.secondary">
@@ -547,6 +565,11 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                   <Refresh />
                 </IconButton>
               </span>
+            </Tooltip>
+            <Tooltip title={themeMode === 'dark' ? 'Light theme' : 'Dark theme'}>
+              <IconButton color="primary" onClick={onToggleTheme}>
+                {themeMode === 'dark' ? <LightMode /> : <DarkMode />}
+              </IconButton>
             </Tooltip>
             <Tooltip title="Account">
               <IconButton
@@ -610,7 +633,11 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 direction="row"
                 sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}
               >
-                <Typography variant="h5" component="h2">
+                <Typography
+                  variant="h5"
+                  component="h2"
+                  sx={{ color: themeMode === 'dark' ? 'text.primary' : '#05070a', fontWeight: 900 }}
+                >
                   Channels
                 </Typography>
               </Stack>
@@ -630,12 +657,28 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                       key={channel.id}
                       selected={channel.id === selectedChannelId}
                       onClick={() => setSelectedChannelId(channel.id)}
-                      sx={{ borderRadius: 1, mb: 0.5 }}
+                      sx={{
+                        borderRadius: 1,
+                        mb: 0.5,
+                        '&.Mui-selected': {
+                          bgcolor: themeMode === 'dark' ? 'primary.main' : '#d7ebff',
+                          color: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
+                        },
+                        '&.Mui-selected .MuiTypography-root': {
+                          color: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
+                        },
+                        '&.Mui-selected .MuiChip-root': {
+                          color: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
+                          borderColor: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
+                        },
+                      }}
                     >
                       <ListItemText
                         primary={
                           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                            <Typography fontWeight={700}>#{channel.name}</Typography>
+                            <Typography sx={{ color: themeMode === 'dark' ? 'text.primary' : '#05070a', fontWeight: 900 }}>
+                              #{channel.name}
+                            </Typography>
                             <Chip
                               size="small"
                               icon={channel.is_private ? <Lock /> : <Public />}
@@ -698,7 +741,11 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                   }}
                 >
                   <Box>
-                    <Typography variant="h5" component="h2">
+                    <Typography
+                      variant="h5"
+                      component="h2"
+                      sx={{ color: themeMode === 'dark' ? 'text.primary' : '#05070a', fontWeight: 900 }}
+                    >
                       {selectedChannel ? `#${selectedChannel.name}` : 'Messages'}
                     </Typography>
                     {selectedChannel && (
@@ -747,13 +794,12 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                   <Box component="form" onSubmit={handleSendMessage} sx={{ mt: 2 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                       <TextField
+                        inputRef={messageInputRef}
                         label={`Message #${selectedChannel.name}`}
                         value={draftMessage}
                         onChange={(event) => setDraftMessage(event.target.value)}
                         size="small"
                         fullWidth
-                        multiline
-                        maxRows={4}
                         disabled={sendingMessage}
                       />
                       <Button

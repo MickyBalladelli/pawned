@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { CssBaseline } from '@mui/material'
+import { ThemeProvider, createTheme } from '@mui/material/styles'
 import AppContent from './AppContent'
 import LoadingPage from './LoadingPage'
 import LoginPage from './LoginPage'
@@ -8,6 +10,7 @@ import { requestJson } from './requestJson'
 import './App.css'
 
 const authTokenKey = 'velaAuthToken'
+const themeModeKey = 'velaThemeMode'
 
 function App() {
   const [authToken, setAuthToken] = useState(() => localStorage.getItem(authTokenKey))
@@ -25,6 +28,38 @@ function App() {
   const [resendingVerification, setResendingVerification] = useState(false)
   const [resendVerificationMessage, setResendVerificationMessage] = useState(null)
   const [authVerificationLink, setAuthVerificationLink] = useState(null)
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem(themeModeKey) || 'light')
+
+  const theme = useMemo(() => createTheme({
+    palette: {
+      mode: themeMode,
+      primary: {
+        main: themeMode === 'dark' ? '#8bd3ff' : '#005c99',
+      },
+      secondary: {
+        main: themeMode === 'dark' ? '#ffcf70' : '#8a5a00',
+      },
+      background: {
+        default: themeMode === 'dark' ? '#101418' : '#f7f9fb',
+        paper: themeMode === 'dark' ? '#18212a' : '#ffffff',
+      },
+      text: {
+        primary: themeMode === 'dark' ? '#f4f7fb' : '#101820',
+        secondary: themeMode === 'dark' ? '#b7c2ce' : '#4a5563',
+      },
+    },
+    shape: {
+      borderRadius: 8,
+    },
+  }), [themeMode])
+
+  function toggleThemeMode() {
+    setThemeMode((current) => {
+      const next = current === 'dark' ? 'light' : 'dark'
+      localStorage.setItem(themeModeKey, next)
+      return next
+    })
+  }
 
   function clearAuth() {
     localStorage.removeItem(authTokenKey)
@@ -151,51 +186,72 @@ function App() {
   }, [authToken])
 
   if (loadingAuth) {
-    return <LoadingPage />
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LoadingPage />
+      </ThemeProvider>
+    )
   }
 
   if (!authUser) {
     if (authView === 'verify') {
-      return <VerifyEmailPage onBackToLogin={() => setAuthView('login')} />
+      return (
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <VerifyEmailPage onBackToLogin={() => setAuthView('login')} />
+        </ThemeProvider>
+      )
     }
 
     if (authView === 'signup') {
       return (
-        <SignUpPage
-          error={signupError}
-          result={signupResult}
-          resendingVerification={resendingVerification}
-          signingUp={signingUp}
-          onBackToLogin={() => setAuthView('login')}
-          onClearError={() => setSignupError(null)}
-          onResendVerification={handleResendVerification}
-          onSignUp={handleSignUp}
-        />
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <SignUpPage
+            error={signupError}
+            result={signupResult}
+            resendingVerification={resendingVerification}
+            signingUp={signingUp}
+            onBackToLogin={() => setAuthView('login')}
+            onClearError={() => setSignupError(null)}
+            onResendVerification={handleResendVerification}
+            onSignUp={handleSignUp}
+          />
+        </ThemeProvider>
       )
     }
 
     return (
-      <LoginPage
-        authenticating={authenticating}
-        error={authError}
-        verificationLink={authVerificationLink}
-        resendMessage={resendVerificationMessage}
-        resendingVerification={resendingVerification}
-        onClearError={() => setAuthError(null)}
-        onLogin={handleLogin}
-        onResendVerification={(identifier) => handleResendVerification(identifier, true)}
-        onShowSignUp={() => setAuthView('signup')}
-      />
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <LoginPage
+          authenticating={authenticating}
+          error={authError}
+          verificationLink={authVerificationLink}
+          resendMessage={resendVerificationMessage}
+          resendingVerification={resendingVerification}
+          onClearError={() => setAuthError(null)}
+          onLogin={handleLogin}
+          onResendVerification={(identifier) => handleResendVerification(identifier, true)}
+          onShowSignUp={() => setAuthView('signup')}
+        />
+      </ThemeProvider>
     )
   }
 
   return (
-    <AppContent
-      authToken={authToken}
-      authUser={authUser}
-      onLogout={handleLogout}
-      onUserUpdated={setAuthUser}
-    />
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppContent
+        authToken={authToken}
+        authUser={authUser}
+        themeMode={themeMode}
+        onLogout={handleLogout}
+        onToggleTheme={toggleThemeMode}
+        onUserUpdated={setAuthUser}
+      />
+    </ThemeProvider>
   )
 }
 

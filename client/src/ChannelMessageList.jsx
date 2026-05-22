@@ -173,8 +173,9 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
               )}
               <Typography
                 sx={{
-                  whiteSpace: 'pre-wrap',
-                  overflowWrap: 'anywhere',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                   fontSize: 14,
                   lineHeight: 1.35,
                   color: 'text.primary',
