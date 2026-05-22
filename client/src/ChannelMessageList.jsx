@@ -89,6 +89,36 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
       }}
     >
       {messages.map((message, index) => {
+        if (message.is_presence_notice) {
+          return (
+            <Box
+              key={message.id}
+              sx={{
+                px: 1,
+                py: 0.5,
+                textAlign: 'center',
+              }}
+            >
+              <Typography
+                component="span"
+                sx={{
+                  display: 'inline-block',
+                  px: 1.25,
+                  py: 0.25,
+                  borderRadius: 1,
+                  bgcolor: 'action.hover',
+                  color: 'text.secondary',
+                  fontSize: 12,
+                  fontStyle: 'italic',
+                  lineHeight: 1.4,
+                }}
+              >
+                {message.content}
+              </Typography>
+            </Box>
+          )
+        }
+
         const hasHeader = shouldShowHeader(message, messages[index - 1])
 
         return (

@@ -276,6 +276,34 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           setMessages((current) => current.filter((item) => item.id !== message.id))
         })
 
+        liveSocket.on('channelPresence', (notice) => {
+          if (authUser.show_channel_presence === false) {
+            return
+          }
+
+          const currentChannelId = selectedChannelIdRef.current
+
+          if (Number(notice.channel_id) !== Number(currentChannelId)) {
+            return
+          }
+
+          const noticeId = notice.id || `presence-${Date.now()}`
+
+          setMessages((current) => [
+            ...current,
+            {
+              ...notice,
+              id: noticeId,
+              is_presence_notice: true,
+              content: `${notice.username} has ${notice.type === 'join' ? 'joined' : 'left'} the channel`,
+            },
+          ])
+
+          window.setTimeout(() => {
+            setMessages((current) => current.filter((message) => message.id !== noticeId))
+          }, 9000)
+        })
+
         liveSocket.on('channelCreated', () => {
           loadChannels()
         })
@@ -318,7 +346,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       setSocket(null)
       setSocketConnected(false)
     }
-  }, [authToken, loadChannels])
+  }, [authToken, authUser.show_channel_presence, loadChannels])
 
   useEffect(() => {
     const load = Promise.resolve().then(() => loadMessages(selectedChannelId))
@@ -348,6 +376,10 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }, [canUseSelectedChannel, selectedChannelId, socket])
 
   useEffect(() => {
+    if (messages.at(-1)?.is_presence_notice) {
+      return
+    }
+
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [messages, selectedChannelId])
 

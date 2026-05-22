@@ -147,7 +147,7 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, email, is_admin, avatar_url FROM users WHERE id = $1 AND is_verified = true',
+      'SELECT id, username, email, is_admin, avatar_url, show_channel_presence FROM users WHERE id = $1 AND is_verified = true',
       [session.userId]
     );
 
@@ -299,6 +299,7 @@ app.post('/api/auth/login', async (req, res) => {
                is_verified,
                email,
                avatar_url,
+               show_channel_presence,
                verification_token,
                verification_token_expires_at
         FROM users
@@ -351,6 +352,7 @@ app.post('/api/auth/login', async (req, res) => {
         email: user.email,
         is_admin: user.is_admin,
         avatar_url: user.avatar_url,
+        show_channel_presence: user.show_channel_presence,
       },
     });
   } catch (err) {
@@ -538,6 +540,7 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
   const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : ''
   const confirmNewPassword = typeof req.body.confirmNewPassword === 'string' ? req.body.confirmNewPassword : ''
   const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl)
+  const showChannelPresence = req.body.showChannelPresence !== false
 
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'Valid email is required' })
@@ -572,11 +575,12 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
         UPDATE users
         SET email = $1,
             password_hash = $2,
-            avatar_url = $3
-        WHERE id = $4
-        RETURNING id, username, email, is_admin, avatar_url
+            avatar_url = $3,
+            show_channel_presence = $4
+        WHERE id = $5
+        RETURNING id, username, email, is_admin, avatar_url, show_channel_presence
       `,
-      [email, passwordHash, avatarUrl, req.user.id]
+      [email, passwordHash, avatarUrl, showChannelPresence, req.user.id]
     )
 
     res.json({ user: result.rows[0], message: 'Settings saved' })
@@ -1032,7 +1036,7 @@ async function getUserFromToken(token) {
   }
 
   const result = await pool.query(
-    'SELECT id, username, email, is_admin, avatar_url FROM users WHERE id = $1 AND is_verified = true',
+    'SELECT id, username, email, is_admin, avatar_url, show_channel_presence FROM users WHERE id = $1 AND is_verified = true',
     [session.userId]
   )
 
@@ -1053,6 +1057,7 @@ io.on('connection', async (socket) => {
   }
 
   socket.data.user = user
+  socket.data.channelIds = new Set()
   socket.join(`user:${user.id}`)
 
   if (user.is_admin) {
@@ -1069,7 +1074,20 @@ io.on('connection', async (socket) => {
         return
       }
 
+      if (socket.data.channelIds.has(String(channelId))) {
+        callback?.({ ok: true })
+        return
+      }
+
       socket.join(String(channelId))
+      socket.data.channelIds.add(String(channelId))
+      io.to(String(channelId)).emit('channelPresence', {
+        id: `presence-${Date.now()}-${socket.id}-join-${channelId}`,
+        channel_id: Number(channelId),
+        username: socket.data.user.username,
+        type: 'join',
+        created_at: new Date().toISOString(),
+      })
       callback?.({ ok: true })
       console.log(`User ${socket.id} joined channel ${channelId}`)
     } catch (err) {
@@ -1080,6 +1098,17 @@ io.on('connection', async (socket) => {
   
   // Leave a channel
   socket.on('leaveChannel', (channelId) => {
+    if (socket.data.channelIds.has(String(channelId))) {
+      io.to(String(channelId)).emit('channelPresence', {
+        id: `presence-${Date.now()}-${socket.id}-leave-${channelId}`,
+        channel_id: Number(channelId),
+        username: socket.data.user.username,
+        type: 'leave',
+        created_at: new Date().toISOString(),
+      })
+      socket.data.channelIds.delete(String(channelId))
+    }
+
     socket.leave(String(channelId))
     console.log(`User ${socket.id} left channel ${channelId}`)
   })
@@ -1130,6 +1159,16 @@ io.on('connection', async (socket) => {
   
   // Handle user disconnect
   socket.on('disconnect', () => {
+    for (const channelId of socket.data.channelIds || []) {
+      io.to(channelId).emit('channelPresence', {
+        id: `presence-${Date.now()}-${socket.id}-leave-${channelId}`,
+        channel_id: Number(channelId),
+        username: socket.data.user.username,
+        type: 'leave',
+        created_at: new Date().toISOString(),
+      })
+    }
+
     console.log('User disconnected:', socket.id);
   });
 });
@@ -1168,6 +1207,7 @@ async function createTables() {
         verification_token_expires_at TIMESTAMP,
         verified_at TIMESTAMP,
         avatar_url TEXT,
+        show_channel_presence BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -1178,7 +1218,9 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_channel_presence BOOLEAN DEFAULT TRUE');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
+    await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL');
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
 
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;

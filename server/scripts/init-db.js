@@ -44,6 +44,7 @@ async function initializeDatabase() {
         verification_token TEXT UNIQUE,
         verification_token_expires_at TIMESTAMP,
         verified_at TIMESTAMP,
+        show_channel_presence BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -54,7 +55,9 @@ async function initializeDatabase() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_channel_presence BOOLEAN DEFAULT TRUE')
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL')
+    await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL')
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
     
     // Create messages table

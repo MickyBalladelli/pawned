@@ -6,7 +6,9 @@ import {
   Button,
   Card,
   CardContent,
+  FormControlLabel,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from '@mui/material'
@@ -35,6 +37,7 @@ function AccountSettingsPage({ authToken, user, onBack, onUserUpdated }) {
     newPassword: '',
     confirmNewPassword: '',
     avatarUrl: user.avatar_url || '',
+    showChannelPresence: user.show_channel_presence !== false,
   })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
@@ -168,6 +171,16 @@ function AccountSettingsPage({ authToken, user, onBack, onUserUpdated }) {
             size="small"
             fullWidth
             required
+          />
+
+          <FormControlLabel
+            control={
+              <Switch
+                checked={form.showChannelPresence}
+                onChange={(event) => updateField('showChannelPresence', event.target.checked)}
+              />
+            }
+            label="Show join and leave notices"
           />
 
           <Stack spacing={2.75}>
