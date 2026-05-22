@@ -232,6 +232,16 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
           })
         })
 
+        liveSocket.on('messageDeleted', (message) => {
+          const currentChannelId = selectedChannelIdRef.current
+
+          if (Number(message.channel_id) !== Number(currentChannelId)) {
+            return
+          }
+
+          setMessages((current) => current.filter((item) => item.id !== message.id))
+        })
+
         setSocket(liveSocket)
       })
       .catch((err) => {
@@ -417,6 +427,21 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
           : message,
       ),
     )
+  }
+
+  async function handleDeleteMessage(message) {
+    setError(null)
+    setNotice(null)
+
+    try {
+      await requestJson(`/api/messages/${message.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      })
+      setMessages((current) => current.filter((item) => item.id !== message.id))
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   async function handleSendMessage(event) {
@@ -710,7 +735,12 @@ function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
                 ) : messages.length === 0 ? (
                   <Typography color="text.secondary">No messages in this channel</Typography>
                 ) : (
-                  <ChannelMessageList messages={messages} endRef={messagesEndRef} />
+                  <ChannelMessageList
+                    authUser={authUser}
+                    messages={messages}
+                    endRef={messagesEndRef}
+                    onDeleteMessage={handleDeleteMessage}
+                  />
                 )}
 
                 {selectedChannel && (

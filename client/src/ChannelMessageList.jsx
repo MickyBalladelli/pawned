@@ -1,4 +1,5 @@
-import { Avatar, Box, Stack, Tooltip, Typography } from '@mui/material'
+import { useState } from 'react'
+import { Avatar, Box, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material'
 
 const groupWindowMs = 5 * 60 * 1000
 
@@ -49,7 +50,35 @@ function shouldShowHeader(message, previousMessage) {
   return messageDate - previousDate > groupWindowMs
 }
 
-function ChannelMessageList({ messages, endRef }) {
+function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
+  const [messageMenu, setMessageMenu] = useState(null)
+
+  function openMessageMenu(event, message) {
+    if (message.user_id !== authUser.id && !authUser.is_admin) {
+      return
+    }
+
+    event.preventDefault()
+    setMessageMenu({
+      mouseX: event.clientX + 2,
+      mouseY: event.clientY - 6,
+      message,
+    })
+  }
+
+  function closeMessageMenu() {
+    setMessageMenu(null)
+  }
+
+  async function handleDeleteMessage() {
+    const message = messageMenu?.message
+    closeMessageMenu()
+
+    if (message) {
+      await onDeleteMessage(message)
+    }
+  }
+
   return (
     <Box
       sx={{
@@ -65,6 +94,7 @@ function ChannelMessageList({ messages, endRef }) {
         return (
           <Box
             key={message.id}
+            onContextMenu={(event) => openMessageMenu(event, message)}
             sx={{
               display: 'grid',
               gridTemplateColumns: '40px minmax(0, 1fr)',
@@ -157,6 +187,18 @@ function ChannelMessageList({ messages, endRef }) {
         )
       })}
       <Box ref={endRef} />
+      <Menu
+        open={Boolean(messageMenu)}
+        onClose={closeMessageMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          messageMenu
+            ? { top: messageMenu.mouseY, left: messageMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleDeleteMessage}>Delete message</MenuItem>
+      </Menu>
     </Box>
   )
 }

@@ -593,6 +593,38 @@ app.get('/api/channels/:id/messages', async (req, res) => {
   }
 });
 
+app.delete('/api/messages/:id', authenticate, async (req, res) => {
+  const { id } = req.params
+
+  try {
+    const messageResult = await pool.query(
+      'SELECT id, channel_id, user_id FROM messages WHERE id = $1',
+      [id]
+    )
+    const message = messageResult.rows[0]
+
+    if (!message) {
+      return res.status(404).json({ error: 'Message not found' })
+    }
+
+    if (message.user_id !== req.user.id && !req.user.is_admin) {
+      return res.status(403).json({ error: 'You can only delete your own messages' })
+    }
+
+    await pool.query('DELETE FROM messages WHERE id = $1', [id])
+
+    io.to(String(message.channel_id)).emit('messageDeleted', {
+      id: message.id,
+      channel_id: message.channel_id,
+    })
+
+    res.json({ message: 'Message deleted' })
+  } catch (err) {
+    console.error('Error deleting message:', err)
+    res.status(500).json({ error: 'Failed to delete message' })
+  }
+})
+
 async function getUserFromToken(token) {
   const session = token ? sessions.get(token) : null
 
