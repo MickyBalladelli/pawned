@@ -12,9 +12,19 @@ import {
   Typography,
 } from '@mui/material'
 import { PersonAdd } from '@mui/icons-material'
+import ResendVerificationButton from './ResendVerificationButton'
 import { requestJson } from './requestJson'
 
-function SignUpPage({ error, result, signingUp, onBackToLogin, onClearError, onSignUp }) {
+function SignUpPage({
+  error,
+  result,
+  resendingVerification,
+  signingUp,
+  onBackToLogin,
+  onClearError,
+  onResendVerification,
+  onSignUp,
+}) {
   const [form, setForm] = useState({
     email: '',
     username: '',
@@ -73,6 +83,10 @@ function SignUpPage({ error, result, signingUp, onBackToLogin, onClearError, onS
     await onSignUp(form)
   }
 
+  function handleResendVerification() {
+    onResendVerification(form.email)
+  }
+
   const usernameHelperText =
     usernameState.error ||
     (usernameState.checking && 'Checking username') ||
@@ -124,6 +138,13 @@ function SignUpPage({ error, result, signingUp, onBackToLogin, onClearError, onS
                       Dev link: {result.verificationLink}
                     </Box>
                   )}
+                  <Box sx={{ mt: 1 }}>
+                    <ResendVerificationButton
+                      disabled={!form.email}
+                      resending={resendingVerification}
+                      onResend={handleResendVerification}
+                    />
+                  </Box>
                 </Alert>
               )}
 

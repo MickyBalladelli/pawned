@@ -11,13 +11,31 @@ import {
   Typography,
 } from '@mui/material'
 import { Lock } from '@mui/icons-material'
+import ResendVerificationButton from './ResendVerificationButton'
 
-function LoginPage({ authenticating, error, onClearError, onLogin, onShowSignUp }) {
+const pendingVerificationMessage = 'Account pending approval. Verify your email first.'
+
+function LoginPage({
+  authenticating,
+  error,
+  verificationLink,
+  resendMessage,
+  resendingVerification,
+  onClearError,
+  onLogin,
+  onResendVerification,
+  onShowSignUp,
+}) {
   const [authForm, setAuthForm] = useState({ username: '', password: '' })
+  const canResendVerification = error === pendingVerificationMessage && authForm.username.trim()
 
   async function handleSubmit(event) {
     event.preventDefault()
     await onLogin(authForm)
+  }
+
+  function handleResendVerification() {
+    onResendVerification(authForm.username)
   }
 
   return (
@@ -52,9 +70,30 @@ function LoginPage({ authenticating, error, onClearError, onLogin, onShowSignUp 
 
               {error && (
                 <Alert severity="error" onClose={onClearError}>
-                  {error}
+                  {canResendVerification ? (
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1.5}
+                      sx={{ alignItems: { xs: 'flex-start', sm: 'center' } }}
+                    >
+                      <Box>{error}</Box>
+                      <ResendVerificationButton
+                        resending={resendingVerification}
+                        onResend={handleResendVerification}
+                      />
+                      {verificationLink && (
+                        <Box sx={{ flexBasis: '100%', overflowWrap: 'anywhere' }}>
+                          Dev link: {verificationLink}
+                        </Box>
+                      )}
+                    </Stack>
+                  ) : (
+                    error
+                  )}
                 </Alert>
               )}
+
+              {resendMessage && <Alert severity="success">{resendMessage}</Alert>}
 
               <TextField
                 label="Username"

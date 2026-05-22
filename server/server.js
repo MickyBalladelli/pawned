@@ -7,6 +7,7 @@ const socketIo = require('socket.io');
 const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer')
 
 // Initialize Express app
 const app = express();
@@ -31,6 +32,11 @@ const pool = new Pool({
 
 const sessions = new Map();
 const verificationTokens = new Map()
+const mailTransport = nodemailer.createTransport({
+  sendmail: true,
+  newline: 'unix',
+  path: process.env.SENDMAIL_PATH || '/usr/sbin/sendmail',
+})
 
 function getAuthToken(req) {
   const header = req.get('Authorization') || '';
@@ -67,7 +73,21 @@ function getVerificationLink(req, token) {
 }
 
 function sendVerificationEmail(email, verificationLink) {
-  console.log(`Verification mail for ${email}: ${verificationLink}`)
+  return mailTransport.sendMail({
+    from: process.env.MAIL_FROM || 'Vela <no-reply@vela.io>',
+    to: email,
+    subject: 'Verify your Vela account',
+    text: `Welcome to Vela.\n\nVerify your email here:\n${verificationLink}\n\nThis link expires in 24 hours.`,
+    html: `
+      <p>Welcome to Vela.</p>
+      <p><a href="${verificationLink}">Verify your email</a></p>
+      <p>This link expires in 24 hours.</p>
+    `,
+  }).then(() => {
+    console.log(`Verification email sent to ${email}`)
+  }).catch((err) => {
+    console.error(`Error sending verification email to ${email}:`, err)
+  })
 }
 
 function passwordMatches(password, passwordHash) {
@@ -157,7 +177,18 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, password_hash, is_admin, is_verified FROM users WHERE LOWER(username) = LOWER($1)',
+      `
+        SELECT id,
+               username,
+               password_hash,
+               is_admin,
+               is_verified,
+               email,
+               verification_token,
+               verification_token_expires_at
+        FROM users
+        WHERE LOWER(username) = LOWER($1)
+      `,
       [username.trim()]
     );
 
@@ -168,7 +199,30 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     if (!user.is_verified) {
-      return res.status(403).json({ error: 'Account pending approval. Verify your email first.' })
+      let verificationToken = user.verification_token
+      let verificationTokenExpiresAt = user.verification_token_expires_at
+
+      if (!verificationToken || !verificationTokenExpiresAt || verificationTokenExpiresAt <= new Date()) {
+        verificationToken = createVerificationToken()
+        verificationTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24)
+
+        await pool.query(
+          `
+            UPDATE users
+            SET verification_token = $1,
+                verification_token_expires_at = $2
+            WHERE id = $3
+          `,
+          [verificationToken, verificationTokenExpiresAt, user.id]
+        )
+      }
+
+      verificationTokens.set(verificationToken, { email: user.email, expiresAt: verificationTokenExpiresAt })
+
+      return res.status(403).json({
+        error: 'Account pending approval. Verify your email first.',
+        verificationLink: getVerificationLink(req, verificationToken),
+      })
     }
 
     const token = crypto.randomBytes(32).toString('hex');
@@ -263,7 +317,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     const verificationLink = getVerificationLink(req, verificationToken)
     verificationTokens.set(verificationToken, { email, expiresAt: verificationTokenExpiresAt })
-    sendVerificationEmail(email, verificationLink)
+    await sendVerificationEmail(email, verificationLink)
 
     res.status(201).json({
       message: 'Account pending approval. Check your email to verify.',
@@ -308,6 +362,47 @@ app.post('/api/auth/verify-email', async (req, res) => {
   } catch (err) {
     console.error('Error verifying email:', err)
     res.status(500).json({ error: 'Failed to verify email' })
+  }
+})
+
+app.post('/api/auth/resend-verification', async (req, res) => {
+  const identifier = typeof req.body.identifier === 'string' ? req.body.identifier.trim() : normalizeEmail(req.body.email)
+
+  if (!identifier) {
+    return res.status(400).json({ error: 'Email or username is required' })
+  }
+
+  const verificationToken = createVerificationToken()
+  const verificationTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24)
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE users
+        SET verification_token = $1,
+            verification_token_expires_at = $2
+        WHERE (LOWER(email) = LOWER($3) OR LOWER(username) = LOWER($3))
+          AND is_verified = false
+        RETURNING email
+      `,
+      [verificationToken, verificationTokenExpiresAt, identifier]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'No unverified account found' })
+    }
+
+    const verificationLink = getVerificationLink(req, verificationToken)
+    verificationTokens.set(verificationToken, { email: result.rows[0].email, expiresAt: verificationTokenExpiresAt })
+    await sendVerificationEmail(result.rows[0].email, verificationLink)
+
+    res.json({
+      message: 'Verification email sent again.',
+      verificationLink: process.env.NODE_ENV === 'production' ? undefined : verificationLink,
+    })
+  } catch (err) {
+    console.error('Error resending verification email:', err)
+    res.status(500).json({ error: 'Failed to resend verification email' })
   }
 })
 

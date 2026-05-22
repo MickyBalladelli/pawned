@@ -10,7 +10,9 @@ export async function requestJson(url, options) {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
-    throw new Error(payload?.error || 'Request failed')
+    const error = new Error(payload?.error || 'Request failed')
+    error.payload = payload
+    throw error
   }
 
   return payload
