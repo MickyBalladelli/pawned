@@ -111,13 +111,21 @@ async function initializeDatabase() {
     
     // Create sample channels
     await pool.query(`
-      INSERT INTO channels (name, description, is_private) VALUES 
-      ('General', 'General discussion about the game', false),
-      ('Guilds', 'Guild related discussions', false),
-      ('Events', 'Game events and announcements', false),
-      ('Private1', 'A private channel', true)
-      ON CONFLICT (name) DO NOTHING;
-    `);
+      INSERT INTO channels (name, description, is_private)
+      SELECT incoming.name, incoming.description, incoming.is_private
+      FROM (
+        VALUES
+          ('General', 'General discussion about the game', false),
+          ('Guilds', 'Guild related discussions', false),
+          ('Events', 'Game events and announcements', false),
+          ('Private1', 'A private channel', true)
+      ) AS incoming(name, description, is_private)
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM channels c
+        WHERE LOWER(c.name) = LOWER(incoming.name)
+      );
+    `)
 
     await pool.query(`
       INSERT INTO channel_members (channel_id, user_id, role, status)
@@ -141,6 +149,7 @@ async function initializeDatabase() {
 
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON channel_members(channel_id)')
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON channel_members(user_id)')
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_channels_lower_name_unique ON channels(LOWER(name))')
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)')
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)')
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)')

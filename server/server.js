@@ -38,6 +38,8 @@ const mailTransport = nodemailer.createTransport({
   path: process.env.SENDMAIL_PATH || '/usr/sbin/sendmail',
 })
 
+const channelNameConflictError = 'Channel name is already taken'
+
 function getAuthToken(req) {
   const header = req.get('Authorization') || '';
 
@@ -76,6 +78,21 @@ function normalizeAvatarUrl(avatarUrl) {
   }
 
   return value.length <= 1500000 ? value : undefined
+}
+
+async function channelNameExists(name, excludedChannelId = null, client = pool) {
+  const result = await client.query(
+    `
+      SELECT id
+      FROM channels
+      WHERE LOWER(name) = LOWER($1)
+        AND ($2::integer IS NULL OR id <> $2::integer)
+      LIMIT 1
+    `,
+    [name, excludedChannelId]
+  )
+
+  return result.rows.length > 0
 }
 
 function createVerificationToken() {
@@ -644,6 +661,12 @@ app.post('/api/channels', authenticate, async (req, res) => {
 
   try {
     await client.query('BEGIN')
+
+    if (await channelNameExists(trimmedName, null, client)) {
+      await client.query('ROLLBACK')
+      return res.status(409).json({ error: channelNameConflictError })
+    }
+
     const channelResult = await client.query(
       'INSERT INTO channels (name, description, is_private, owner_user_id) VALUES ($1, $2, $3, $4) RETURNING *',
       [trimmedName, description || null, privateChannel, req.user.id]
@@ -689,6 +712,10 @@ app.post('/api/channels', authenticate, async (req, res) => {
     });
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {})
+    if (err.code === '23505') {
+      return res.status(409).json({ error: channelNameConflictError })
+    }
+
     console.error('Error creating channel:', err);
     res.status(500).json({ error: 'Failed to create channel' });
   } finally {
@@ -708,6 +735,10 @@ app.put('/api/channels/:id', authenticate, requireChannelManager, async (req, re
   }
   
   try {
+    if (await channelNameExists(trimmedName, id)) {
+      return res.status(409).json({ error: channelNameConflictError })
+    }
+
     const result = await pool.query(
       'UPDATE channels SET name = $1, description = $2, is_private = $3 WHERE id = $4 RETURNING *',
       [trimmedName, description || null, privateChannel, id]
@@ -722,6 +753,10 @@ app.put('/api/channels/:id', authenticate, requireChannelManager, async (req, re
     // Notify all clients about the updated channel
     io.emit('channelUpdated', result.rows[0]);
   } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: channelNameConflictError })
+    }
+
     console.error('Error updating channel:', err);
     res.status(500).json({ error: 'Failed to update channel' });
   }
@@ -1207,6 +1242,7 @@ async function createTables() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name)');
+    await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_channels_lower_name_unique ON channels(LOWER(name))');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON channel_members(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON channel_members(user_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)');
