@@ -1,0 +1,22 @@
+{
+  "FileVersion": 3,
+  "Category": "Games",
+  "Description": "Unreal client for the Vela MMO universe",
+  "Modules": [
+    {
+      "Name": "VelaUnrealClient",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "WebSockets",
+      "Enabled": true
+    },
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true
+    }
+  ]
+}
