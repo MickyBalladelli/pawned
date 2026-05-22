@@ -83,6 +83,7 @@ function ChannelMessageList({ messages, endRef }) {
           >
             {hasHeader ? (
               <Avatar
+                src={message.avatar_url || undefined}
                 sx={{
                   width: 32,
                   height: 32,

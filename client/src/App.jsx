@@ -189,7 +189,14 @@ function App() {
     )
   }
 
-  return <AppContent authToken={authToken} authUser={authUser} onLogout={handleLogout} />
+  return (
+    <AppContent
+      authToken={authToken}
+      authUser={authUser}
+      onLogout={handleLogout}
+      onUserUpdated={setAuthUser}
+    />
+  )
 }
 
 export default App

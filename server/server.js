@@ -64,6 +64,20 @@ function normalizeUsername(username) {
   return typeof username === 'string' ? username.trim() : ''
 }
 
+function normalizeAvatarUrl(avatarUrl) {
+  const value = typeof avatarUrl === 'string' ? avatarUrl.trim() : ''
+
+  if (!value) {
+    return null
+  }
+
+  if (!/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(value)) {
+    return undefined
+  }
+
+  return value.length <= 1500000 ? value : undefined
+}
+
 function createVerificationToken() {
   return crypto.randomBytes(32).toString('hex')
 }
@@ -116,7 +130,7 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, is_admin FROM users WHERE id = $1 AND is_verified = true',
+      'SELECT id, username, email, is_admin, avatar_url FROM users WHERE id = $1 AND is_verified = true',
       [session.userId]
     );
 
@@ -157,7 +171,7 @@ pool.query('SELECT NOW()', (err, res) => {
 app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // Middleware for parsing JSON
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 // Routes
 app.get('/', (req, res) => {
@@ -184,6 +198,7 @@ app.post('/api/auth/login', async (req, res) => {
                is_admin,
                is_verified,
                email,
+               avatar_url,
                verification_token,
                verification_token_expires_at
         FROM users
@@ -233,7 +248,9 @@ app.post('/api/auth/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
+        email: user.email,
         is_admin: user.is_admin,
+        avatar_url: user.avatar_url,
       },
     });
   } catch (err) {
@@ -415,6 +432,64 @@ app.post('/api/auth/logout', authenticate, (req, res) => {
   res.json({ message: 'Logged out' });
 });
 
+app.put('/api/auth/settings', authenticate, async (req, res) => {
+  const email = normalizeEmail(req.body.email)
+  const currentPassword = typeof req.body.currentPassword === 'string' ? req.body.currentPassword : ''
+  const newPassword = typeof req.body.newPassword === 'string' ? req.body.newPassword : ''
+  const confirmNewPassword = typeof req.body.confirmNewPassword === 'string' ? req.body.confirmNewPassword : ''
+  const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl)
+
+  if (!email || !email.includes('@')) {
+    return res.status(400).json({ error: 'Valid email is required' })
+  }
+
+  if (avatarUrl === undefined) {
+    return res.status(400).json({ error: 'Picture must be a png, jpg, webp, or gif under 1.5 MB' })
+  }
+
+  if (newPassword && newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' })
+  }
+
+  if (newPassword !== confirmNewPassword) {
+    return res.status(400).json({ error: 'New passwords do not match' })
+  }
+
+  try {
+    const userResult = await pool.query(
+      'SELECT password_hash FROM users WHERE id = $1',
+      [req.user.id]
+    )
+    const currentUser = userResult.rows[0]
+
+    if (newPassword && !passwordMatches(currentPassword, currentUser.password_hash)) {
+      return res.status(400).json({ error: 'Current password is wrong' })
+    }
+
+    const passwordHash = newPassword ? `sha256:${hashPassword(newPassword)}` : currentUser.password_hash
+    const result = await pool.query(
+      `
+        UPDATE users
+        SET email = $1,
+            password_hash = $2,
+            avatar_url = $3
+        WHERE id = $4
+        RETURNING id, username, email, is_admin, avatar_url
+      `,
+      [email, passwordHash, avatarUrl, req.user.id]
+    )
+
+    res.json({ user: result.rows[0], message: 'Settings saved' })
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: 'Email is already in use' })
+    }
+
+    console.error('Error updating settings:', err)
+    res.status(500).json({ error: 'Failed to update settings' })
+  }
+})
+
 // Get all channels
 app.get('/api/channels', async (req, res) => {
   try {
@@ -508,7 +583,7 @@ app.get('/api/channels/:id/messages', async (req, res) => {
   
   try {
     const result = await pool.query(
-      'SELECT m.*, u.username FROM messages m JOIN users u ON m.user_id = u.id WHERE m.channel_id = $1 ORDER BY m.created_at DESC LIMIT $2',
+      'SELECT m.*, u.username, u.avatar_url FROM messages m JOIN users u ON m.user_id = u.id WHERE m.channel_id = $1 ORDER BY m.created_at DESC LIMIT $2',
       [id, limit]
     );
     res.json(result.rows);
@@ -526,7 +601,7 @@ async function getUserFromToken(token) {
   }
 
   const result = await pool.query(
-    'SELECT id, username, is_admin FROM users WHERE id = $1 AND is_verified = true',
+    'SELECT id, username, email, is_admin, avatar_url FROM users WHERE id = $1 AND is_verified = true',
     [session.userId]
   )
 
@@ -585,12 +660,11 @@ io.on('connection', async (socket) => {
       )
       
       const messageData = result.rows[0]
-      
-      // Emit the message to the channel
-      const messageWithUser = {
-        ...messageData,
-        username: socket.data.user.username
-      }
+      const messageResult = await pool.query(
+        'SELECT m.*, u.username, u.avatar_url FROM messages m JOIN users u ON m.user_id = u.id WHERE m.id = $1',
+        [messageData.id]
+      )
+      const messageWithUser = messageResult.rows[0]
       
       io.to(String(channelId)).emit('receiveMessage', messageWithUser)
       callback?.({ message: messageWithUser })
@@ -638,6 +712,7 @@ async function createTables() {
         verification_token TEXT UNIQUE,
         verification_token_expires_at TIMESTAMP,
         verified_at TIMESTAMP,
+        avatar_url TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -647,6 +722,7 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT UNIQUE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
 
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;

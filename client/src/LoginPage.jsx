@@ -11,6 +11,7 @@ import {
   Typography,
 } from '@mui/material'
 import { Lock } from '@mui/icons-material'
+import PasswordField from './PasswordField'
 import ResendVerificationButton from './ResendVerificationButton'
 
 const pendingVerificationMessage = 'Account pending approval. Verify your email first.'
@@ -104,9 +105,8 @@ function LoginPage({
                 fullWidth
                 required
               />
-              <TextField
+              <PasswordField
                 label="Password"
-                type="password"
                 value={authForm.password}
                 onChange={(event) =>
                   setAuthForm((current) => ({ ...current, password: event.target.value }))

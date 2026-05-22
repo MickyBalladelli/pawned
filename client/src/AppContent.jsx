@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
+  Avatar,
   Box,
   Button,
   Card,
@@ -35,7 +36,9 @@ import {
   Refresh,
   Save,
   Send,
+  Settings,
 } from '@mui/icons-material'
+import AccountSettingsPage from './AccountSettingsPage'
 import ChannelMessageList from './ChannelMessageList'
 import { requestJson } from './requestJson'
 
@@ -85,7 +88,11 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
-function AppContent({ authToken, authUser, onLogout }) {
+function getInitial(username) {
+  return username?.trim().charAt(0).toUpperCase() || '?'
+}
+
+function AppContent({ authToken, authUser, onLogout, onUserUpdated }) {
   const [channels, setChannels] = useState([])
   const [selectedChannelId, setSelectedChannelId] = useState(null)
   const [messages, setMessages] = useState([])
@@ -102,6 +109,7 @@ function AppContent({ authToken, authUser, onLogout }) {
   const [deletingId, setDeletingId] = useState(null)
   const [notice, setNotice] = useState(null)
   const [error, setError] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
   const selectedChannelIdRef = useRef(null)
   const messagesEndRef = useRef(null)
 
@@ -389,6 +397,17 @@ function AppContent({ authToken, authUser, onLogout }) {
     setNotice(null)
   }
 
+  function handleUserUpdated(user) {
+    onUserUpdated(user)
+    setMessages((current) =>
+      current.map((message) =>
+        message.user_id === user.id
+          ? { ...message, avatar_url: user.avatar_url, username: user.username }
+          : message,
+      ),
+    )
+  }
+
   async function handleSendMessage(event) {
     event.preventDefault()
 
@@ -481,6 +500,23 @@ function AppContent({ authToken, authUser, onLogout }) {
                 New channel
               </Button>
             )}
+            <Button
+              variant={showSettings ? 'contained' : 'outlined'}
+              startIcon={<Settings />}
+              onClick={() => {
+                setShowSettings((current) => !current)
+                setError(null)
+                setNotice(null)
+              }}
+            >
+              Settings
+            </Button>
+            <Avatar
+              src={authUser.avatar_url || undefined}
+              sx={{ width: 36, height: 36, fontSize: 15, fontWeight: 800, bgcolor: 'primary.main' }}
+            >
+              {getInitial(authUser.username)}
+            </Avatar>
             <Button variant="outlined" onClick={handleLogout}>
               Sign out
             </Button>
@@ -510,14 +546,22 @@ function AppContent({ authToken, authUser, onLogout }) {
           </Alert>
         )}
 
-        <Box
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: 'minmax(320px, 0.95fr) minmax(0, 1.35fr)' },
-            gap: 3,
-            alignItems: 'start',
-          }}
-        >
+        {showSettings ? (
+          <AccountSettingsPage
+            authToken={authToken}
+            user={authUser}
+            onBack={() => setShowSettings(false)}
+            onUserUpdated={handleUserUpdated}
+          />
+        ) : (
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', md: 'minmax(320px, 0.95fr) minmax(0, 1.35fr)' },
+              gap: 3,
+              alignItems: 'start',
+            }}
+          >
           <Card>
             <CardContent>
               <Stack
@@ -679,7 +723,8 @@ function AppContent({ authToken, authUser, onLogout }) {
               </CardContent>
             </Card>
           </Stack>
-        </Box>
+          </Box>
+        )}
       </Stack>
 
       {isAdmin && (

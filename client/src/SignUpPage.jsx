@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import { PersonAdd } from '@mui/icons-material'
+import PasswordField from './PasswordField'
 import ResendVerificationButton from './ResendVerificationButton'
 import { requestJson } from './requestJson'
 
@@ -168,18 +169,16 @@ function SignUpPage({
                 fullWidth
                 required
               />
-              <TextField
+              <PasswordField
                 label="Password"
-                type="password"
                 value={form.password}
                 onChange={(event) => updateField('password', event.target.value)}
                 helperText="At least 6 characters"
                 fullWidth
                 required
               />
-              <TextField
+              <PasswordField
                 label="Confirm password"
-                type="password"
                 value={form.confirmPassword}
                 onChange={(event) => updateField('confirmPassword', event.target.value)}
                 error={!passwordsMatch}
