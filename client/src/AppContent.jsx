@@ -41,6 +41,7 @@ import {
   Public,
   Refresh,
   Save,
+  Search,
   Send,
   Settings,
 } from '@mui/icons-material'
@@ -106,6 +107,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const [socket, setSocket] = useState(null)
   const [socketConnected, setSocketConnected] = useState(false)
   const [draftMessage, setDraftMessage] = useState('')
+  const [channelFilter, setChannelFilter] = useState('')
   const [form, setForm] = useState(emptyForm)
   const [channelDialogOpen, setChannelDialogOpen] = useState(false)
   const [membershipDialogOpen, setMembershipDialogOpen] = useState(false)
@@ -131,6 +133,20 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const isAdmin = Boolean(authUser?.is_admin)
   const canUseSelectedChannel = Boolean(selectedChannel?.can_access)
   const canManageSelectedChannel = Boolean(selectedChannel?.can_manage)
+  const filteredChannels = useMemo(() => {
+    const filter = channelFilter.trim().toLowerCase()
+
+    if (!filter) {
+      return channels
+    }
+
+    return channels.filter((channel) => {
+      return (
+        channel.name?.toLowerCase().includes(filter) ||
+        channel.description?.toLowerCase().includes(filter)
+      )
+    })
+  }, [channelFilter, channels])
 
   const getAuthHeaders = useCallback(() => {
     return authToken ? { Authorization: `Bearer ${authToken}` } : {}
@@ -708,6 +724,19 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                   Channels
                 </Typography>
               </Stack>
+              <TextField
+                label="Filter channels"
+                value={channelFilter}
+                onChange={(event) => setChannelFilter(event.target.value)}
+                size="small"
+                fullWidth
+                sx={{ mb: 2 }}
+                slotProps={{
+                  input: {
+                    startAdornment: <Search fontSize="small" sx={{ color: 'text.secondary', mr: 1 }} />,
+                  },
+                }}
+              />
 
               {loadingChannels ? (
                 <Stack sx={{ alignItems: 'center', py: 6 }}>
@@ -717,9 +746,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
                   <Typography color="text.secondary">No channels yet</Typography>
                 </Paper>
+              ) : filteredChannels.length === 0 ? (
+                <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography color="text.secondary">No matching channels</Typography>
+                </Paper>
               ) : (
                 <List disablePadding>
-                  {channels.map((channel) => (
+                  {filteredChannels.map((channel) => (
                     <ListItemButton
                       key={channel.id}
                       selected={channel.id === selectedChannelId}
