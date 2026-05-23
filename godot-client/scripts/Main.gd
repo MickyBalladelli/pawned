@@ -25,12 +25,18 @@ func _input(event: InputEvent) -> void:
 			_move_player_to_mouse(event.position)
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			right_mouse_down = event.pressed
-		elif right_mouse_down and event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
+			if event.pressed:
+				_turn_player_to_mouse(event.position)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP and event.pressed:
 			_zoom_camera(-0.8)
-		elif right_mouse_down and event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN and event.pressed:
 			_zoom_camera(0.8)
 	elif event is InputEventMouseMotion and right_mouse_down:
 		_zoom_camera(event.relative.y * 0.035)
+	elif event is InputEventPanGesture:
+		_zoom_camera(event.delta.y * 0.8)
+	elif event is InputEventMagnifyGesture:
+		_zoom_camera((1.0 - event.factor) * 8.0)
 
 func _process(delta: float) -> void:
 	socket.poll()
@@ -79,6 +85,13 @@ func _move_player_to_mouse(mouse_position: Vector2) -> void:
 	player.set_move_target(ground_position)
 	target_marker.global_position = Vector3(ground_position.x, 0.03, ground_position.z)
 	target_marker.visible = true
+
+func _turn_player_to_mouse(mouse_position: Vector2) -> void:
+	var ground_position_variant: Variant = _get_ground_position(mouse_position)
+	if ground_position_variant == null:
+		return
+
+	player.look_at_ground_position(ground_position_variant)
 
 func _get_ground_position(mouse_position: Vector2) -> Variant:
 	var ray_origin: Vector3 = camera.project_ray_origin(mouse_position)

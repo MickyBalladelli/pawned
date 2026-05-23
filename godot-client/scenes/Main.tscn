@@ -1,7 +1,8 @@
-[gd_scene load_steps=16 format=3 uid="uid://m8kga4hqpbki"]
+[gd_scene load_steps=17 format=3 uid="uid://m8kga4hqpbki"]
 
 [ext_resource type="Script" uid="uid://jjxtne70uedt" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://88535m60gg5e" path="res://scripts/Player.gd" id="2_player"]
+[ext_resource type="PackedScene" path="res://assets/characters/kaykit_adventurers/Knight.glb" id="3_knight"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -100,31 +101,41 @@ script = ExtResource("2_player")
 shape = SubResource("CapsuleShape_player")
 
 [node name="Body" type="MeshInstance3D" parent="Player"]
+visible = false
 mesh = SubResource("CapsuleMesh_body")
 
 [node name="Head" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+visible = false
 mesh = SubResource("SphereMesh_head")
 
 [node name="LeftArm" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(0.96, -0.28, 0, 0.28, 0.96, 0, 0, 0, 1, -0.48, 0.1, 0)
+visible = false
 mesh = SubResource("CapsuleMesh_limb")
 
 [node name="RightArm" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(0.96, 0.28, 0, -0.28, 0.96, 0, 0, 0, 1, 0.48, 0.1, 0)
+visible = false
 mesh = SubResource("CapsuleMesh_limb")
 
 [node name="LeftLeg" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, -0.75, 0)
+visible = false
 mesh = SubResource("CapsuleMesh_limb")
 
 [node name="RightLeg" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, -0.75, 0)
+visible = false
 mesh = SubResource("CapsuleMesh_limb")
 
 [node name="FacingMarker" type="MeshInstance3D" parent="Player"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15, 0.43)
+visible = false
 mesh = SubResource("BoxMesh_marker")
+
+[node name="Knight" parent="Player" instance=ExtResource("3_knight")]
+transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, 0, -0.95, 0)
 
 [node name="Hud" type="CanvasLayer" parent="."]
 
