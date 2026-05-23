@@ -144,7 +144,6 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [moves, setMoves] = useState([])
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
-  const [boardStyle, setBoardStyle] = useState('flat')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
@@ -576,15 +575,6 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <Chip label={statusLabel(selectedGame)} color={selectedGame?.status === 'active' ? 'success' : 'default'} variant="outlined" />
               <Chip label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
-              <ToggleButtonGroup
-                value={boardStyle}
-                exclusive
-                size="small"
-                onChange={(event, value) => value && setBoardStyle(value)}
-              >
-                <ToggleButton value="flat">Flat</ToggleButton>
-                <ToggleButton value="wood3d">3D</ToggleButton>
-              </ToggleButtonGroup>
               {selectedGame?.status === 'waiting' && playerColor && (
                 <Button
                   size="small"
@@ -634,8 +624,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 )}
                 <ChessBoard
                   boardSquares={boardSquares}
-                  boardStyle={boardStyle}
                   canMove={canMove}
+                  position={selectedGame.fen}
+                  playerColor={playerColor}
                   selectedSquare={selectedSquare}
                   themeMode={themeMode}
                   onSquareClick={handleSquareClick}
