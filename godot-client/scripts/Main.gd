@@ -13,6 +13,8 @@ var reconnect_timer: float = 0.0
 var latest_input: Dictionary = {"moveX": 0.0, "moveY": 0.0}
 var camera_distance: float = 10.7
 var right_mouse_down: bool = false
+var faded_occluders: Array[Node3D] = []
+var original_visibility: Dictionary = {}
 
 func _ready() -> void:
 	player.input_changed.connect(_on_player_input_changed)
@@ -41,6 +43,7 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	socket.poll()
 	_update_camera(delta)
+	_update_occluder_fade()
 	if target_marker.visible and not player.has_move_target:
 		target_marker.visible = false
 	var state: int = socket.get_ready_state()
@@ -107,6 +110,79 @@ func _get_ground_position(mouse_position: Vector2) -> Variant:
 
 func _zoom_camera(amount: float) -> void:
 	camera_distance = clampf(camera_distance + amount, 5.5, 18.0)
+
+func _update_occluder_fade() -> void:
+	var next_faded: Array[Node3D] = []
+	var camera_position_2d: Vector2 = Vector2(camera.global_position.x, camera.global_position.z)
+	var player_position_2d: Vector2 = Vector2(player.global_position.x, player.global_position.z)
+	var camera_to_player: Vector2 = player_position_2d - camera_position_2d
+	var camera_to_player_length: float = camera_to_player.length()
+
+	if camera_to_player_length <= 0.01:
+		_restore_all_occluders()
+		return
+
+	for node in get_tree().get_nodes_in_group("camera_fadeable"):
+		if not node is Node3D:
+			continue
+
+		var occluder: Node3D = node
+		var occluder_position_2d: Vector2 = Vector2(occluder.global_position.x, occluder.global_position.z)
+		var projected_distance: float = (occluder_position_2d - camera_position_2d).dot(camera_to_player) / camera_to_player_length
+		if projected_distance <= 0.0 or projected_distance >= camera_to_player_length:
+			continue
+
+		var closest_point: Vector2 = camera_position_2d + camera_to_player.normalized() * projected_distance
+		var line_distance: float = occluder_position_2d.distance_to(closest_point)
+		if line_distance < 1.25:
+			next_faded.append(occluder)
+
+	for occluder in faded_occluders:
+		if not next_faded.has(occluder):
+			_set_occluder_fade(occluder, false)
+
+	for occluder in next_faded:
+		if not faded_occluders.has(occluder):
+			_set_occluder_fade(occluder, true)
+
+	faded_occluders = next_faded
+
+func _restore_all_occluders() -> void:
+	for occluder in faded_occluders:
+		_set_occluder_fade(occluder, false)
+	faded_occluders.clear()
+
+func _set_occluder_fade(occluder: Node3D, faded: bool) -> void:
+	for mesh_instance in _get_mesh_instances(occluder):
+		if faded:
+			_hide_mesh(mesh_instance)
+		else:
+			_restore_mesh(mesh_instance)
+
+func _get_mesh_instances(root: Node) -> Array[MeshInstance3D]:
+	var meshes: Array[MeshInstance3D] = []
+	if root is MeshInstance3D:
+		meshes.append(root)
+
+	for child in root.get_children():
+		meshes.append_array(_get_mesh_instances(child))
+
+	return meshes
+
+func _hide_mesh(mesh_instance: MeshInstance3D) -> void:
+	var instance_id: int = mesh_instance.get_instance_id()
+	if not original_visibility.has(instance_id):
+		original_visibility[instance_id] = mesh_instance.visible
+
+	mesh_instance.visible = false
+
+func _restore_mesh(mesh_instance: MeshInstance3D) -> void:
+	var instance_id: int = mesh_instance.get_instance_id()
+	if not original_visibility.has(instance_id):
+		return
+
+	mesh_instance.visible = original_visibility[instance_id]
+	original_visibility.erase(instance_id)
 
 func _read_messages() -> void:
 	while socket.get_available_packet_count() > 0:
