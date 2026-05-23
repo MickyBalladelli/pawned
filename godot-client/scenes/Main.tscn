@@ -1,8 +1,9 @@
-[gd_scene load_steps=17 format=3 uid="uid://m8kga4hqpbki"]
+[gd_scene load_steps=18 format=3 uid="uid://m8kga4hqpbki"]
 
 [ext_resource type="Script" uid="uid://jjxtne70uedt" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://88535m60gg5e" path="res://scripts/Player.gd" id="2_player"]
 [ext_resource type="PackedScene" path="res://assets/characters/kaykit_adventurers/Knight.glb" id="3_knight"]
+[ext_resource type="Script" path="res://scripts/EnvironmentScatter.gd" id="4_scatter"]
 
 [sub_resource type="Environment" id="Environment_1"]
 background_mode = 1
@@ -92,6 +93,9 @@ shape = SubResource("BoxShape_ground")
 [node name="TargetMarker" type="MeshInstance3D" parent="."]
 visible = false
 mesh = SubResource("CylinderMesh_target")
+
+[node name="EnvironmentScatter" type="Node3D" parent="."]
+script = ExtResource("4_scatter")
 
 [node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)
