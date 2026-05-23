@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   Box,
@@ -147,6 +147,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
+  const movesEndRef = useRef(null)
 
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
   const playerColor = getPlayerColor(selectedGame, authUser.id)
@@ -280,6 +281,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       socket.off('chess:moveMade', handleMoveMade)
     }
   }, [selectedGameId, socket])
+
+  useEffect(() => {
+    movesEndRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [moves.length])
 
   async function createGame() {
     setBusy(true)
@@ -668,6 +673,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                         <Typography sx={{ fontWeight: 800 }}>{move.san}</Typography>
                       </Stack>
                     ))}
+                    <Box ref={movesEndRef} />
                   </Stack>
                 )}
               </Paper>
