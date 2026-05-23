@@ -668,6 +668,21 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               borderRadius: 2,
             }}
           />
+          <Tabs
+            value={activeView}
+            onChange={handleActiveViewChange}
+            sx={{
+              minHeight: 44,
+              borderBottom: { xs: 1, md: 0 },
+              borderColor: 'divider',
+              '& .MuiTab-root': {
+                minHeight: 44,
+              },
+            }}
+          >
+            <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
+            <Tab icon={<SportsEsports />} iconPosition="start" value="chess" label="Chess" />
+          </Tabs>
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
               {activeView === 'chat' ? <Forum color="primary" /> : <SportsEsports color="primary" />}
@@ -758,14 +773,6 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           />
         ) : (
           <>
-          <Tabs
-            value={activeView}
-            onChange={handleActiveViewChange}
-            sx={{ borderBottom: 1, borderColor: 'divider' }}
-          >
-            <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
-            <Tab icon={<SportsEsports />} iconPosition="start" value="chess" label="Chess" />
-          </Tabs>
           {activeView === 'chess' ? (
             <ChessPage
               authToken={authToken}
