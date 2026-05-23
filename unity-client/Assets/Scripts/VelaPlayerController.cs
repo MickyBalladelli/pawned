@@ -46,7 +46,7 @@ public sealed class VelaPlayerController : MonoBehaviour
         }
 
         transform.position += direction * speed * Time.deltaTime;
-        transform.position = new Vector3(transform.position.x, 0.95f, transform.position.z);
+        transform.position = ClampToWorld(transform.position);
 
         if (direction.magnitude > 0.01f)
         {
@@ -75,7 +75,7 @@ public sealed class VelaPlayerController : MonoBehaviour
 
     public void SetMoveTarget(Vector3 target)
     {
-        moveTarget = target;
+        moveTarget = ClampToWorld(target);
         hasMoveTarget = true;
     }
 
@@ -132,5 +132,16 @@ public sealed class VelaPlayerController : MonoBehaviour
         if (Input.GetKey(negative)) value -= 1f;
         if (Input.GetKey(positive)) value += 1f;
         return value;
+    }
+
+    private static Vector3 ClampToWorld(Vector3 position)
+    {
+        float edgePadding = 1f;
+        float limit = VelaBootstrap.WorldRadius - edgePadding;
+        return new Vector3(
+            Mathf.Clamp(position.x, -limit, limit),
+            0.95f,
+            Mathf.Clamp(position.z, -limit, limit)
+        );
     }
 }

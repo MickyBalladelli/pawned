@@ -3,23 +3,25 @@ using UnityEngine;
 [ExecuteAlways]
 public sealed class VelaEnvironmentScatter : MonoBehaviour
 {
-    [SerializeField] private int seed = 7241;
-    [SerializeField] private float radius = 27f;
-    [SerializeField] private float playerClearRadius = 4f;
-    [SerializeField] private int treeCount = 42;
-    [SerializeField] private int rockCount = 34;
-    [SerializeField] private int plantCount = 90;
+    private const int Seed = 7241;
+    private const float Radius = 1450f;
+    private const float PlayerClearRadius = 4f;
+    private const int TreeCount = 4500;
+    private const int RockCount = 3000;
+    private const int PlantCount = 9000;
 
     private System.Random random;
 
     private void OnEnable()
     {
-        if (transform.childCount > 0)
+        int desiredChildCount = TreeCount + RockCount + PlantCount;
+        if (transform.childCount == desiredChildCount)
         {
             return;
         }
 
-        random = new System.Random(seed);
+        ClearGeneratedChildren();
+        random = new System.Random(Seed);
         ScatterTrees();
         ScatterRocks();
         ScatterPlants();
@@ -30,7 +32,7 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
         Material trunk = VelaBootstrap.MakeMaterial(new Color(0.36f, 0.24f, 0.13f), 0.7f);
         Material leaves = VelaBootstrap.MakeMaterial(new Color(0.12f, 0.42f, 0.2f), 0.8f);
 
-        for (int index = 0; index < treeCount; index++)
+        for (int index = 0; index < TreeCount; index++)
         {
             GameObject tree = new GameObject("Tree");
             tree.transform.position = RandomGroundPosition();
@@ -58,7 +60,7 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
     {
         Material rock = VelaBootstrap.MakeMaterial(new Color(0.42f, 0.46f, 0.43f), 0.8f);
 
-        for (int index = 0; index < rockCount; index++)
+        for (int index = 0; index < RockCount; index++)
         {
             GameObject rockObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
             rockObject.name = "Rock";
@@ -75,7 +77,7 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
     {
         Material plant = VelaBootstrap.MakeMaterial(new Color(0.25f, 0.62f, 0.28f), 0.9f);
 
-        for (int index = 0; index < plantCount; index++)
+        for (int index = 0; index < PlantCount; index++)
         {
             GameObject plantObject = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             plantObject.name = "Plant";
@@ -94,8 +96,8 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
 
         for (int attempt = 0; attempt < 24; attempt++)
         {
-            position = new Vector2(RandomRange(-radius, radius), RandomRange(-radius, radius));
-            if (position.magnitude >= playerClearRadius && position.magnitude <= radius)
+            position = new Vector2(RandomRange(-Radius, Radius), RandomRange(-Radius, Radius));
+            if (position.magnitude >= PlayerClearRadius && position.magnitude <= Radius)
             {
                 break;
             }
@@ -107,5 +109,13 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
     private float RandomRange(float min, float max)
     {
         return min + (float)random.NextDouble() * (max - min);
+    }
+
+    private void ClearGeneratedChildren()
+    {
+        while (transform.childCount > 0)
+        {
+            VelaBootstrap.DestroyGenerated(transform.GetChild(0).gameObject);
+        }
     }
 }

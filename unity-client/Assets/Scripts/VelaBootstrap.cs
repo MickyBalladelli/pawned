@@ -2,6 +2,9 @@ using UnityEngine;
 
 public sealed class VelaBootstrap : MonoBehaviour
 {
+    public const float WorldSize = 3000f;
+    public const float WorldRadius = WorldSize * 0.5f;
+
 #if UNITY_EDITOR
     [UnityEditor.InitializeOnLoadMethod]
     private static void BuildEditorWorld()
@@ -26,6 +29,8 @@ public sealed class VelaBootstrap : MonoBehaviour
         VelaGameClient existingClient = FindObjectOfType<VelaGameClient>();
         if (existingClient != null)
         {
+            CreateGround();
+            CreateInvisibleWalls();
             existingClient.RepairSceneReferences();
             if (existingClient.Player != null && existingClient.GameCamera != null && existingClient.TargetMarker != null)
             {
@@ -40,6 +45,7 @@ public sealed class VelaBootstrap : MonoBehaviour
 
         CreateLight();
         CreateGround();
+        CreateInvisibleWalls();
 
         GameObject player = CreatePlayer();
         GameObject marker = CreateTargetMarker();
@@ -65,10 +71,37 @@ public sealed class VelaBootstrap : MonoBehaviour
 
     private static void CreateGround()
     {
-        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        GameObject ground = GameObject.Find("Ground");
+        if (ground == null)
+        {
+            ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        }
+
         ground.name = "Ground";
-        ground.transform.localScale = new Vector3(6f, 1f, 6f);
+        ground.transform.localScale = new Vector3(WorldSize * 0.1f, 1f, WorldSize * 0.1f);
         ground.GetComponent<Renderer>().material = MakeMaterial(new Color(0.12f, 0.2f, 0.16f), 0.85f);
+    }
+
+    private static void CreateInvisibleWalls()
+    {
+        CreateInvisibleWall("North Wall", new Vector3(0f, 2.5f, WorldRadius), new Vector3(WorldSize, 5f, 2f));
+        CreateInvisibleWall("South Wall", new Vector3(0f, 2.5f, -WorldRadius), new Vector3(WorldSize, 5f, 2f));
+        CreateInvisibleWall("East Wall", new Vector3(WorldRadius, 2.5f, 0f), new Vector3(2f, 5f, WorldSize));
+        CreateInvisibleWall("West Wall", new Vector3(-WorldRadius, 2.5f, 0f), new Vector3(2f, 5f, WorldSize));
+    }
+
+    private static void CreateInvisibleWall(string name, Vector3 position, Vector3 scale)
+    {
+        GameObject wall = GameObject.Find(name);
+        if (wall == null)
+        {
+            wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        }
+
+        wall.name = name;
+        wall.transform.position = position;
+        wall.transform.localScale = scale;
+        DestroyGenerated(wall.GetComponent<Renderer>());
     }
 
     private static GameObject CreatePlayer()
@@ -113,6 +146,7 @@ public sealed class VelaBootstrap : MonoBehaviour
         cameraObject.tag = "MainCamera";
         Camera camera = cameraObject.AddComponent<Camera>();
         camera.fieldOfView = 55f;
+        camera.farClipPlane = 3600f;
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.047f, 0.071f, 0.09f);
         return camera;
