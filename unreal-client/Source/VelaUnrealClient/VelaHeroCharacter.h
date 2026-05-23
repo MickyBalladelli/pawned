@@ -21,6 +21,7 @@ protected:
 private:
     void MoveForward(float Value);
     void MoveRight(float Value);
+    void ZoomCamera(float Value);
     void SendInputToServer();
     void UpdateMovementAnimation();
 
@@ -54,4 +55,7 @@ private:
     float ForwardInput = 0.0f;
     float RightInput = 0.0f;
     float SendAccumulator = 0.0f;
+    float MinCameraDistance = 220.0f;
+    float MaxCameraDistance = 1800.0f;
+    float ZoomStep = 120.0f;
 };

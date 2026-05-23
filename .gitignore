@@ -151,3 +151,6 @@ vite.config.ts.timestamp-*
 
 # Accidental local Unreal template project
 unreal-client/Vela/
+
+builds/
+build/

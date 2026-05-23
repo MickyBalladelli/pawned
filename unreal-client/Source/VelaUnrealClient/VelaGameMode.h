@@ -14,4 +14,12 @@ public:
 
 protected:
     virtual void BeginPlay() override;
+
+private:
+    class AStaticMeshActor* SpawnMeshActor(
+        class UStaticMesh* Mesh,
+        const FVector& Location,
+        const FRotator& Rotation,
+        const FVector& Scale,
+        bool bCollisionEnabled);
 };

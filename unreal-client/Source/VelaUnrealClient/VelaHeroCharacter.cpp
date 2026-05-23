@@ -93,7 +93,7 @@ AVelaHeroCharacter::AVelaHeroCharacter()
 
     SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
     SpringArm->SetupAttachment(RootComponent);
-    SpringArm->TargetArmLength = 360.0f;
+    SpringArm->TargetArmLength = 520.0f;
     SpringArm->SocketOffset = FVector(0.0f, 0.0f, 75.0f);
     SpringArm->SetRelativeRotation(FRotator(-18.0f, 0.0f, 0.0f));
     SpringArm->bUsePawnControlRotation = true;
@@ -134,6 +134,7 @@ void AVelaHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 
     PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &AVelaHeroCharacter::MoveForward);
     PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &AVelaHeroCharacter::MoveRight);
+    PlayerInputComponent->BindAxis(TEXT("CameraZoom"), this, &AVelaHeroCharacter::ZoomCamera);
     PlayerInputComponent->BindAxis(TEXT("Turn"), this, &APawn::AddControllerYawInput);
     PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &APawn::AddControllerPitchInput);
 }
@@ -160,6 +161,19 @@ void AVelaHeroCharacter::MoveRight(float Value)
         const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
         AddMovementInput(Direction, Value);
     }
+}
+
+void AVelaHeroCharacter::ZoomCamera(float Value)
+{
+    if (FMath::Abs(Value) <= KINDA_SMALL_NUMBER)
+    {
+        return;
+    }
+
+    SpringArm->TargetArmLength = FMath::Clamp(
+        SpringArm->TargetArmLength - Value * ZoomStep,
+        MinCameraDistance,
+        MaxCameraDistance);
 }
 
 void AVelaHeroCharacter::SendInputToServer()
