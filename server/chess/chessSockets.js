@@ -5,9 +5,29 @@ const {
   resignChessGame,
   cancelChessGame,
 } = require('./chessStore')
+const { playBotTurn } = require('./chessBotRunner')
 
 function chessRoom(gameId) {
   return `chess:game:${gameId}`
+}
+
+function emitGameUpdate(io, game) {
+  io.to(chessRoom(game.id)).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+}
+
+function emitMoveMade(io, result) {
+  io.to(chessRoom(result.game.id)).emit('chess:moveMade', result)
+  emitGameUpdate(io, result.game)
+}
+
+async function playAndEmitBotTurn(pool, io, gameId) {
+  const botResult = await playBotTurn(pool, gameId)
+
+  if (botResult) {
+    emitMoveMade(io, botResult)
+  }
+
+  return botResult
 }
 
 function registerChessSockets(io, socket, { pool }) {
@@ -54,9 +74,9 @@ function registerChessSockets(io, socket, { pool }) {
         promotion,
       })
 
-      io.to(chessRoom(result.game.id)).emit('chess:moveMade', result)
-      io.to(`user:${result.game.white_user_id}`).to(`user:${result.game.black_user_id}`).emit('chess:gameUpdated', result.game)
+      emitMoveMade(io, result)
       callback?.(result)
+      await playAndEmitBotTurn(pool, io, result.game.id)
     } catch (err) {
       callback?.({ error: err.message || 'Failed to make chess move' })
     }
@@ -72,7 +92,7 @@ function registerChessSockets(io, socket, { pool }) {
 
     try {
       const game = await resignChessGame(pool, gameId, socket.data.user)
-      io.to(chessRoom(game.id)).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      emitGameUpdate(io, game)
       callback?.({ game })
     } catch (err) {
       callback?.({ error: err.message || 'Failed to resign chess game' })
@@ -89,7 +109,7 @@ function registerChessSockets(io, socket, { pool }) {
 
     try {
       const game = await cancelChessGame(pool, gameId, socket.data.user)
-      io.to(chessRoom(game.id)).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      emitGameUpdate(io, game)
       callback?.({ game })
     } catch (err) {
       callback?.({ error: err.message || 'Failed to cancel chess game' })

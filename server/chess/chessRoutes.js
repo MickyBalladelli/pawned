@@ -3,17 +3,47 @@ const {
   getChessGame,
   listChessGames,
   createChessGame,
+  createBotChessGame,
   joinChessGame,
   listChessMoves,
   makeChessMove,
   resignChessGame,
   cancelChessGame,
 } = require('./chessStore')
+const { botLevels, openingBook } = require('./chessBot')
+const { playBotTurn } = require('./chessBotRunner')
+
+function emitGameUpdate(io, game) {
+  io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+}
+
+function emitMoveMade(io, result) {
+  io.to(`chess:game:${result.game.id}`).emit('chess:moveMade', result)
+  emitGameUpdate(io, result.game)
+}
+
+async function playAndEmitBotTurn(pool, io, gameId) {
+  const botResult = await playBotTurn(pool, gameId)
+
+  if (botResult) {
+    emitMoveMade(io, botResult)
+  }
+
+  return botResult
+}
 
 function createChessRouter({ pool, authenticate, io }) {
   const router = express.Router()
 
   router.use(authenticate)
+
+  router.get('/bot-levels', (req, res) => {
+    res.json({ levels: botLevels })
+  })
+
+  router.get('/openings', (req, res) => {
+    res.json(openingBook)
+  })
 
   router.get('/games', async (req, res) => {
     try {
@@ -32,12 +62,30 @@ function createChessRouter({ pool, authenticate, io }) {
         opponentUserId: req.body?.opponentUserId,
       })
 
-      io.to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      emitGameUpdate(io, game)
       res.status(201).json({ game })
     } catch (err) {
       console.error('Error creating chess game:', err)
       const status = err.message === 'Opponent must be another user' ? 400 : 500
       res.status(status).json({ error: err.message || 'Failed to create chess game' })
+    }
+  })
+
+  router.post('/bot-games', async (req, res) => {
+    try {
+      const game = await createBotChessGame(pool, req.user, {
+        color: req.body?.color,
+        level: req.body?.level,
+      })
+      const botResult = await playAndEmitBotTurn(pool, io, game.id)
+      const activeGame = botResult?.game || game
+      const moves = await listChessMoves(pool, activeGame.id)
+
+      emitGameUpdate(io, activeGame)
+      res.status(201).json({ game: activeGame, moves })
+    } catch (err) {
+      console.error('Error creating bot chess game:', err)
+      res.status(500).json({ error: err.message || 'Failed to create bot chess game' })
     }
   })
 
@@ -63,7 +111,7 @@ function createChessRouter({ pool, authenticate, io }) {
         color: req.body?.color,
       })
 
-      io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      emitGameUpdate(io, game)
       res.json({ game })
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
@@ -79,8 +127,8 @@ function createChessRouter({ pool, authenticate, io }) {
         promotion: req.body?.promotion,
       })
 
-      io.to(`chess:game:${result.game.id}`).emit('chess:moveMade', result)
-      io.to(`user:${result.game.white_user_id}`).to(`user:${result.game.black_user_id}`).emit('chess:gameUpdated', result.game)
+      emitMoveMade(io, result)
+      await playAndEmitBotTurn(pool, io, result.game.id)
       res.status(201).json(result)
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
@@ -91,7 +139,7 @@ function createChessRouter({ pool, authenticate, io }) {
   router.post('/games/:id/resign', async (req, res) => {
     try {
       const game = await resignChessGame(pool, req.params.id, req.user)
-      io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      emitGameUpdate(io, game)
       res.json({ game })
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
@@ -102,7 +150,7 @@ function createChessRouter({ pool, authenticate, io }) {
   router.post('/games/:id/cancel', async (req, res) => {
     try {
       const game = await cancelChessGame(pool, req.params.id, req.user)
-      io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      emitGameUpdate(io, game)
       res.json({ game })
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400

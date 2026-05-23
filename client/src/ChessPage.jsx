@@ -11,8 +11,10 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  MenuItem,
   Paper,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -29,6 +31,7 @@ import ChessBoard from './ChessBoard'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+const botLevels = [600, 800, 1000, 1200, 1400, 1600]
 
 function getAuthHeaders(authToken) {
   return { Authorization: `Bearer ${authToken}` }
@@ -144,6 +147,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [moves, setMoves] = useState([])
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
+  const [botLevel, setBotLevel] = useState(800)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
@@ -299,6 +303,32 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setSelectedGameId(data.game.id)
       setGames((current) => [data.game, ...current])
       onNotice('Chess game created')
+      loadGames()
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function createBotGame() {
+    setBusy(true)
+
+    try {
+      const data = await requestJson('/api/chess/bot-games', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          color: newGameColor,
+          level: botLevel,
+        }),
+      })
+
+      setSelectedGameId(data.game.id)
+      setGames((current) => [data.game, ...current])
+      setSelectedGame(data.game)
+      setMoves(data.moves || [])
+      onNotice(`Bot game created at ${data.game.bot_level || botLevel}`)
       loadGames()
     } catch (err) {
       onError(err.message)
@@ -495,8 +525,33 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               disabled={busy}
               fullWidth
             >
-              New game
+              New human game
             </Button>
+            <Stack direction="row" spacing={1}>
+              <TextField
+                select
+                label="Bot level"
+                size="small"
+                value={botLevel}
+                onChange={(event) => setBotLevel(Number(event.target.value))}
+                sx={{ width: 132 }}
+              >
+                {botLevels.map((level) => (
+                  <MenuItem key={level} value={level}>
+                    {level}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                variant="outlined"
+                startIcon={<SportsEsports />}
+                onClick={createBotGame}
+                disabled={busy}
+                sx={{ flex: 1 }}
+              >
+                New bot game
+              </Button>
+            </Stack>
           </Stack>
 
           <Divider sx={{ my: 2 }} />
@@ -525,7 +580,12 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     primary={gameTitle(game)}
                     secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
                   />
-                  <Chip size="small" label={statusLabel(game)} variant="outlined" />
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                    {game.is_bot_game && (
+                      <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
+                    )}
+                    <Chip size="small" label={statusLabel(game)} variant="outlined" />
+                  </Stack>
                 </ListItemButton>
               ))}
             </List>

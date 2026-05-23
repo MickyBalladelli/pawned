@@ -1,6 +1,9 @@
 const { Chess } = require('chess.js')
+const crypto = require('crypto')
+const { normalizeBotLevel } = require('./chessBot')
 
 const startingFen = new Chess().fen()
+const chessBotUsername = 'VelaBot'
 
 function normalizeColor(color) {
   return color === 'black' ? 'black' : 'white'
@@ -61,6 +64,8 @@ function mapGame(row) {
     white_user_id: row.white_user_id === null ? null : Number(row.white_user_id),
     black_user_id: row.black_user_id === null ? null : Number(row.black_user_id),
     winner_user_id: row.winner_user_id === null ? null : Number(row.winner_user_id),
+    bot_level: row.bot_level === null || row.bot_level === undefined ? null : Number(row.bot_level),
+    is_bot_game: Boolean(row.is_bot_game),
     turn_color: row.turn_color || currentTurnColor(row.fen),
   }
 }
@@ -77,9 +82,14 @@ async function createChessTables(pool) {
       winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      ended_at TIMESTAMP
+      ended_at TIMESTAMP,
+      is_bot_game BOOLEAN DEFAULT FALSE,
+      bot_level INTEGER
     )
   `)
+
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS is_bot_game BOOLEAN DEFAULT FALSE')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS bot_level INTEGER')
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chess_moves (
@@ -100,7 +110,28 @@ async function createChessTables(pool) {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_chess_games_white_user_id ON chess_games(white_user_id)')
   await pool.query('CREATE INDEX IF NOT EXISTS idx_chess_games_black_user_id ON chess_games(black_user_id)')
   await pool.query('CREATE INDEX IF NOT EXISTS idx_chess_games_status ON chess_games(status)')
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_chess_games_is_bot_game ON chess_games(is_bot_game)')
   await pool.query('CREATE INDEX IF NOT EXISTS idx_chess_moves_game_id ON chess_moves(game_id)')
+}
+
+async function getChessBotUser(pool) {
+  const passwordHash = `sha256:${crypto.randomBytes(32).toString('hex')}`
+  const result = await pool.query(
+    `
+      INSERT INTO users (username, password_hash, is_admin, is_verified)
+      VALUES ($1, $2, false, true)
+      ON CONFLICT (username) DO UPDATE
+      SET is_verified = true,
+          password_hash = CASE
+            WHEN users.password_hash IS NULL OR users.password_hash = 'bot' THEN EXCLUDED.password_hash
+            ELSE users.password_hash
+          END
+      RETURNING id, username
+    `,
+    [chessBotUsername, passwordHash]
+  )
+
+  return result.rows[0]
 }
 
 async function getChessGame(pool, gameId, client = pool) {
@@ -172,6 +203,33 @@ async function createChessGame(pool, user, options = {}) {
       RETURNING id
     `,
     [whiteUserId, blackUserId, startingFen, status]
+  )
+
+  return getChessGame(pool, result.rows[0].id)
+}
+
+async function createBotChessGame(pool, user, options = {}) {
+  const playerColor = normalizeColor(options.color)
+  const botLevel = normalizeBotLevel(options.level)
+  const bot = await getChessBotUser(pool)
+  const whiteUserId = playerColor === 'white' ? user.id : bot.id
+  const blackUserId = playerColor === 'black' ? user.id : bot.id
+
+  const result = await pool.query(
+    `
+      INSERT INTO chess_games (
+        white_user_id,
+        black_user_id,
+        fen,
+        status,
+        turn_color,
+        is_bot_game,
+        bot_level
+      )
+      VALUES ($1, $2, $3, 'active', 'white', true, $4)
+      RETURNING id
+    `,
+    [whiteUserId, blackUserId, startingFen, botLevel]
   )
 
   return getChessGame(pool, result.rows[0].id)
@@ -457,9 +515,11 @@ async function cancelChessGame(pool, gameId, user) {
 
 module.exports = {
   createChessTables,
+  getChessBotUser,
   getChessGame,
   listChessGames,
   createChessGame,
+  createBotChessGame,
   joinChessGame,
   listChessMoves,
   makeChessMove,
