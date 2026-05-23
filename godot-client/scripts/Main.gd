@@ -13,6 +13,9 @@ var reconnect_timer: float = 0.0
 var latest_input: Dictionary = {"moveX": 0.0, "moveY": 0.0}
 var camera_distance: float = 10.7
 var right_mouse_down: bool = false
+var left_mouse_down: bool = false
+var left_mouse_dragging: bool = false
+var left_mouse_hold_time: float = 0.0
 var faded_occluders: Array[Node3D] = []
 var original_visibility: Dictionary = {}
 
@@ -24,7 +27,17 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+			left_mouse_down = true
+			left_mouse_dragging = false
+			left_mouse_hold_time = 0.0
 			_move_player_to_mouse(event.position)
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if left_mouse_dragging:
+				player.clear_move_target()
+				target_marker.visible = false
+			left_mouse_down = false
+			left_mouse_dragging = false
+			left_mouse_hold_time = 0.0
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			right_mouse_down = event.pressed
 			if event.pressed:
@@ -35,6 +48,8 @@ func _input(event: InputEvent) -> void:
 			_zoom_camera(0.8)
 	elif event is InputEventMouseMotion and right_mouse_down:
 		_zoom_camera(event.relative.y * 0.035)
+	elif event is InputEventMouseMotion and left_mouse_down:
+		_move_player_to_mouse(event.position)
 	elif event is InputEventPanGesture:
 		_zoom_camera(event.delta.y * 0.8)
 	elif event is InputEventMagnifyGesture:
@@ -42,6 +57,7 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	socket.poll()
+	_update_held_mouse_movement(delta)
 	_update_camera(delta)
 	_update_occluder_fade()
 	if target_marker.visible and not player.has_move_target:
@@ -110,6 +126,16 @@ func _get_ground_position(mouse_position: Vector2) -> Variant:
 
 func _zoom_camera(amount: float) -> void:
 	camera_distance = clampf(camera_distance + amount, 5.5, 18.0)
+
+func _update_held_mouse_movement(delta: float) -> void:
+	if not left_mouse_down:
+		return
+
+	left_mouse_hold_time += delta
+	if left_mouse_hold_time > 0.12:
+		left_mouse_dragging = true
+
+	_move_player_to_mouse(get_viewport().get_mouse_position())
 
 func _update_occluder_fade() -> void:
 	var next_faded: Array[Node3D] = []
