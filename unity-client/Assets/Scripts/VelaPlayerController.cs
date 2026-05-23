@@ -50,7 +50,7 @@ public sealed class VelaPlayerController : MonoBehaviour
 
         if (direction.magnitude > 0.01f)
         {
-            float targetYaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+            float targetYaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + 180f;
             transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.Euler(0f, targetYaw, 0f), turnSpeed * Time.deltaTime);
             hasLookTarget = false;
         }
@@ -93,7 +93,7 @@ public sealed class VelaPlayerController : MonoBehaviour
             return;
         }
 
-        lookTargetYaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+        lookTargetYaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + 180f;
         hasLookTarget = true;
     }
 

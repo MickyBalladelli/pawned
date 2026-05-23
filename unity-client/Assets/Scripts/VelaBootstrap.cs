@@ -32,6 +32,11 @@ public sealed class VelaBootstrap : MonoBehaviour
             CreateGround();
             CreateInvisibleWalls();
             existingClient.RepairSceneReferences();
+            if (existingClient.Player != null)
+            {
+                CreateImportedSoldier(existingClient.Player.transform);
+            }
+
             if (existingClient.Player != null && existingClient.GameCamera != null && existingClient.TargetMarker != null)
             {
                 return;
@@ -110,6 +115,11 @@ public sealed class VelaBootstrap : MonoBehaviour
         player.transform.position = new Vector3(0f, 0.95f, 0f);
         player.AddComponent<VelaPlayerController>();
 
+        if (CreateImportedSoldier(player.transform))
+        {
+            return player;
+        }
+
         Material bodyMaterial = MakeMaterial(new Color(0.18f, 0.55f, 0.95f), 0.55f);
         Material skinMaterial = MakeMaterial(new Color(0.86f, 0.7f, 0.56f), 0.5f);
 
@@ -128,6 +138,49 @@ public sealed class VelaBootstrap : MonoBehaviour
         facing.GetComponent<Renderer>().material = skinMaterial;
 
         return player;
+    }
+
+    private static bool CreateImportedSoldier(Transform parent)
+    {
+#if UNITY_EDITOR
+        if (parent.Find("Soldier") != null)
+        {
+            Transform existingSoldier = parent.Find("Soldier");
+            existingSoldier.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            DestroyFallbackPlayerParts(parent);
+            return true;
+        }
+
+        const string SoldierPath = "Assets/LowPolySoldiers_demo/models/Soldier_demo.FBX";
+        GameObject soldierAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>(SoldierPath);
+        if (soldierAsset == null)
+        {
+            return false;
+        }
+
+        GameObject soldier = Object.Instantiate(soldierAsset, parent);
+        soldier.name = "Soldier";
+        soldier.transform.localPosition = new Vector3(0f, -0.95f, 0f);
+        soldier.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
+        soldier.transform.localScale = Vector3.one;
+        DestroyFallbackPlayerParts(parent);
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    private static void DestroyFallbackPlayerParts(Transform parent)
+    {
+        string[] fallbackPartNames = { "Body", "Head", "LeftArm", "RightArm", "LeftLeg", "RightLeg", "FacingMarker" };
+        foreach (string partName in fallbackPartNames)
+        {
+            Transform part = parent.Find(partName);
+            if (part != null)
+            {
+                DestroyGenerated(part.gameObject);
+            }
+        }
     }
 
     private static GameObject CreateTargetMarker()
