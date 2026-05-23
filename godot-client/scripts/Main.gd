@@ -19,7 +19,7 @@ func _ready() -> void:
 	target_marker.visible = false
 	_connect_to_server()
 
-func _unhandled_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 			_move_player_to_mouse(event.position)
@@ -82,16 +82,15 @@ func _move_player_to_mouse(mouse_position: Vector2) -> void:
 
 func _get_ground_position(mouse_position: Vector2) -> Variant:
 	var ray_origin: Vector3 = camera.project_ray_origin(mouse_position)
-	var ray_end: Vector3 = ray_origin + camera.project_ray_normal(mouse_position) * 1000.0
-	var query := PhysicsRayQueryParameters3D.create(ray_origin, ray_end)
-	query.exclude = [player.get_rid()]
-
-	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
-	var result: Dictionary = space_state.intersect_ray(query)
-	if result.is_empty():
+	var ray_direction: Vector3 = camera.project_ray_normal(mouse_position)
+	if is_zero_approx(ray_direction.y):
 		return null
 
-	return result.position
+	var distance_to_ground: float = -ray_origin.y / ray_direction.y
+	if distance_to_ground < 0.0:
+		return null
+
+	return ray_origin + ray_direction * distance_to_ground
 
 func _zoom_camera(amount: float) -> void:
 	camera_distance = clampf(camera_distance + amount, 5.5, 18.0)
