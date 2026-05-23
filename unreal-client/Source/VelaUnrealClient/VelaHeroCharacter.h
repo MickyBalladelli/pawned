@@ -22,6 +22,7 @@ private:
     void MoveForward(float Value);
     void MoveRight(float Value);
     void SendInputToServer();
+    void UpdateMovementAnimation();
 
     UPROPERTY(VisibleAnywhere)
     class USpringArmComponent* SpringArm;
@@ -40,6 +41,15 @@ private:
 
     UPROPERTY(VisibleAnywhere)
     class UPointLightComponent* HeroLight;
+
+    UPROPERTY()
+    class UAnimSequence* IdleAnimation;
+
+    UPROPERTY()
+    class UAnimSequence* RunAnimation;
+
+    UPROPERTY()
+    class UAnimSequence* ActiveAnimation;
 
     float ForwardInput = 0.0f;
     float RightInput = 0.0f;

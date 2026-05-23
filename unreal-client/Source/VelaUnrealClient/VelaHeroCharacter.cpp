@@ -1,6 +1,7 @@
 #include "VelaHeroCharacter.h"
 
 #include "Camera/CameraComponent.h"
+#include "Animation/AnimSequence.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -21,14 +22,27 @@ AVelaHeroCharacter::AVelaHeroCharacter()
     bUseControllerRotationYaw = false;
 
     bool bHasHumanoidMesh = false;
-    static ConstructorHelpers::FObjectFinder<USkeletalMesh> HumanoidAsset(TEXT("/Game/Character/Mesh/SK_Mannequin.SK_Mannequin"));
+    static ConstructorHelpers::FObjectFinder<USkeletalMesh> HumanoidAsset(TEXT("/Game/Mannequin/Character/Mesh/SK_Mannequin.SK_Mannequin"));
     if (HumanoidAsset.Succeeded())
     {
         GetMesh()->SetSkeletalMesh(HumanoidAsset.Object);
         GetMesh()->SetRelativeLocation(FVector(0.0f, 0.0f, -96.0f));
         GetMesh()->SetRelativeRotation(FRotator(0.0f, -90.0f, 0.0f));
         GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
         bHasHumanoidMesh = true;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> IdleAsset(TEXT("/Game/Character/Animations/ThirdPersonIdle.ThirdPersonIdle"));
+    if (IdleAsset.Succeeded())
+    {
+        IdleAnimation = IdleAsset.Object;
+    }
+
+    static ConstructorHelpers::FObjectFinder<UAnimSequence> RunAsset(TEXT("/Game/Character/Animations/ThirdPersonRun.ThirdPersonRun"));
+    if (RunAsset.Succeeded())
+    {
+        RunAnimation = RunAsset.Object;
     }
 
     BodyMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BodyMesh"));
@@ -97,6 +111,7 @@ void AVelaHeroCharacter::BeginPlay()
 
     UE_LOG(LogTemp, Display, TEXT("Vela hero spawned"));
 
+    UpdateMovementAnimation();
 }
 
 void AVelaHeroCharacter::Tick(float DeltaSeconds)
@@ -109,6 +124,8 @@ void AVelaHeroCharacter::Tick(float DeltaSeconds)
         SendAccumulator = 0.0f;
         SendInputToServer();
     }
+
+    UpdateMovementAnimation();
 }
 
 void AVelaHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -151,4 +168,21 @@ void AVelaHeroCharacter::SendInputToServer()
     {
         VelaGameInstance->SendMovementInput(RightInput, ForwardInput);
     }
+}
+
+void AVelaHeroCharacter::UpdateMovementAnimation()
+{
+    if (!GetMesh()->GetSkeletalMeshAsset())
+    {
+        return;
+    }
+
+    UAnimSequence* DesiredAnimation = GetVelocity().SizeSquared2D() > 100.0f ? RunAnimation : IdleAnimation;
+    if (!DesiredAnimation || DesiredAnimation == ActiveAnimation)
+    {
+        return;
+    }
+
+    ActiveAnimation = DesiredAnimation;
+    GetMesh()->PlayAnimation(ActiveAnimation, true);
 }
