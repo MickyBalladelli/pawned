@@ -9,9 +9,9 @@ public sealed class VelaGameClient : MonoBehaviour
 {
     private const string ServerUrl = "ws://127.0.0.1:4100/play";
 
-    public VelaPlayerController Player { get; set; }
-    public Camera Camera { get; set; }
-    public GameObject TargetMarker { get; set; }
+    public VelaPlayerController Player;
+    public Camera GameCamera;
+    public GameObject TargetMarker;
 
     private ClientWebSocket socket;
     private CancellationTokenSource cancellation;
@@ -22,15 +22,35 @@ public sealed class VelaGameClient : MonoBehaviour
     private bool leftMouseDown;
     private bool leftMouseDragging;
     private float leftMouseHoldTime;
+    private Vector3 leftMouseDownPosition;
+
+    private void Awake()
+    {
+        RepairSceneReferences();
+    }
 
     private void Start()
     {
+        RepairSceneReferences();
+        if (Player == null)
+        {
+            statusText = "Missing player";
+            enabled = false;
+            return;
+        }
+
         Player.InputChanged += OnPlayerInputChanged;
         _ = ConnectToServer();
     }
 
     private void Update()
     {
+        RepairSceneReferences();
+        if (Player == null || GameCamera == null || TargetMarker == null)
+        {
+            return;
+        }
+
         UpdateMouseInput();
         UpdateHeldMouseMovement();
         UpdateCamera();
@@ -52,6 +72,32 @@ public sealed class VelaGameClient : MonoBehaviour
     {
         cancellation?.Cancel();
         socket?.Dispose();
+    }
+
+    public void RepairSceneReferences()
+    {
+        if (Player == null)
+        {
+            Player = FindObjectOfType<VelaPlayerController>();
+        }
+
+        if (GameCamera == null)
+        {
+            GameCamera = Camera.main;
+            if (GameCamera == null)
+            {
+                GameObject cameraObject = GameObject.Find("Main Camera");
+                if (cameraObject != null)
+                {
+                    GameCamera = cameraObject.GetComponent<Camera>();
+                }
+            }
+        }
+
+        if (TargetMarker == null)
+        {
+            TargetMarker = GameObject.Find("TargetMarker");
+        }
     }
 
     private async Task ConnectToServer()
@@ -144,6 +190,7 @@ public sealed class VelaGameClient : MonoBehaviour
             leftMouseDown = true;
             leftMouseDragging = false;
             leftMouseHoldTime = 0f;
+            leftMouseDownPosition = Input.mousePosition;
             MovePlayerToMouse(Input.mousePosition);
         }
         else if (Input.GetMouseButtonUp(0))
@@ -152,6 +199,10 @@ public sealed class VelaGameClient : MonoBehaviour
             {
                 Player.ClearMoveTarget();
                 TargetMarker.SetActive(false);
+            }
+            else
+            {
+                MovePlayerToMouse(Input.mousePosition);
             }
 
             leftMouseDown = false;
@@ -185,7 +236,7 @@ public sealed class VelaGameClient : MonoBehaviour
         }
 
         leftMouseHoldTime += Time.deltaTime;
-        if (leftMouseHoldTime > 0.12f)
+        if (leftMouseHoldTime > 0.12f && (Input.mousePosition - leftMouseDownPosition).sqrMagnitude > 16f)
         {
             leftMouseDragging = true;
             MovePlayerToMouse(Input.mousePosition);
@@ -196,8 +247,8 @@ public sealed class VelaGameClient : MonoBehaviour
     {
         Vector3 offset = new Vector3(0f, cameraDistance * 0.6f, cameraDistance * 0.78f);
         Vector3 targetPosition = Player.transform.position + offset;
-        Camera.transform.position = Vector3.Lerp(Camera.transform.position, targetPosition, 8f * Time.deltaTime);
-        Camera.transform.LookAt(Player.transform.position + new Vector3(0f, 0.7f, 0f));
+        GameCamera.transform.position = Vector3.Lerp(GameCamera.transform.position, targetPosition, 8f * Time.deltaTime);
+        GameCamera.transform.LookAt(Player.transform.position + new Vector3(0f, 0.7f, 0f));
     }
 
     private void MovePlayerToMouse(Vector3 mousePosition)
@@ -222,7 +273,13 @@ public sealed class VelaGameClient : MonoBehaviour
 
     private bool TryGetGroundPosition(Vector3 mousePosition, out Vector3 groundPosition)
     {
-        Ray ray = Camera.ScreenPointToRay(mousePosition);
+        if (GameCamera == null)
+        {
+            groundPosition = Vector3.zero;
+            return false;
+        }
+
+        Ray ray = GameCamera.ScreenPointToRay(mousePosition);
         Plane ground = new Plane(Vector3.up, Vector3.zero);
         if (ground.Raycast(ray, out float distance))
         {

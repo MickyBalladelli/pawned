@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[ExecuteAlways]
 public sealed class VelaEnvironmentScatter : MonoBehaviour
 {
     [SerializeField] private int seed = 7241;
@@ -11,8 +12,13 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
 
     private System.Random random;
 
-    private void Start()
+    private void OnEnable()
     {
+        if (transform.childCount > 0)
+        {
+            return;
+        }
+
         random = new System.Random(seed);
         ScatterTrees();
         ScatterRocks();
@@ -37,14 +43,14 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
             trunkObject.transform.localPosition = new Vector3(0f, 0.75f, 0f);
             trunkObject.transform.localScale = new Vector3(0.25f, 1.5f, 0.25f);
             trunkObject.GetComponent<Renderer>().material = trunk;
-            Destroy(trunkObject.GetComponent<Collider>());
+            VelaBootstrap.DestroyGenerated(trunkObject.GetComponent<Collider>());
 
             GameObject leavesObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             leavesObject.transform.SetParent(tree.transform, false);
             leavesObject.transform.localPosition = new Vector3(0f, 1.75f, 0f);
             leavesObject.transform.localScale = new Vector3(1.25f, 1.25f, 1.25f);
             leavesObject.GetComponent<Renderer>().material = leaves;
-            Destroy(leavesObject.GetComponent<Collider>());
+            VelaBootstrap.DestroyGenerated(leavesObject.GetComponent<Collider>());
         }
     }
 
@@ -61,7 +67,7 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
             float scale = RandomRange(0.75f, 1.45f);
             rockObject.transform.localScale = new Vector3(0.7f, 0.3f, 0.5f) * scale;
             rockObject.GetComponent<Renderer>().material = rock;
-            Destroy(rockObject.GetComponent<Collider>());
+            VelaBootstrap.DestroyGenerated(rockObject.GetComponent<Collider>());
         }
     }
 
@@ -78,7 +84,7 @@ public sealed class VelaEnvironmentScatter : MonoBehaviour
             float scale = RandomRange(0.75f, 1.55f);
             plantObject.transform.localScale = new Vector3(0.12f, 0.16f, 0.12f) * scale;
             plantObject.GetComponent<Renderer>().material = plant;
-            Destroy(plantObject.GetComponent<Collider>());
+            VelaBootstrap.DestroyGenerated(plantObject.GetComponent<Collider>());
         }
     }
 

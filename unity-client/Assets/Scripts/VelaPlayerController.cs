@@ -1,7 +1,6 @@
 using System;
 using UnityEngine;
 
-[RequireComponent(typeof(CharacterController))]
 public sealed class VelaPlayerController : MonoBehaviour
 {
     public event Action<Vector2> InputChanged;
@@ -10,7 +9,6 @@ public sealed class VelaPlayerController : MonoBehaviour
     [SerializeField] private float turnSpeed = 10f;
     [SerializeField] private float targetStopDistance = 0.12f;
 
-    private CharacterController controller;
     private Vector2 lastInput;
     private Vector3 moveTarget;
     private bool hasMoveTarget;
@@ -19,11 +17,6 @@ public sealed class VelaPlayerController : MonoBehaviour
     private float walkTime;
 
     public bool HasMoveTarget => hasMoveTarget;
-
-    private void Awake()
-    {
-        controller = GetComponent<CharacterController>();
-    }
 
     private void Update()
     {
@@ -52,7 +45,8 @@ public sealed class VelaPlayerController : MonoBehaviour
             }
         }
 
-        controller.SimpleMove(direction * speed);
+        transform.position += direction * speed * Time.deltaTime;
+        transform.position = new Vector3(transform.position.x, 0.95f, transform.position.z);
 
         if (direction.magnitude > 0.01f)
         {

@@ -2,12 +2,35 @@ using UnityEngine;
 
 public sealed class VelaBootstrap : MonoBehaviour
 {
+#if UNITY_EDITOR
+    [UnityEditor.InitializeOnLoadMethod]
+    private static void BuildEditorWorld()
+    {
+        UnityEditor.EditorApplication.delayCall += () =>
+        {
+            if (Application.isPlaying)
+            {
+                return;
+            }
+
+            BuildWorld();
+            UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
+            UnityEditor.SceneView.RepaintAll();
+        };
+    }
+#endif
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void BuildWorld()
     {
-        if (FindObjectOfType<VelaGameClient>() != null)
+        VelaGameClient existingClient = FindObjectOfType<VelaGameClient>();
+        if (existingClient != null)
         {
-            return;
+            existingClient.RepairSceneReferences();
+            if (existingClient.Player != null && existingClient.GameCamera != null && existingClient.TargetMarker != null)
+            {
+                return;
+            }
         }
 
         RenderSettings.skybox = null;
@@ -22,9 +45,9 @@ public sealed class VelaBootstrap : MonoBehaviour
         GameObject marker = CreateTargetMarker();
         Camera camera = CreateCamera();
 
-        VelaGameClient client = new GameObject("VelaGameClient").AddComponent<VelaGameClient>();
+        VelaGameClient client = existingClient != null ? existingClient : new GameObject("VelaGameClient").AddComponent<VelaGameClient>();
         client.Player = player.GetComponent<VelaPlayerController>();
-        client.Camera = camera;
+        client.GameCamera = camera;
         client.TargetMarker = marker;
 
         new GameObject("EnvironmentScatter").AddComponent<VelaEnvironmentScatter>();
@@ -52,8 +75,6 @@ public sealed class VelaBootstrap : MonoBehaviour
     {
         GameObject player = new GameObject("Player");
         player.transform.position = new Vector3(0f, 0.95f, 0f);
-        player.AddComponent<CharacterController>().height = 1.8f;
-        player.GetComponent<CharacterController>().radius = 0.42f;
         player.AddComponent<VelaPlayerController>();
 
         Material bodyMaterial = MakeMaterial(new Color(0.18f, 0.55f, 0.95f), 0.55f);
@@ -94,7 +115,6 @@ public sealed class VelaBootstrap : MonoBehaviour
         camera.fieldOfView = 55f;
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.047f, 0.071f, 0.09f);
-        cameraObject.AddComponent<AudioListener>();
         return camera;
     }
 
@@ -106,7 +126,7 @@ public sealed class VelaBootstrap : MonoBehaviour
         part.transform.localPosition = position;
         part.transform.localScale = scale;
         part.GetComponent<Renderer>().material = material;
-        Object.Destroy(part.GetComponent<Collider>());
+        DestroyGenerated(part.GetComponent<Collider>());
     }
 
     private static void CreateSpherePart(string name, Transform parent, Vector3 position, Vector3 scale, Material material)
@@ -117,7 +137,7 @@ public sealed class VelaBootstrap : MonoBehaviour
         part.transform.localPosition = position;
         part.transform.localScale = scale;
         part.GetComponent<Renderer>().material = material;
-        Object.Destroy(part.GetComponent<Collider>());
+        DestroyGenerated(part.GetComponent<Collider>());
     }
 
     public static Material MakeMaterial(Color color, float smoothness)
@@ -126,5 +146,22 @@ public sealed class VelaBootstrap : MonoBehaviour
         material.color = color;
         material.SetFloat("_Glossiness", 1f - smoothness);
         return material;
+    }
+
+    public static void DestroyGenerated(Object generatedObject)
+    {
+        if (generatedObject == null)
+        {
+            return;
+        }
+
+        if (Application.isPlaying)
+        {
+            Object.Destroy(generatedObject);
+        }
+        else
+        {
+            Object.DestroyImmediate(generatedObject);
+        }
     }
 }
