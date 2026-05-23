@@ -611,9 +611,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr', xl: 'minmax(320px, 640px) minmax(240px, 1fr)' },
-                gap: 2,
+                gridTemplateColumns: { xs: '1fr', lg: 'minmax(320px, 560px) 220px' },
+                gap: { xs: 2, lg: 3 },
                 alignItems: 'start',
+                justifyContent: { xs: 'center', lg: 'start' },
               }}
             >
               <Box>
@@ -638,7 +639,15 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 )}
               </Box>
 
-              <Paper variant="outlined" sx={{ p: 2 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  width: { xs: '100%', lg: 220 },
+                  maxHeight: { lg: 520 },
+                  overflow: 'auto',
+                }}
+              >
                 <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
                   Moves
                 </Typography>

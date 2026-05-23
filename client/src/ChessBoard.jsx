@@ -27,7 +27,7 @@ function ChessBoard({
   themeMode,
 }) {
   return (
-    <Box sx={{ width: '100%', maxWidth: 520, mx: { xs: 'auto', xl: 0 } }}>
+    <Box sx={{ width: '100%', maxWidth: 520, mx: { xs: 'auto', lg: 0 } }}>
       <Chessboard
         options={{
           id: 'vela-chessboard',
