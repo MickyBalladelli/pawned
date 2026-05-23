@@ -15,11 +15,17 @@ public sealed class VelaPlayerController : MonoBehaviour
     private float lookTargetYaw;
     private bool hasLookTarget;
     private float walkTime;
+    private VelaSoldierAnimator soldierAnimator;
 
     public bool HasMoveTarget => hasMoveTarget;
 
     private void Update()
     {
+        if (soldierAnimator == null)
+        {
+            soldierAnimator = GetComponentInChildren<VelaSoldierAnimator>();
+        }
+
         float moveX = GetAxis(KeyCode.A, KeyCode.D);
         float moveY = GetAxis(KeyCode.W, KeyCode.S);
         Vector2 input = Vector2.ClampMagnitude(new Vector2(moveX, moveY), 1f);
@@ -71,6 +77,22 @@ public sealed class VelaPlayerController : MonoBehaviour
         }
 
         UpdateWalkAnimation(direction.magnitude);
+        UpdateSoldierAnimation(direction.magnitude);
+
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            soldierAnimator?.Jump();
+        }
+
+        if (Input.GetKeyDown(KeyCode.F))
+        {
+            soldierAnimator?.Shoot();
+        }
+
+        if (Input.GetKeyDown(KeyCode.K))
+        {
+            soldierAnimator?.Die();
+        }
     }
 
     public void SetMoveTarget(Vector3 target)
@@ -99,6 +121,11 @@ public sealed class VelaPlayerController : MonoBehaviour
 
     private void UpdateWalkAnimation(float moveAmount)
     {
+        if (soldierAnimator != null)
+        {
+            return;
+        }
+
         Transform leftArm = transform.Find("LeftArm");
         Transform rightArm = transform.Find("RightArm");
         Transform leftLeg = transform.Find("LeftLeg");
@@ -124,6 +151,12 @@ public sealed class VelaPlayerController : MonoBehaviour
         float bob = Mathf.Sin(walkTime * 2f) * 0.04f * Mathf.Clamp01(moveAmount);
         if (body != null) body.localPosition = new Vector3(0f, -0.1f + bob, 0f);
         if (head != null) head.localPosition = new Vector3(0f, 0.8f + bob, 0f);
+    }
+
+    private void UpdateSoldierAnimation(float moveAmount)
+    {
+        bool running = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+        soldierAnimator?.SetMovement(moveAmount, running);
     }
 
     private static float GetAxis(KeyCode negative, KeyCode positive)

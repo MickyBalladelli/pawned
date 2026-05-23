@@ -147,6 +147,7 @@ public sealed class VelaBootstrap : MonoBehaviour
         {
             Transform existingSoldier = parent.Find("Soldier");
             existingSoldier.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            ConfigureSoldierAnimator(existingSoldier.gameObject);
             DestroyFallbackPlayerParts(parent);
             return true;
         }
@@ -163,11 +164,41 @@ public sealed class VelaBootstrap : MonoBehaviour
         soldier.transform.localPosition = new Vector3(0f, -0.95f, 0f);
         soldier.transform.localRotation = Quaternion.Euler(0f, 180f, 0f);
         soldier.transform.localScale = Vector3.one;
+        ConfigureSoldierAnimator(soldier);
         DestroyFallbackPlayerParts(parent);
         return true;
 #else
         return false;
 #endif
+    }
+
+    private static void ConfigureSoldierAnimator(GameObject soldier)
+    {
+#if UNITY_EDITOR
+        VelaSoldierAnimator soldierAnimator = soldier.GetComponent<VelaSoldierAnimator>();
+        if (soldierAnimator == null)
+        {
+            soldierAnimator = soldier.AddComponent<VelaSoldierAnimator>();
+        }
+
+        soldierAnimator.IdleClip = LoadAnimationClip("Assets/LowPolySoldiers_demo/animation/demo_combat_idle.FBX");
+        soldierAnimator.RunClip = LoadAnimationClip("Assets/LowPolySoldiers_demo/animation/demo_combat_run.FBX");
+        soldierAnimator.ShootClip = LoadAnimationClip("Assets/LowPolySoldiers_demo/animation/demo_combat_shoot.FBX");
+#endif
+    }
+
+    private static AnimationClip LoadAnimationClip(string path)
+    {
+#if UNITY_EDITOR
+        foreach (Object asset in UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path))
+        {
+            if (asset is AnimationClip clip && !clip.name.StartsWith("__preview__"))
+            {
+                return clip;
+            }
+        }
+#endif
+        return null;
     }
 
     private static void DestroyFallbackPlayerParts(Transform parent)

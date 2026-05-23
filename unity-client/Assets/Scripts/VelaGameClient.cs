@@ -214,6 +214,7 @@ public sealed class VelaGameClient : MonoBehaviour
         {
             rightMouseDown = true;
             TurnPlayerToMouse(Input.mousePosition);
+            Player.GetComponentInChildren<VelaSoldierAnimator>()?.Shoot();
         }
         else if (Input.GetMouseButtonUp(1))
         {
