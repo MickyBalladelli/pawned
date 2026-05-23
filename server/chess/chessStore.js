@@ -159,6 +159,10 @@ async function listChessGames(pool, user, scope = 'mine') {
 
   if (scope === 'open') {
     where = "WHERE g.status = 'waiting' AND (g.white_user_id IS NULL OR g.black_user_id IS NULL)"
+  } else if (scope === 'active') {
+    where = "WHERE g.status = 'active'"
+  } else if (scope === 'completed') {
+    where = "WHERE g.status IN ('checkmate', 'draw', 'resigned', 'canceled')"
   } else {
     params.push(user.id)
     where = 'WHERE g.white_user_id = $1 OR g.black_user_id = $1'

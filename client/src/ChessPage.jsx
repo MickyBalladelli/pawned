@@ -23,7 +23,6 @@ import {
 import {
   Add,
   Casino,
-  Login,
   Refresh,
   SportsEsports,
 } from '@mui/icons-material'
@@ -102,6 +101,14 @@ function openColorForGame(game) {
   return game?.white_user_id ? 'black' : 'white'
 }
 
+function isCompletedGame(game) {
+  return ['checkmate', 'draw', 'resigned', 'canceled'].includes(game?.status)
+}
+
+function isActiveGame(game) {
+  return game?.status === 'active' || game?.status === 'waiting'
+}
+
 function statusLabel(game) {
   if (!game) {
     return 'Idle'
@@ -142,6 +149,8 @@ function addMoveOnce(current, move) {
 function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, onError, onNotice }) {
   const [games, setGames] = useState([])
   const [openGames, setOpenGames] = useState([])
+  const [activeGames, setActiveGames] = useState([])
+  const [completedGames, setCompletedGames] = useState([])
   const [selectedGameId, setSelectedGameId] = useState(null)
   const [selectedGame, setSelectedGame] = useState(null)
   const [moves, setMoves] = useState([])
@@ -157,18 +166,34 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const playerColor = getPlayerColor(selectedGame, authUser.id)
   const canMove = Boolean(selectedGame?.status === 'active' && playerColor === selectedGame.turn_color)
   const boardSquares = useMemo(() => parseFenBoard(selectedGame?.fen), [selectedGame?.fen])
+  const myActiveGames = useMemo(() => games.filter(isActiveGame), [games])
+  const myCompletedGames = useMemo(() => games.filter(isCompletedGame), [games])
+  const watchGames = useMemo(() => (
+    activeGames.filter((game) => !getPlayerColor(game, authUser.id))
+  ), [activeGames, authUser.id])
+  const visibleCompletedGames = useMemo(() => {
+    const ownIds = new Set(myCompletedGames.map((game) => game.id))
+    return [
+      ...myCompletedGames,
+      ...completedGames.filter((game) => !ownIds.has(game.id)),
+    ]
+  }, [completedGames, myCompletedGames])
 
   const loadGames = useCallback(async () => {
     setLoading(true)
 
     try {
-      const [mine, open] = await Promise.all([
+      const [mine, open, active, completed] = await Promise.all([
         requestJson('/api/chess/games', { headers: authHeaders }),
         requestJson('/api/chess/games?scope=open', { headers: authHeaders }),
+        requestJson('/api/chess/games?scope=active', { headers: authHeaders }),
+        requestJson('/api/chess/games?scope=completed', { headers: authHeaders }),
       ])
 
       setGames(mine.games || [])
       setOpenGames(open.games || [])
+      setActiveGames(active.games || [])
+      setCompletedGames(completed.games || [])
 
       if (!selectedGameId && mine.games?.[0]) {
         setSelectedGameId(mine.games[0].id)
@@ -254,12 +279,42 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     }
 
     const handleGameUpdated = (game) => {
-      setGames((current) => {
-        const exists = current.some((item) => item.id === game.id)
-        const next = exists ? current.map((item) => item.id === game.id ? game : item) : [game, ...current]
-        return next
+      if (getPlayerColor(game, authUser.id)) {
+        setGames((current) => {
+          const exists = current.some((item) => item.id === game.id)
+          const next = exists ? current.map((item) => item.id === game.id ? game : item) : [game, ...current]
+          return next
+        })
+      } else {
+        setGames((current) => current.filter((item) => item.id !== game.id))
+      }
+      setOpenGames((current) => {
+        const withoutGame = current.filter((item) => item.id !== game.id)
+
+        if (game.status === 'waiting') {
+          return [game, ...withoutGame]
+        }
+
+        return withoutGame
       })
-      setOpenGames((current) => current.filter((item) => item.id !== game.id))
+      setActiveGames((current) => {
+        const withoutGame = current.filter((item) => item.id !== game.id)
+
+        if (game.status === 'active') {
+          return [game, ...withoutGame]
+        }
+
+        return withoutGame
+      })
+      setCompletedGames((current) => {
+        const withoutGame = current.filter((item) => item.id !== game.id)
+
+        if (isCompletedGame(game)) {
+          return [game, ...withoutGame]
+        }
+
+        return withoutGame
+      })
 
       if (Number(game.id) === Number(selectedGameId)) {
         setSelectedGame(game)
@@ -284,7 +339,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       socket.off('chess:gameUpdated', handleGameUpdated)
       socket.off('chess:moveMade', handleMoveMade)
     }
-  }, [selectedGameId, socket])
+  }, [authUser.id, selectedGameId, socket])
 
   useEffect(() => {
     movesEndRef.current?.scrollIntoView({ block: 'nearest' })
@@ -470,6 +525,45 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     }
   }
 
+  function renderGameList(items, emptyText, options = {}) {
+    if (items.length === 0) {
+      return (
+        <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+          <Typography color="text.secondary">{emptyText}</Typography>
+        </Paper>
+      )
+    }
+
+    return (
+      <List disablePadding>
+        {items.map((game) => {
+          const action = options.action?.(game)
+
+          return (
+            <ListItemButton
+              key={game.id}
+              selected={Number(game.id) === Number(selectedGameId)}
+              onClick={() => options.onClick ? options.onClick(game) : setSelectedGameId(game.id)}
+              disabled={options.disabled?.(game)}
+              sx={{ borderRadius: 1, mb: 0.5 }}
+            >
+              <ListItemText
+                primary={gameTitle(game)}
+                secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
+              />
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                {game.is_bot_game && (
+                  <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
+                )}
+                <Chip size="small" label={action || statusLabel(game)} variant="outlined" />
+              </Stack>
+            </ListItemButton>
+          )
+        })}
+      </List>
+    )
+  }
+
   return (
     <Box
       sx={{
@@ -557,38 +651,14 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           <Divider sx={{ my: 2 }} />
 
           <Typography variant="overline" color="text.secondary">
-            My games
+            My active games
           </Typography>
           {loading ? (
             <Stack sx={{ alignItems: 'center', py: 4 }}>
               <CircularProgress size={26} />
             </Stack>
-          ) : games.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-              <Typography color="text.secondary">No games</Typography>
-            </Paper>
           ) : (
-            <List disablePadding>
-              {games.map((game) => (
-                <ListItemButton
-                  key={game.id}
-                  selected={Number(game.id) === Number(selectedGameId)}
-                  onClick={() => setSelectedGameId(game.id)}
-                  sx={{ borderRadius: 1, mb: 0.5 }}
-                >
-                  <ListItemText
-                    primary={gameTitle(game)}
-                    secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
-                  />
-                  <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                    {game.is_bot_game && (
-                      <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
-                    )}
-                    <Chip size="small" label={statusLabel(game)} variant="outlined" />
-                  </Stack>
-                </ListItemButton>
-              ))}
-            </List>
+            renderGameList(myActiveGames, 'No active games')
           )}
 
           <Divider sx={{ my: 2 }} />
@@ -596,33 +666,27 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
             Open games
           </Typography>
-          {openGames.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
-              <Typography color="text.secondary">No open games</Typography>
-            </Paper>
-          ) : (
-            <List disablePadding>
-              {openGames.map((game) => (
-                <ListItemButton
-                  key={game.id}
-                  onClick={() => joinGame(game.id)}
-                  disabled={busy}
-                  sx={{ borderRadius: 1, mb: 0.5 }}
-                >
-                  <ListItemText
-                    primary={gameTitle(game)}
-                    secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
-                  />
-                  <Chip
-                    size="small"
-                    icon={<Login />}
-                    label={`Join as ${openColorForGame(game)}`}
-                    variant="outlined"
-                  />
-                </ListItemButton>
-              ))}
-            </List>
-          )}
+          {renderGameList(openGames, 'No open games', {
+            action: (game) => `Join as ${openColorForGame(game)}`,
+            disabled: () => busy,
+            onClick: (game) => joinGame(game.id),
+          })}
+
+          <Divider sx={{ my: 2 }} />
+
+          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Watch live
+          </Typography>
+          {renderGameList(watchGames, 'No live games', {
+            action: () => 'View',
+          })}
+
+          <Divider sx={{ my: 2 }} />
+
+          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Completed games
+          </Typography>
+          {renderGameList(visibleCompletedGames, 'No completed games')}
         </CardContent>
       </Card>
 
@@ -654,6 +718,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <Chip label={statusLabel(selectedGame)} color={selectedGame?.status === 'active' ? 'success' : 'default'} variant="outlined" />
               <Chip label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
+              {selectedGame && !playerColor && (
+                <Chip label="Viewer" variant="outlined" />
+              )}
               {selectedGame?.status === 'waiting' && playerColor && (
                 <Button
                   size="small"
@@ -713,7 +780,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 />
                 {selectedGame.status === 'active' && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {canMove ? 'Your turn' : 'Waiting for opponent'}
+                    {!playerColor ? 'Viewing game' : canMove ? 'Your turn' : 'Waiting for opponent'}
                   </Typography>
                 )}
               </Box>

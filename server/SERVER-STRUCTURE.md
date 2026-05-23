@@ -101,6 +101,8 @@ The server automatically creates three tables:
 ### Chess
 - `GET /api/chess/games` - Get your chess games
 - `GET /api/chess/games?scope=open` - Get open chess games
+- `GET /api/chess/games?scope=active` - Get live chess games for viewing
+- `GET /api/chess/games?scope=completed` - Get completed chess games
 - `POST /api/chess/games` - Create a chess game
 - `POST /api/chess/bot-games` - Create a chess game against VelaBot
 - `GET /api/chess/bot-levels` - Get supported bot levels
