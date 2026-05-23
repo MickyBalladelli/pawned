@@ -48,7 +48,7 @@ function VerifyEmailPage({ onBackToLogin }) {
       <Stack spacing={3}>
         <Box
           component="img"
-          src="/images/vela.png"
+          src="/images/vela-chess.jpeg"
           alt="Vela"
           sx={{
             width: '100%',

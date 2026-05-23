@@ -1291,6 +1291,19 @@ async function createTables() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name)');
+    await pool.query(`
+      WITH duplicate_channels AS (
+        SELECT id,
+               name,
+               ROW_NUMBER() OVER (PARTITION BY LOWER(name) ORDER BY id) AS duplicate_rank
+        FROM channels
+      )
+      UPDATE channels c
+      SET name = LEFT(c.name, 90) || '-' || c.id
+      FROM duplicate_channels d
+      WHERE c.id = d.id
+        AND d.duplicate_rank > 1
+    `);
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_channels_lower_name_unique ON channels(LOWER(name))');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON channel_members(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON channel_members(user_id)');

@@ -25,6 +25,8 @@ import {
   Paper,
   Stack,
   Switch,
+  Tab,
+  Tabs,
   TextField,
   Tooltip,
   Typography,
@@ -44,10 +46,12 @@ import {
   Search,
   Send,
   Settings,
+  SportsEsports,
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
 import ChannelMessageList from './ChannelMessageList'
 import ChannelMembershipDialog from './ChannelMembershipDialog'
+import ChessPage from './ChessPage'
 import { requestJson } from './requestJson'
 
 const emptyForm = {
@@ -121,6 +125,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const [notice, setNotice] = useState(null)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [activeView, setActiveView] = useState('chat')
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null)
   const selectedChannelIdRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -640,7 +645,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         >
           <Box
             component="img"
-            src="/images/vela.png"
+            src="/images/vela-chess.jpeg"
             alt="Vela"
             sx={{
               width: { xs: '100%', sm: 180, md: 160 },
@@ -651,9 +656,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           />
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-              <Forum color="primary" />
+              {activeView === 'chat' ? <Forum color="primary" /> : <SportsEsports color="primary" />}
               <Typography variant="overline" color="text.secondary">
-                Chat operations
+                {activeView === 'chat' ? 'Chat operations' : 'Chess table'}
               </Typography>
             </Stack>
             <Typography
@@ -662,25 +667,29 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               color="text.primary"
               sx={{ fontSize: { xs: 30, md: 34 }, fontWeight: 900, mb: 0 }}
             >
-              {isAdmin ? 'Channel Admin' : 'Channels'}
+              {activeView === 'chat' ? (isAdmin ? 'Channel Admin' : 'Channels') : 'Chess'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Button variant="contained" startIcon={<Add />} onClick={startCreate}>
-              {isAdmin ? 'New channel' : 'New private'}
-            </Button>
-            <Tooltip title="Refresh channels">
-              <span>
-                <IconButton
-                  color="primary"
-                  onClick={loadChannels}
-                  disabled={loadingChannels}
-                  sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
-                >
-                  <Refresh />
-                </IconButton>
-              </span>
-            </Tooltip>
+            {activeView === 'chat' && (
+              <>
+                <Button variant="contained" startIcon={<Add />} onClick={startCreate}>
+                  {isAdmin ? 'New channel' : 'New private'}
+                </Button>
+                <Tooltip title="Refresh channels">
+                  <span>
+                    <IconButton
+                      color="primary"
+                      onClick={loadChannels}
+                      disabled={loadingChannels}
+                      sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
+                    >
+                      <Refresh />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </>
+            )}
             <Tooltip title={themeMode === 'dark' ? 'Light theme' : 'Dark theme'}>
               <IconButton color="primary" onClick={onToggleTheme}>
                 {themeMode === 'dark' ? <LightMode /> : <DarkMode />}
@@ -734,6 +743,26 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             onUserUpdated={handleUserUpdated}
           />
         ) : (
+          <>
+          <Tabs
+            value={activeView}
+            onChange={(event, value) => setActiveView(value)}
+            sx={{ borderBottom: 1, borderColor: 'divider' }}
+          >
+            <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
+            <Tab icon={<SportsEsports />} iconPosition="start" value="chess" label="Chess" />
+          </Tabs>
+          {activeView === 'chess' ? (
+            <ChessPage
+              authToken={authToken}
+              authUser={authUser}
+              socket={socket}
+              socketConnected={socketConnected}
+              themeMode={themeMode}
+              onError={setError}
+              onNotice={setNotice}
+            />
+          ) : (
           <Box
             sx={{
               display: 'grid',
@@ -1028,6 +1057,8 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             </Card>
           </Stack>
           </Box>
+          )}
+          </>
         )}
       </Stack>
 
