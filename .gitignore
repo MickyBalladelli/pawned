@@ -149,6 +149,15 @@ vite.config.ts.timestamp-*
 **/Saved/
 *.xcworkspace/
 
+# Unity generated files
+**/Library/
+**/Temp/
+**/Obj/
+**/Logs/
+**/UserSettings/
+*.csproj
+*.sln
+
 # Accidental local Unreal template project
 unreal-client/Vela/
 
