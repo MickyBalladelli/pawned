@@ -39,11 +39,13 @@ void AVelaGameMode::BeginPlay()
 
     if (ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(FVector(0.0f, 0.0f, 5000.0f), FRotator(-45.0f, -35.0f, 0.0f)))
     {
+        Sun->GetLightComponent()->SetMobility(EComponentMobility::Movable);
         Sun->GetLightComponent()->Intensity = 8.0f;
     }
 
     if (ASkyLight* SkyLight = World->SpawnActor<ASkyLight>(FVector::ZeroVector, FRotator::ZeroRotator))
     {
+        SkyLight->GetLightComponent()->SetMobility(EComponentMobility::Movable);
         SkyLight->GetLightComponent()->Intensity = 1.5f;
     }
 
@@ -129,7 +131,7 @@ AStaticMeshActor* AVelaGameMode::SpawnMeshActor(
     UStaticMeshComponent* MeshComponent = Actor->GetStaticMeshComponent();
     MeshComponent->SetStaticMesh(Mesh);
     MeshComponent->SetRelativeScale3D(Scale);
-    MeshComponent->SetMobility(EComponentMobility::Static);
+    MeshComponent->SetMobility(EComponentMobility::Movable);
     MeshComponent->SetCollisionEnabled(bCollisionEnabled ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
     MeshComponent->SetCollisionProfileName(bCollisionEnabled ? TEXT("BlockAll") : TEXT("NoCollision"));
 
