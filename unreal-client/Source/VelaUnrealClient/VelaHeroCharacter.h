@@ -22,6 +22,10 @@ private:
     void MoveForward(float Value);
     void MoveRight(float Value);
     void ZoomCamera(float Value);
+    void StartCameraLook();
+    void StopCameraLook();
+    void TurnCamera(float Value);
+    void LookUpCamera(float Value);
     void SendInputToServer();
     void UpdateMovementAnimation();
 
@@ -58,4 +62,5 @@ private:
     float MinCameraDistance = 220.0f;
     float MaxCameraDistance = 1800.0f;
     float ZoomStep = 120.0f;
+    bool bCameraLookActive = false;
 };

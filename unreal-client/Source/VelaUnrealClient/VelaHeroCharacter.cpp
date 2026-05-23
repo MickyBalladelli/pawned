@@ -6,6 +6,7 @@
 #include "Components/PointLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "UObject/ConstructorHelpers.h"
@@ -109,6 +110,15 @@ void AVelaHeroCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
+    if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+    {
+        PlayerController->bShowMouseCursor = true;
+
+        FInputModeGameAndUI InputMode;
+        InputMode.SetHideCursorDuringCapture(false);
+        PlayerController->SetInputMode(InputMode);
+    }
+
     UE_LOG(LogTemp, Display, TEXT("Vela hero spawned"));
 
     UpdateMovementAnimation();
@@ -135,8 +145,10 @@ void AVelaHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &AVelaHeroCharacter::MoveForward);
     PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &AVelaHeroCharacter::MoveRight);
     PlayerInputComponent->BindAxis(TEXT("CameraZoom"), this, &AVelaHeroCharacter::ZoomCamera);
-    PlayerInputComponent->BindAxis(TEXT("Turn"), this, &APawn::AddControllerYawInput);
-    PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &APawn::AddControllerPitchInput);
+    PlayerInputComponent->BindAxis(TEXT("Turn"), this, &AVelaHeroCharacter::TurnCamera);
+    PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &AVelaHeroCharacter::LookUpCamera);
+    PlayerInputComponent->BindAction(TEXT("CameraLook"), IE_Pressed, this, &AVelaHeroCharacter::StartCameraLook);
+    PlayerInputComponent->BindAction(TEXT("CameraLook"), IE_Released, this, &AVelaHeroCharacter::StopCameraLook);
 }
 
 void AVelaHeroCharacter::MoveForward(float Value)
@@ -174,6 +186,32 @@ void AVelaHeroCharacter::ZoomCamera(float Value)
         SpringArm->TargetArmLength - Value * ZoomStep,
         MinCameraDistance,
         MaxCameraDistance);
+}
+
+void AVelaHeroCharacter::StartCameraLook()
+{
+    bCameraLookActive = true;
+}
+
+void AVelaHeroCharacter::StopCameraLook()
+{
+    bCameraLookActive = false;
+}
+
+void AVelaHeroCharacter::TurnCamera(float Value)
+{
+    if (bCameraLookActive)
+    {
+        AddControllerYawInput(Value);
+    }
+}
+
+void AVelaHeroCharacter::LookUpCamera(float Value)
+{
+    if (bCameraLookActive)
+    {
+        AddControllerPitchInput(Value);
+    }
 }
 
 void AVelaHeroCharacter::SendInputToServer()
