@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://m8kga4hqpbki"]
+[gd_scene load_steps=16 format=3 uid="uid://m8kga4hqpbki"]
 
 [ext_resource type="Script" uid="uid://jjxtne70uedt" path="res://scripts/Main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://88535m60gg5e" path="res://scripts/Player.gd" id="2_player"]
@@ -17,6 +17,20 @@ roughness = 0.85
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 material = SubResource("Material_ground")
 size = Vector2(60, 60)
+
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
+size = Vector3(60, 0.1, 60)
+
+[sub_resource type="StandardMaterial3D" id="Material_target"]
+albedo_color = Color(0.95, 0.78, 0.22, 1)
+roughness = 0.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_target"]
+material = SubResource("Material_target")
+top_radius = 0.45
+bottom_radius = 0.45
+height = 0.04
+radial_segments = 36
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_player"]
 radius = 0.42
@@ -69,6 +83,14 @@ fov = 55.0
 
 [node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
 mesh = SubResource("PlaneMesh_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape_ground")
+
+[node name="TargetMarker" type="MeshInstance3D" parent="."]
+visible = false
+mesh = SubResource("CylinderMesh_target")
 
 [node name="Player" type="CharacterBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, 0)

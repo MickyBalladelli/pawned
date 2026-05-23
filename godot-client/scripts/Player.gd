@@ -4,12 +4,35 @@ signal input_changed(input: Dictionary)
 
 @export var speed: float = 5.0
 @export var turn_speed: float = 10.0
+@export var target_stop_distance: float = 0.12
 
 var last_input: Vector2 = Vector2.ZERO
+var move_target: Vector3 = Vector3.ZERO
+var has_move_target: bool = false
+var walk_time: float = 0.0
+
+@onready var body: MeshInstance3D = $Body
+@onready var head: MeshInstance3D = $Head
+@onready var left_arm: MeshInstance3D = $LeftArm
+@onready var right_arm: MeshInstance3D = $RightArm
+@onready var left_leg: MeshInstance3D = $LeftLeg
+@onready var right_leg: MeshInstance3D = $RightLeg
 
 func _physics_process(delta: float) -> void:
 	var input_vector: Vector2 = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction: Vector3 = Vector3(input_vector.x, 0.0, input_vector.y)
+
+	if input_vector.length() > 0.01:
+		has_move_target = false
+	elif has_move_target:
+		var target_direction: Vector3 = move_target - global_position
+		target_direction.y = 0.0
+		var distance: float = target_direction.length()
+		if distance <= target_stop_distance:
+			has_move_target = false
+			direction = Vector3.ZERO
+		else:
+			direction = target_direction.normalized()
 
 	velocity.x = direction.x * speed
 	velocity.z = direction.z * speed
@@ -25,3 +48,26 @@ func _physics_process(delta: float) -> void:
 			"moveX": input_vector.x,
 			"moveY": input_vector.y,
 		})
+
+	_update_walk_animation(delta, direction.length())
+
+func set_move_target(target: Vector3) -> void:
+	move_target = target
+	has_move_target = true
+
+func clear_move_target() -> void:
+	has_move_target = false
+
+func _update_walk_animation(delta: float, move_amount: float) -> void:
+	if move_amount > 0.01:
+		walk_time += delta * 9.0
+	else:
+		walk_time = lerpf(walk_time, 0.0, 10.0 * delta)
+
+	var swing: float = sin(walk_time) * 0.55 * clampf(move_amount, 0.0, 1.0)
+	left_arm.rotation.x = swing
+	right_arm.rotation.x = -swing
+	left_leg.rotation.x = -swing
+	right_leg.rotation.x = swing
+	body.position.y = sin(walk_time * 2.0) * 0.04 * clampf(move_amount, 0.0, 1.0)
+	head.position.y = 0.9 + body.position.y
