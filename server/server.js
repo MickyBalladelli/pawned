@@ -8,6 +8,9 @@ const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer')
+const createChessRouter = require('./chess/chessRoutes')
+const registerChessSockets = require('./chess/chessSockets')
+const { createChessTables } = require('./chess/chessStore')
 
 // Initialize Express app
 const app = express();
@@ -281,6 +284,8 @@ app.get('/', (req, res) => {
 app.get('/verify-email', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
+
+app.use('/api/chess', createChessRouter({ pool, authenticate, io }))
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;
@@ -1063,6 +1068,8 @@ io.on('connection', async (socket) => {
   if (user.is_admin) {
     socket.join('admins')
   }
+
+  registerChessSockets(io, socket, { pool })
   
   // Join a channel
   socket.on('joinChannel', async (channelId, callback) => {
@@ -1290,6 +1297,7 @@ async function createTables() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)');
+    await createChessTables(pool)
     
     console.log('Database tables created successfully');
   } catch (err) {

@@ -30,6 +30,7 @@ vela/
 - Integrates with PostgreSQL database
 - Runs on port 4000
 - Provides REST API endpoints for channels and messages
+- Provides REST API endpoints for chess games and moves
 - Handles user authentication and session management
 
 ### Database Schema
@@ -37,6 +38,8 @@ The server automatically creates three tables:
 1. **channels** - Stores chat channels
 2. **users** - Stores user information
 3. **messages** - Stores chat messages
+4. **chess_games** - Stores chess game state
+5. **chess_moves** - Stores move history
 
 ### Client Interface (client/index.html)
 - Responsive web interface
@@ -95,15 +98,30 @@ The server automatically creates three tables:
 ### Messages
 - `GET /api/channels/:id/messages` - Get messages for a channel
 
+### Chess
+- `GET /api/chess/games` - Get your chess games
+- `GET /api/chess/games?scope=open` - Get open chess games
+- `POST /api/chess/games` - Create a chess game
+- `GET /api/chess/games/:id` - Get a chess game and moves
+- `POST /api/chess/games/:id/join` - Join an open chess game
+- `POST /api/chess/games/:id/moves` - Make a move
+- `POST /api/chess/games/:id/resign` - Resign a game
+
 ## Socket Events
 
 ### Client to Server
 - `joinChannel(channelId)` - Join a channel
 - `leaveChannel(channelId)` - Leave a channel
 - `sendMessage(data)` - Send a message to a channel
+- `chess:joinGame(gameId)` - Join a chess game room
+- `chess:leaveGame(gameId)` - Leave a chess game room
+- `chess:move(data)` - Make a chess move
+- `chess:resign(data)` - Resign a chess game
 
 ### Server to Client
 - `receiveMessage(message)` - Receive a message
 - `channelCreated(channel)` - New channel created
 - `channelUpdated(channel)` - Channel updated
 - `channelDeleted(channelId)` - Channel deleted
+- `chess:moveMade(result)` - Chess move accepted
+- `chess:gameUpdated(game)` - Chess game state changed
