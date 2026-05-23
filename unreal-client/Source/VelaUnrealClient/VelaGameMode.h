@@ -21,5 +21,14 @@ private:
         const FVector& Location,
         const FRotator& Rotation,
         const FVector& Scale,
-        bool bCollisionEnabled);
+        bool bCollisionEnabled,
+        const FLinearColor& Color = FLinearColor::White);
+
+    void SpawnPineTree(class UStaticMesh* CylinderMesh, class UStaticMesh* ConeMesh, const FVector& Location, float Scale, float Rotation);
+    void SpawnBroadleafTree(class UStaticMesh* CylinderMesh, class UStaticMesh* SphereMesh, const FVector& Location, float Scale, float Rotation);
+    void SpawnPalmTree(class UStaticMesh* CylinderMesh, class UStaticMesh* ConeMesh, const FVector& Location, float Scale, float Rotation);
+    void SpawnBush(class UStaticMesh* SphereMesh, const FVector& Location, float Scale);
+    void SpawnRock(class UStaticMesh* SphereMesh, const FVector& Location, float Scale);
+    void SpawnGrassClump(class UStaticMesh* ConeMesh, const FVector& Location, float Scale, float Rotation);
+    bool IsClearSpawnLocation(const FVector& Location) const;
 };

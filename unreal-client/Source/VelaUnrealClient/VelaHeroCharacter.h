@@ -26,6 +26,8 @@ private:
     void StopCameraLook();
     void TurnCamera(float Value);
     void LookUpCamera(float Value);
+    void MoveToClickedLocation();
+    void UpdateClickMove();
     void SendInputToServer();
     void UpdateMovementAnimation();
 
@@ -62,5 +64,8 @@ private:
     float MinCameraDistance = 220.0f;
     float MaxCameraDistance = 1800.0f;
     float ZoomStep = 120.0f;
+    float ClickMoveStopDistance = 80.0f;
     bool bCameraLookActive = false;
+    bool bHasClickMoveTarget = false;
+    FVector ClickMoveTarget = FVector::ZeroVector;
 };

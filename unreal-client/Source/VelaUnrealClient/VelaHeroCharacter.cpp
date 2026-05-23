@@ -128,6 +128,8 @@ void AVelaHeroCharacter::Tick(float DeltaSeconds)
 {
     Super::Tick(DeltaSeconds);
 
+    UpdateClickMove();
+
     SendAccumulator += DeltaSeconds;
     if (SendAccumulator >= 0.05f)
     {
@@ -149,6 +151,7 @@ void AVelaHeroCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
     PlayerInputComponent->BindAxis(TEXT("LookUp"), this, &AVelaHeroCharacter::LookUpCamera);
     PlayerInputComponent->BindAction(TEXT("CameraLook"), IE_Pressed, this, &AVelaHeroCharacter::StartCameraLook);
     PlayerInputComponent->BindAction(TEXT("CameraLook"), IE_Released, this, &AVelaHeroCharacter::StopCameraLook);
+    PlayerInputComponent->BindAction(TEXT("MoveToClick"), IE_Pressed, this, &AVelaHeroCharacter::MoveToClickedLocation);
 }
 
 void AVelaHeroCharacter::MoveForward(float Value)
@@ -157,6 +160,8 @@ void AVelaHeroCharacter::MoveForward(float Value)
 
     if (Controller && FMath::Abs(Value) > KINDA_SMALL_NUMBER)
     {
+        bHasClickMoveTarget = false;
+
         const FRotator YawRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
         const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
         AddMovementInput(Direction, Value);
@@ -169,6 +174,8 @@ void AVelaHeroCharacter::MoveRight(float Value)
 
     if (Controller && FMath::Abs(Value) > KINDA_SMALL_NUMBER)
     {
+        bHasClickMoveTarget = false;
+
         const FRotator YawRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
         const FVector Direction = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
         AddMovementInput(Direction, Value);
@@ -211,6 +218,67 @@ void AVelaHeroCharacter::LookUpCamera(float Value)
     if (bCameraLookActive)
     {
         AddControllerPitchInput(Value);
+    }
+}
+
+void AVelaHeroCharacter::MoveToClickedLocation()
+{
+    if (bCameraLookActive)
+    {
+        return;
+    }
+
+    APlayerController* PlayerController = Cast<APlayerController>(GetController());
+    UWorld* World = GetWorld();
+    if (!PlayerController || !World)
+    {
+        return;
+    }
+
+    FVector WorldLocation = FVector::ZeroVector;
+    FVector WorldDirection = FVector::ZeroVector;
+    if (!PlayerController->DeprojectMousePositionToWorld(WorldLocation, WorldDirection))
+    {
+        return;
+    }
+
+    FHitResult Hit;
+    FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(VelaClickMove), false, this);
+    const FVector TraceEnd = WorldLocation + WorldDirection * 50000.0f;
+    if (World->LineTraceSingleByChannel(Hit, WorldLocation, TraceEnd, ECC_Visibility, QueryParams))
+    {
+        ClickMoveTarget = Hit.ImpactPoint;
+        bHasClickMoveTarget = true;
+    }
+}
+
+void AVelaHeroCharacter::UpdateClickMove()
+{
+    if (!bHasClickMoveTarget)
+    {
+        return;
+    }
+
+    const FVector ToTarget = ClickMoveTarget - GetActorLocation();
+    const FVector FlatToTarget(ToTarget.X, ToTarget.Y, 0.0f);
+    if (FlatToTarget.SizeSquared() <= ClickMoveStopDistance * ClickMoveStopDistance)
+    {
+        bHasClickMoveTarget = false;
+        ForwardInput = 0.0f;
+        RightInput = 0.0f;
+        return;
+    }
+
+    const FVector MoveDirection = FlatToTarget.GetSafeNormal();
+    AddMovementInput(MoveDirection, 1.0f);
+
+    if (Controller)
+    {
+        const FRotator YawRotation(0.0f, Controller->GetControlRotation().Yaw, 0.0f);
+        const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+        const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+        ForwardInput = FVector::DotProduct(MoveDirection, ForwardDirection);
+        RightInput = FVector::DotProduct(MoveDirection, RightDirection);
     }
 }
 
