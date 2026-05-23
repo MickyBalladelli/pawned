@@ -26,8 +26,31 @@ function ChessBoard({
   selectedSquare,
   themeMode,
 }) {
+  function handleSquareClick(square) {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+
+    onSquareClick(square)
+  }
+
   return (
-    <Box sx={{ width: '100%', maxWidth: 520, mx: { xs: 'auto', lg: 0 } }}>
+    <Box
+      sx={{
+        width: '100%',
+        maxWidth: 520,
+        mx: { xs: 'auto', lg: 0 },
+        userSelect: 'none',
+        caretColor: 'transparent',
+        '& *': {
+          userSelect: 'none',
+          caretColor: 'transparent',
+        },
+        '& [contenteditable="true"]': {
+          caretColor: 'transparent',
+        },
+      }}
+    >
       <Chessboard
         options={{
           id: 'vela-chessboard',
@@ -54,7 +77,7 @@ function ChessBoard({
             border: '1px solid rgba(148, 163, 184, 0.55)',
             boxShadow: '0 12px 24px rgba(15, 23, 42, 0.12)',
           },
-          onSquareClick: ({ square }) => onSquareClick(square),
+          onSquareClick: ({ square }) => handleSquareClick(square),
         }}
       />
     </Box>

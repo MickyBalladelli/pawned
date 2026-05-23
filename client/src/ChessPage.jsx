@@ -452,7 +452,14 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       <Card sx={{ width: { xs: '100%', lg: 360 }, maxWidth: '100%', justifySelf: 'start' }}>
         <CardContent>
           <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 900 }}>
+            <Typography
+              variant="h5"
+              component="h2"
+              sx={{
+                color: themeMode === 'dark' ? 'text.primary' : '#05070a',
+                fontWeight: 900,
+              }}
+            >
               Chess
             </Typography>
             <Tooltip title="Refresh games">
@@ -518,7 +525,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     primary={gameTitle(game)}
                     secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
                   />
-                  <Chip size="small" label={game.status} variant="outlined" />
+                  <Chip size="small" label={statusLabel(game)} variant="outlined" />
                 </ListItemButton>
               ))}
             </List>
@@ -569,7 +576,14 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             <Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
                 <SportsEsports color="primary" />
-                <Typography variant="h5" component="h2" sx={{ fontWeight: 900 }}>
+                <Typography
+                  variant="h5"
+                  component="h2"
+                  sx={{
+                    color: themeMode === 'dark' ? 'text.primary' : '#05070a',
+                    fontWeight: 900,
+                  }}
+                >
                   {selectedGame ? gameTitle(selectedGame) : 'Board'}
                 </Typography>
               </Stack>
