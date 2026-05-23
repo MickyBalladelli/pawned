@@ -113,28 +113,13 @@ func _zoom_camera(amount: float) -> void:
 
 func _update_occluder_fade() -> void:
 	var next_faded: Array[Node3D] = []
-	var camera_position_2d: Vector2 = Vector2(camera.global_position.x, camera.global_position.z)
-	var player_position_2d: Vector2 = Vector2(player.global_position.x, player.global_position.z)
-	var camera_to_player: Vector2 = player_position_2d - camera_position_2d
-	var camera_to_player_length: float = camera_to_player.length()
-
-	if camera_to_player_length <= 0.01:
-		_restore_all_occluders()
-		return
 
 	for node in get_tree().get_nodes_in_group("camera_fadeable"):
 		if not node is Node3D:
 			continue
 
 		var occluder: Node3D = node
-		var occluder_position_2d: Vector2 = Vector2(occluder.global_position.x, occluder.global_position.z)
-		var projected_distance: float = (occluder_position_2d - camera_position_2d).dot(camera_to_player) / camera_to_player_length
-		if projected_distance <= 0.0 or projected_distance >= camera_to_player_length:
-			continue
-
-		var closest_point: Vector2 = camera_position_2d + camera_to_player.normalized() * projected_distance
-		var line_distance: float = occluder_position_2d.distance_to(closest_point)
-		if line_distance < 1.25:
+		if _occluder_blocks_player(occluder):
 			next_faded.append(occluder)
 
 	for occluder in faded_occluders:
@@ -158,6 +143,44 @@ func _set_occluder_fade(occluder: Node3D, faded: bool) -> void:
 			_hide_mesh(mesh_instance)
 		else:
 			_restore_mesh(mesh_instance)
+
+func _occluder_blocks_player(occluder: Node3D) -> bool:
+	var view_targets: Array[Vector3] = [
+		player.global_position + Vector3(0.0, 0.4, 0.0),
+		player.global_position + Vector3(0.0, 1.0, 0.0),
+		player.global_position + Vector3(0.35, 0.75, 0.0),
+		player.global_position + Vector3(-0.35, 0.75, 0.0),
+		player.global_position + Vector3(0.0, 0.75, 0.35),
+		player.global_position + Vector3(0.0, 0.75, -0.35),
+	]
+
+	for mesh_instance in _get_mesh_instances(occluder):
+		if not mesh_instance.visible:
+			continue
+
+		var bounds: AABB = _get_global_aabb(mesh_instance).grow(0.35)
+		for target in view_targets:
+			if bounds.intersects_segment(camera.global_position, target) != null:
+				return true
+
+	return false
+
+func _get_global_aabb(mesh_instance: MeshInstance3D) -> AABB:
+	var local_bounds: AABB = mesh_instance.get_aabb()
+	var first_corner: Vector3 = mesh_instance.global_transform * local_bounds.position
+	var global_bounds: AABB = AABB(first_corner, Vector3.ZERO)
+
+	for x in [0.0, 1.0]:
+		for y in [0.0, 1.0]:
+			for z in [0.0, 1.0]:
+				var corner: Vector3 = local_bounds.position + Vector3(
+					local_bounds.size.x * x,
+					local_bounds.size.y * y,
+					local_bounds.size.z * z
+				)
+				global_bounds = global_bounds.expand(mesh_instance.global_transform * corner)
+
+	return global_bounds
 
 func _get_mesh_instances(root: Node) -> Array[MeshInstance3D]:
 	var meshes: Array[MeshInstance3D] = []
