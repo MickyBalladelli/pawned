@@ -11,17 +11,20 @@ public sealed class VelaVillageScatter : MonoBehaviour
     private const float MinDistanceFromCenter = 70f;
 
     private System.Random random;
+    private GameObject[] housePrefabs;
+    private GameObject wellPrefab;
+    private GameObject fencePrefab;
 
     private void OnEnable()
     {
-        int desiredMinimum = VillageCount * HousesPerVillageMin;
-        if (transform.childCount >= desiredMinimum)
+        if (transform.childCount > 0 && transform.GetChild(0).name.StartsWith("BigHousePrefab"))
         {
             return;
         }
 
         ClearGeneratedChildren();
         random = new System.Random(Seed);
+        LoadVillagePrefabs();
         ScatterVillages();
     }
 
@@ -36,13 +39,27 @@ public sealed class VelaVillageScatter : MonoBehaviour
             {
                 Vector2 offset = RandomInsideCircle(VillageRadius);
                 Vector3 position = villageCenter + new Vector3(offset.x, 0f, offset.y);
-                CreateHouse(position, RandomRange(0f, 360f), RandomRange(0.85f, 1.25f));
+                CreateHouse(position, RandomRange(0f, 360f), RandomRange(0.9f, 1.35f));
             }
+
+            CreateWell(villageCenter + new Vector3(RandomRange(-7f, 7f), 0f, RandomRange(-7f, 7f)), RandomRange(0f, 360f));
+            CreateFenceRing(villageCenter, VillageRadius + 8f);
         }
     }
 
     private void CreateHouse(Vector3 position, float yaw, float scale)
     {
+        if (housePrefabs != null && housePrefabs.Length > 0)
+        {
+            GameObject prefab = housePrefabs[RandomRange(0, housePrefabs.Length)];
+            GameObject houseInstance = Instantiate(prefab, transform);
+            houseInstance.name = prefab.name;
+            houseInstance.transform.position = position;
+            houseInstance.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+            houseInstance.transform.localScale = Vector3.one * scale;
+            return;
+        }
+
         GameObject house = new GameObject("Village House");
         house.transform.SetParent(transform, false);
         house.transform.position = position;
@@ -77,6 +94,40 @@ public sealed class VelaVillageScatter : MonoBehaviour
         door.transform.localScale = new Vector3(1.1f, 1.5f, 0.08f);
         door.GetComponent<Renderer>().material = doorMaterial;
         VelaBootstrap.DestroyGenerated(door.GetComponent<Collider>());
+    }
+
+    private void CreateWell(Vector3 position, float yaw)
+    {
+        if (wellPrefab == null)
+        {
+            return;
+        }
+
+        GameObject well = Instantiate(wellPrefab, transform);
+        well.name = "Village Well";
+        well.transform.position = position;
+        well.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+        well.transform.localScale = Vector3.one * 1.15f;
+    }
+
+    private void CreateFenceRing(Vector3 center, float radius)
+    {
+        if (fencePrefab == null)
+        {
+            return;
+        }
+
+        int fenceCount = 12;
+        for (int index = 0; index < fenceCount; index++)
+        {
+            float angle = index / (float)fenceCount * Mathf.PI * 2f;
+            Vector3 position = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+            GameObject fence = Instantiate(fencePrefab, transform);
+            fence.name = "Village Fence";
+            fence.transform.position = position;
+            fence.transform.rotation = Quaternion.Euler(0f, -angle * Mathf.Rad2Deg + 90f, 0f);
+            fence.transform.localScale = Vector3.one * 1.3f;
+        }
     }
 
     private Vector3 RandomGroundPosition()
@@ -116,5 +167,28 @@ public sealed class VelaVillageScatter : MonoBehaviour
         {
             VelaBootstrap.DestroyGenerated(transform.GetChild(0).gameObject);
         }
+    }
+
+    private void LoadVillagePrefabs()
+    {
+#if UNITY_EDITOR
+        GameObject bigHouse = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/VillagePack/BigHouse/BigHousePrefab.prefab");
+        GameObject oldHouse = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/VillagePack/OldHouse/OldHousePrefab.prefab");
+        wellPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/VillagePack/Well/Well.prefab");
+        fencePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/VillagePack/Fence/FencePrefab.prefab");
+
+        if (bigHouse != null && oldHouse != null)
+        {
+            housePrefabs = new[] { bigHouse, oldHouse };
+        }
+        else if (bigHouse != null)
+        {
+            housePrefabs = new[] { bigHouse };
+        }
+        else if (oldHouse != null)
+        {
+            housePrefabs = new[] { oldHouse };
+        }
+#endif
     }
 }

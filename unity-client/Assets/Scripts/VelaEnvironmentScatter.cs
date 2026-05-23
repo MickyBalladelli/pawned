@@ -4,11 +4,11 @@ using UnityEngine;
 public sealed class VelaEnvironmentScatter : MonoBehaviour
 {
     private const int Seed = 7241;
-    private const float Radius = 1450f;
+    private const float Radius = 430f;
     private const float PlayerClearRadius = 4f;
-    private const int TreeCount = 4500;
-    private const int RockCount = 3000;
-    private const int PlantCount = 9000;
+    private const int TreeCount = 900;
+    private const int RockCount = 650;
+    private const int PlantCount = 1800;
 
     private System.Random random;
 

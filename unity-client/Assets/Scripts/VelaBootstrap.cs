@@ -2,7 +2,7 @@ using UnityEngine;
 
 public sealed class VelaBootstrap : MonoBehaviour
 {
-    public const float WorldSize = 3000f;
+    public const float WorldSize = 900f;
     public const float WorldRadius = WorldSize * 0.5f;
 
 #if UNITY_EDITOR
@@ -246,7 +246,7 @@ public sealed class VelaBootstrap : MonoBehaviour
         cameraObject.tag = "MainCamera";
         Camera camera = cameraObject.AddComponent<Camera>();
         camera.fieldOfView = 55f;
-        camera.farClipPlane = 3600f;
+        camera.farClipPlane = 1200f;
         camera.clearFlags = CameraClearFlags.SolidColor;
         camera.backgroundColor = new Color(0.047f, 0.071f, 0.09f);
         return camera;
