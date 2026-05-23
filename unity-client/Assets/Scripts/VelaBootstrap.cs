@@ -31,6 +31,7 @@ public sealed class VelaBootstrap : MonoBehaviour
         {
             CreateGround();
             CreateInvisibleWalls();
+            CreateScatterObject<VelaVillageScatter>("VillageScatter");
             existingClient.RepairSceneReferences();
             if (existingClient.Player != null)
             {
@@ -61,7 +62,22 @@ public sealed class VelaBootstrap : MonoBehaviour
         client.GameCamera = camera;
         client.TargetMarker = marker;
 
-        new GameObject("EnvironmentScatter").AddComponent<VelaEnvironmentScatter>();
+        CreateScatterObject<VelaEnvironmentScatter>("EnvironmentScatter");
+        CreateScatterObject<VelaVillageScatter>("VillageScatter");
+    }
+
+    private static void CreateScatterObject<T>(string objectName) where T : Component
+    {
+        GameObject scatterObject = GameObject.Find(objectName);
+        if (scatterObject == null)
+        {
+            scatterObject = new GameObject(objectName);
+        }
+
+        if (scatterObject.GetComponent<T>() == null)
+        {
+            scatterObject.AddComponent<T>();
+        }
     }
 
     private static void CreateLight()
