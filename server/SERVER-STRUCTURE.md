@@ -106,6 +106,7 @@ The server automatically creates three tables:
 - `POST /api/chess/games/:id/join` - Join an open chess game
 - `POST /api/chess/games/:id/moves` - Make a move
 - `POST /api/chess/games/:id/resign` - Resign a game
+- `POST /api/chess/games/:id/cancel` - Cancel a waiting game
 
 ## Socket Events
 
@@ -117,6 +118,7 @@ The server automatically creates three tables:
 - `chess:leaveGame(gameId)` - Leave a chess game room
 - `chess:move(data)` - Make a chess move
 - `chess:resign(data)` - Resign a chess game
+- `chess:cancel(data)` - Cancel a waiting chess game
 
 ### Server to Client
 - `receiveMessage(message)` - Receive a message

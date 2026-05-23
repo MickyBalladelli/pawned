@@ -413,6 +413,48 @@ async function resignChessGame(pool, gameId, user) {
   }
 }
 
+async function cancelChessGame(pool, gameId, user) {
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    const result = await client.query('SELECT * FROM chess_games WHERE id = $1 FOR UPDATE', [gameId])
+    const game = mapGame(result.rows[0])
+
+    if (!game) {
+      throw new Error('Game not found')
+    }
+
+    if (game.status !== 'waiting') {
+      throw new Error('Only waiting games can be canceled')
+    }
+
+    if (!colorForUser(game, user.id)) {
+      throw new Error('You are not a player in this game')
+    }
+
+    await client.query(
+      `
+        UPDATE chess_games
+        SET status = 'canceled',
+            ended_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `,
+      [game.id]
+    )
+
+    await client.query('COMMIT')
+    return getChessGame(pool, game.id)
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 module.exports = {
   createChessTables,
   getChessGame,
@@ -422,4 +464,5 @@ module.exports = {
   listChessMoves,
   makeChessMove,
   resignChessGame,
+  cancelChessGame,
 }

@@ -3,6 +3,7 @@ const {
   listChessMoves,
   makeChessMove,
   resignChessGame,
+  cancelChessGame,
 } = require('./chessStore')
 
 function chessRoom(gameId) {
@@ -75,6 +76,23 @@ function registerChessSockets(io, socket, { pool }) {
       callback?.({ game })
     } catch (err) {
       callback?.({ error: err.message || 'Failed to resign chess game' })
+    }
+  })
+
+  socket.on('chess:cancel', async (data, callback) => {
+    const { gameId } = data || {}
+
+    if (!gameId) {
+      callback?.({ error: 'Game id is required' })
+      return
+    }
+
+    try {
+      const game = await cancelChessGame(pool, gameId, socket.data.user)
+      io.to(chessRoom(game.id)).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      callback?.({ game })
+    } catch (err) {
+      callback?.({ error: err.message || 'Failed to cancel chess game' })
     }
   })
 }

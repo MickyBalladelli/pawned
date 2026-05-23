@@ -7,6 +7,7 @@ const {
   listChessMoves,
   makeChessMove,
   resignChessGame,
+  cancelChessGame,
 } = require('./chessStore')
 
 function createChessRouter({ pool, authenticate, io }) {
@@ -95,6 +96,17 @@ function createChessRouter({ pool, authenticate, io }) {
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
       res.status(status).json({ error: err.message || 'Failed to resign chess game' })
+    }
+  })
+
+  router.post('/games/:id/cancel', async (req, res) => {
+    try {
+      const game = await cancelChessGame(pool, req.params.id, req.user)
+      io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+      res.json({ game })
+    } catch (err) {
+      const status = err.message === 'Game not found' ? 404 : 400
+      res.status(status).json({ error: err.message || 'Failed to cancel chess game' })
     }
   })
 

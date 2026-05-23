@@ -59,6 +59,7 @@ const emptyForm = {
   description: '',
   is_private: false,
 }
+const activeViewStorageKey = 'vela.activeView'
 
 let socketIoClientPromise
 
@@ -104,6 +105,10 @@ function getInitial(username) {
   return username?.trim().charAt(0).toUpperCase() || '?'
 }
 
+function getInitialActiveView() {
+  return localStorage.getItem(activeViewStorageKey) === 'chess' ? 'chess' : 'chat'
+}
+
 function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, onUserUpdated }) {
   const [channels, setChannels] = useState([])
   const [selectedChannelId, setSelectedChannelId] = useState(null)
@@ -125,7 +130,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const [notice, setNotice] = useState(null)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [activeView, setActiveView] = useState('chat')
+  const [activeView, setActiveView] = useState(getInitialActiveView)
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null)
   const selectedChannelIdRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -157,6 +162,15 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     return authToken ? { Authorization: `Bearer ${authToken}` } : {}
   }, [authToken])
   const authHeaders = useMemo(() => getAuthHeaders(), [getAuthHeaders])
+
+  function handleActiveViewChange(event, value) {
+    if (!value) {
+      return
+    }
+
+    setActiveView(value)
+    localStorage.setItem(activeViewStorageKey, value)
+  }
 
   const loadChannels = useCallback(async () => {
     setLoadingChannels(true)
@@ -746,7 +760,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           <>
           <Tabs
             value={activeView}
-            onChange={(event, value) => setActiveView(value)}
+            onChange={handleActiveViewChange}
             sx={{ borderBottom: 1, borderColor: 'divider' }}
           >
             <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />

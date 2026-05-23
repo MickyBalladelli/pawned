@@ -11,10 +11,8 @@ import {
   List,
   ListItemButton,
   ListItemText,
-  MenuItem,
   Paper,
   Stack,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Tooltip,
@@ -27,23 +25,10 @@ import {
   Refresh,
   SportsEsports,
 } from '@mui/icons-material'
+import ChessBoard from './ChessBoard'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const pieceGlyphs = {
-  p: '♟',
-  r: '♜',
-  n: '♞',
-  b: '♝',
-  q: '♛',
-  k: '♚',
-  P: '♙',
-  R: '♖',
-  N: '♘',
-  B: '♗',
-  Q: '♕',
-  K: '♔',
-}
 
 function getAuthHeaders(authToken) {
   return { Authorization: `Bearer ${authToken}` }
@@ -88,6 +73,14 @@ function getPlayerColor(game, userId) {
   return null
 }
 
+function isOwnPiece(piece, playerColor) {
+  if (!piece || !playerColor) {
+    return false
+  }
+
+  return playerColor === 'white' ? /[A-Z]/.test(piece) : /[a-z]/.test(piece)
+}
+
 function gameTitle(game) {
   if (!game) {
     return 'No game'
@@ -102,6 +95,10 @@ function playerName(game, color) {
     : game?.black_username || 'Open'
 }
 
+function openColorForGame(game) {
+  return game?.white_user_id ? 'black' : 'white'
+}
+
 function statusLabel(game) {
   if (!game) {
     return 'Idle'
@@ -113,6 +110,10 @@ function statusLabel(game) {
 
   if (game.status === 'waiting') {
     return 'Waiting'
+  }
+
+  if (game.status === 'canceled') {
+    return 'Canceled'
   }
 
   if (game.status === 'checkmate') {
@@ -143,7 +144,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [moves, setMoves] = useState([])
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
-  const [joinColor, setJoinColor] = useState('black')
+  const [boardStyle, setBoardStyle] = useState('flat')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
@@ -306,10 +307,12 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     setBusy(true)
 
     try {
+      const game = openGames.find((item) => Number(item.id) === Number(gameId))
+      const color = openColorForGame(game)
       const data = await requestJson(`/api/chess/games/${gameId}/join`, {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ color: joinColor }),
+        body: JSON.stringify({ color }),
       })
 
       setSelectedGameId(data.game.id)
@@ -360,7 +363,14 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       return
     }
 
+    const clickedSquare = boardSquares.find((item) => item.square === square)
+    const clickedOwnPiece = isOwnPiece(clickedSquare?.piece, playerColor)
+
     if (!selectedSquare) {
+      if (!clickedOwnPiece) {
+        return
+      }
+
       setSelectedSquare(square)
       setMoveError(null)
       return
@@ -368,6 +378,12 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
     if (selectedSquare === square) {
       setSelectedSquare(null)
+      return
+    }
+
+    if (clickedOwnPiece) {
+      setSelectedSquare(square)
+      setMoveError(null)
       return
     }
 
@@ -389,6 +405,29 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGame(data.game)
       onNotice('Game resigned')
+      loadGames()
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function cancelGame() {
+    if (!selectedGame) {
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      const data = await requestJson(`/api/chess/games/${selectedGame.id}/cancel`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+
+      setSelectedGame(data.game)
+      onNotice('Game canceled')
       loadGames()
     } catch (err) {
       onError(err.message)
@@ -435,8 +474,8 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               onChange={(event, value) => value && setNewGameColor(value)}
               fullWidth
             >
-              <ToggleButton value="white">White</ToggleButton>
-              <ToggleButton value="black">Black</ToggleButton>
+              <ToggleButton value="white">Play as White</ToggleButton>
+              <ToggleButton value="black">Play as Black</ToggleButton>
             </ToggleButtonGroup>
             <Button
               variant="contained"
@@ -483,21 +522,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
           <Divider sx={{ my: 2 }} />
 
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-            <Typography variant="overline" color="text.secondary" sx={{ flex: 1 }}>
-              Open games
-            </Typography>
-            <TextField
-              select
-              size="small"
-              value={joinColor}
-              onChange={(event) => setJoinColor(event.target.value)}
-              sx={{ width: 116 }}
-            >
-              <MenuItem value="white">White</MenuItem>
-              <MenuItem value="black">Black</MenuItem>
-            </TextField>
-          </Stack>
+          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+            Open games
+          </Typography>
           {openGames.length === 0 ? (
             <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
               <Typography color="text.secondary">No open games</Typography>
@@ -515,7 +542,12 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     primary={gameTitle(game)}
                     secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
                   />
-                  <Login fontSize="small" />
+                  <Chip
+                    size="small"
+                    icon={<Login />}
+                    label={`Join as ${openColorForGame(game)}`}
+                    variant="outlined"
+                  />
                 </ListItemButton>
               ))}
             </List>
@@ -544,6 +576,26 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <Chip label={statusLabel(selectedGame)} color={selectedGame?.status === 'active' ? 'success' : 'default'} variant="outlined" />
               <Chip label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
+              <ToggleButtonGroup
+                value={boardStyle}
+                exclusive
+                size="small"
+                onChange={(event, value) => value && setBoardStyle(value)}
+              >
+                <ToggleButton value="flat">Flat</ToggleButton>
+                <ToggleButton value="wood3d">3D</ToggleButton>
+              </ToggleButtonGroup>
+              {selectedGame?.status === 'waiting' && playerColor && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  onClick={cancelGame}
+                  disabled={busy}
+                >
+                  Cancel
+                </Button>
+              )}
               {selectedGame?.status === 'active' && playerColor && (
                 <Button
                   size="small"
@@ -580,61 +632,14 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     {moveError}
                   </Alert>
                 )}
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(8, minmax(0, 1fr))',
-                    width: '100%',
-                    maxWidth: 520,
-                    aspectRatio: '1 / 1',
-                    border: 1,
-                    borderColor: 'divider',
-                    bgcolor: 'background.default',
-                  }}
-                >
-                  {boardSquares.map((square) => (
-                    <Box
-                      component="button"
-                      key={square.square}
-                      type="button"
-                      onClick={() => handleSquareClick(square.square)}
-                      disabled={!canMove}
-                      sx={{
-                        position: 'relative',
-                        border: 0,
-                        p: 0,
-                        cursor: canMove ? 'pointer' : 'default',
-                        bgcolor: selectedSquare === square.square
-                          ? 'warning.light'
-                          : square.dark
-                            ? themeMode === 'dark' ? '#64748b' : '#8ab391'
-                            : themeMode === 'dark' ? '#e5e7eb' : '#f0d9b5',
-                        color: /[A-Z]/.test(square.piece || '') ? '#f8fafc' : '#111827',
-                        fontSize: { xs: 28, sm: 42, md: 52 },
-                        lineHeight: 1,
-                        fontFamily: 'serif',
-                        '&:hover': {
-                          filter: canMove ? 'brightness(1.08)' : 'none',
-                        },
-                      }}
-                    >
-                      {square.piece && pieceGlyphs[square.piece]}
-                      <Typography
-                        component="span"
-                        sx={{
-                          position: 'absolute',
-                          left: 4,
-                          bottom: 2,
-                          fontSize: 10,
-                          fontWeight: 800,
-                          color: 'rgba(0, 0, 0, 0.56)',
-                        }}
-                      >
-                        {square.square}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
+                <ChessBoard
+                  boardSquares={boardSquares}
+                  boardStyle={boardStyle}
+                  canMove={canMove}
+                  selectedSquare={selectedSquare}
+                  themeMode={themeMode}
+                  onSquareClick={handleSquareClick}
+                />
                 {selectedGame.status === 'active' && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
                     {canMove ? 'Your turn' : 'Waiting for opponent'}
