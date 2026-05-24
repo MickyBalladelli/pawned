@@ -15,6 +15,8 @@ import {
   Tab,
   Tabs,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
 import { ChevronLeft, ChevronRight, MenuBook, Search } from '@mui/icons-material'
@@ -23,7 +25,13 @@ import ChessBoard from './ChessBoard'
 import openingsBook from './data/chessOpenings.json'
 
 const startingFen = new Chess().fen()
-const puzzlePreviewLimit = 500
+const puzzlePreviewLimit = 200
+const puzzleDifficulties = [
+  { value: 'easy', label: 'Easy', range: '800-1200' },
+  { value: 'medium', label: 'Medium', range: '1201-1600' },
+  { value: 'hard', label: 'Hard', range: '1601-2000' },
+  { value: 'expert', label: 'Expert', range: '2001-2600' },
+]
 
 function buildPositions(opening) {
   if (!opening) {
@@ -106,6 +114,7 @@ function TrainingPage({ themeMode }) {
   const [moveIndex, setMoveIndex] = useState(0)
   const [puzzles, setPuzzles] = useState([])
   const [puzzleLoading, setPuzzleLoading] = useState(false)
+  const [puzzleDifficulty, setPuzzleDifficulty] = useState('easy')
   const [selectedPuzzle, setSelectedPuzzle] = useState(null)
   const [puzzleFen, setPuzzleFen] = useState(startingFen)
   const [puzzleStep, setPuzzleStep] = useState(1)
@@ -116,12 +125,16 @@ function TrainingPage({ themeMode }) {
   useEffect(() => {
     let cancelled = false
 
-    if (puzzles.length > 0 || puzzleLoading) {
+    if (trainingTab !== 'puzzles') {
       return undefined
     }
 
     setPuzzleLoading(true)
-    fetch('/data/chessPuzzles.json')
+    setPuzzles([])
+    setSelectedPuzzle(null)
+    setPuzzleFen(startingFen)
+    setPuzzleStatus('Loading puzzles')
+    fetch(`/data/chessPuzzles-${puzzleDifficulty}.json`)
       .then((response) => response.json())
       .then((data) => {
         if (cancelled) {
@@ -146,7 +159,7 @@ function TrainingPage({ themeMode }) {
     return () => {
       cancelled = true
     }
-  }, [puzzleLoading, puzzles.length])
+  }, [puzzleDifficulty, trainingTab])
 
   useEffect(() => {
     if (!selectedPuzzle) {
@@ -350,6 +363,28 @@ function TrainingPage({ themeMode }) {
               }}
               fullWidth
             />
+            {trainingTab === 'puzzles' && (
+              <ToggleButtonGroup
+                value={puzzleDifficulty}
+                exclusive
+                size="small"
+                onChange={(event, value) => value && setPuzzleDifficulty(value)}
+                fullWidth
+                sx={{
+                  '& .MuiToggleButton-root': {
+                    px: 0.5,
+                    fontSize: 11,
+                    lineHeight: 1.2,
+                  },
+                }}
+              >
+                {puzzleDifficulties.map((difficulty) => (
+                  <ToggleButton key={difficulty.value} value={difficulty.value}>
+                    {difficulty.label}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+            )}
           </Stack>
 
           <Divider sx={{ mb: 1 }} />
@@ -439,6 +474,10 @@ function TrainingPage({ themeMode }) {
               {trainingTab === 'puzzles' ? (
                 <>
                   {selectedPuzzle && <Chip label={selectedPuzzle.rating} variant="outlined" />}
+                  <Chip
+                    label={puzzleDifficulties.find((difficulty) => difficulty.value === puzzleDifficulty)?.range}
+                    variant="outlined"
+                  />
                   <Chip label={puzzleStatus} color={puzzleSolved ? 'success' : 'default'} variant="outlined" />
                 </>
               ) : (
