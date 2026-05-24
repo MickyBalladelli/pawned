@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Box,
   Button,
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Divider,
   List,
   ListItemButton,
@@ -22,6 +23,7 @@ import ChessBoard from './ChessBoard'
 import openingsBook from './data/chessOpenings.json'
 
 const startingFen = new Chess().fen()
+const puzzlePreviewLimit = 500
 
 function buildPositions(opening) {
   if (!opening) {
@@ -58,11 +60,113 @@ function moveLabel(opening, index) {
   return `${index}. ${opening.moves[index - 1]}`
 }
 
+function applyUci(chess, uci) {
+  if (!uci || uci.length < 4) {
+    return null
+  }
+
+  try {
+    return chess.move({
+      from: uci.slice(0, 2),
+      to: uci.slice(2, 4),
+      promotion: uci[4],
+    })
+  } catch {
+    return null
+  }
+}
+
+function puzzleStart(puzzle) {
+  if (!puzzle) {
+    return null
+  }
+
+  const chess = new Chess(puzzle.fen)
+  const firstMove = applyUci(chess, puzzle.moves[0])
+
+  if (!firstMove) {
+    return null
+  }
+
+  return chess
+}
+
+function turnColor(chess) {
+  return chess?.turn() === 'b' ? 'black' : 'white'
+}
+
+function cleanTheme(theme) {
+  return String(theme || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+}
+
 function TrainingPage({ themeMode }) {
   const [trainingTab, setTrainingTab] = useState('openings')
   const [filter, setFilter] = useState('')
   const [selectedOpening, setSelectedOpening] = useState(openingsBook.openings[0])
   const [moveIndex, setMoveIndex] = useState(0)
+  const [puzzles, setPuzzles] = useState([])
+  const [puzzleLoading, setPuzzleLoading] = useState(false)
+  const [selectedPuzzle, setSelectedPuzzle] = useState(null)
+  const [puzzleFen, setPuzzleFen] = useState(startingFen)
+  const [puzzleStep, setPuzzleStep] = useState(1)
+  const [puzzleSelectedSquare, setPuzzleSelectedSquare] = useState(null)
+  const [puzzleStatus, setPuzzleStatus] = useState('Pick a puzzle')
+  const [puzzleSolved, setPuzzleSolved] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+
+    if (puzzles.length > 0 || puzzleLoading) {
+      return undefined
+    }
+
+    setPuzzleLoading(true)
+    fetch('/data/chessPuzzles.json')
+      .then((response) => response.json())
+      .then((data) => {
+        if (cancelled) {
+          return
+        }
+
+        const loadedPuzzles = data.puzzles || []
+        setPuzzles(loadedPuzzles)
+        setSelectedPuzzle(loadedPuzzles[0] || null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPuzzleStatus('Could not load puzzles')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPuzzleLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [puzzleLoading, puzzles.length])
+
+  useEffect(() => {
+    if (!selectedPuzzle) {
+      return
+    }
+
+    const chess = puzzleStart(selectedPuzzle)
+
+    if (!chess) {
+      setPuzzleFen(startingFen)
+      setPuzzleStatus('Puzzle cannot load')
+      return
+    }
+
+    setPuzzleFen(chess.fen())
+    setPuzzleStep(1)
+    setPuzzleSelectedSquare(null)
+    setPuzzleSolved(false)
+    setPuzzleStatus(`${turnColor(chess)} to solve`)
+  }, [selectedPuzzle])
 
   const visibleOpenings = useMemo(() => {
     const query = filter.trim().toLowerCase()
@@ -81,6 +185,27 @@ function TrainingPage({ themeMode }) {
   const positions = useMemo(() => buildPositions(selectedOpening), [selectedOpening])
   const currentFen = positions[Math.min(moveIndex, positions.length - 1)] || startingFen
   const currentMove = moveLabel(selectedOpening, moveIndex)
+  const visiblePuzzles = useMemo(() => {
+    const query = filter.trim().toLowerCase()
+    const matches = query
+      ? puzzles.filter((puzzle) => (
+        puzzle.id.toLowerCase().includes(query) ||
+        String(puzzle.rating).includes(query) ||
+        puzzle.themes.join(' ').toLowerCase().includes(query) ||
+        puzzle.openingTags.join(' ').toLowerCase().includes(query)
+      ))
+      : puzzles
+
+    return matches.slice(0, puzzlePreviewLimit)
+  }, [filter, puzzles])
+  const puzzleBoard = useMemo(() => {
+    try {
+      return new Chess(puzzleFen)
+    } catch {
+      return new Chess()
+    }
+  }, [puzzleFen])
+  const puzzlePlayerColor = turnColor(puzzleBoard)
 
   function selectOpening(opening) {
     setSelectedOpening(opening)
@@ -93,6 +218,81 @@ function TrainingPage({ themeMode }) {
 
   function nextMove() {
     setMoveIndex((current) => Math.min(positions.length - 1, current + 1))
+  }
+
+  function selectPuzzle(puzzle) {
+    setSelectedPuzzle(puzzle)
+  }
+
+  function nextPuzzle() {
+    if (puzzles.length === 0 || !selectedPuzzle) {
+      return
+    }
+
+    const index = puzzles.findIndex((puzzle) => puzzle.id === selectedPuzzle.id)
+    const nextIndex = index >= 0 ? (index + 1) % puzzles.length : 0
+    setSelectedPuzzle(puzzles[nextIndex])
+  }
+
+  function handlePuzzleMove(from, to) {
+    if (!selectedPuzzle || puzzleSolved) {
+      return
+    }
+
+    const expected = selectedPuzzle.moves[puzzleStep]
+    const played = `${from}${to}`.toLowerCase()
+
+    if (!expected || played !== expected.slice(0, 4).toLowerCase()) {
+      setPuzzleStatus('Try again')
+      setPuzzleSelectedSquare(null)
+      return
+    }
+
+    const chess = new Chess(puzzleFen)
+    const userMove = applyUci(chess, expected)
+
+    if (!userMove) {
+      setPuzzleStatus('Puzzle move failed')
+      return
+    }
+
+    let nextStep = puzzleStep + 1
+
+    if (nextStep >= selectedPuzzle.moves.length) {
+      setPuzzleFen(chess.fen())
+      setPuzzleStep(nextStep)
+      setPuzzleSolved(true)
+      setPuzzleSelectedSquare(null)
+      setPuzzleStatus('Solved')
+      return
+    }
+
+    applyUci(chess, selectedPuzzle.moves[nextStep])
+    nextStep += 1
+
+    setPuzzleFen(chess.fen())
+    setPuzzleStep(nextStep)
+    setPuzzleSelectedSquare(null)
+    setPuzzleStatus(nextStep >= selectedPuzzle.moves.length ? 'Solved' : `${turnColor(chess)} to solve`)
+    setPuzzleSolved(nextStep >= selectedPuzzle.moves.length)
+  }
+
+  function handlePuzzleSquareClick(square) {
+    if (!selectedPuzzle || puzzleSolved) {
+      return
+    }
+
+    if (!puzzleSelectedSquare) {
+      setPuzzleSelectedSquare(square)
+      return
+    }
+
+    if (puzzleSelectedSquare === square) {
+      setPuzzleSelectedSquare(null)
+      return
+    }
+
+    handlePuzzleMove(puzzleSelectedSquare, square)
   }
 
   return (
@@ -138,9 +338,10 @@ function TrainingPage({ themeMode }) {
               sx={{ minHeight: 32 }}
             >
               <Tab label="Openings" value="openings" sx={{ minHeight: 32 }} />
+              <Tab label="Puzzles" value="puzzles" sx={{ minHeight: 32 }} />
             </Tabs>
             <TextField
-              label="Filter openings"
+              label={trainingTab === 'puzzles' ? 'Filter puzzles' : 'Filter openings'}
               size="small"
               value={filter}
               onChange={(event) => setFilter(event.target.value)}
@@ -175,6 +376,33 @@ function TrainingPage({ themeMode }) {
                 ))}
               </List>
             )}
+            {trainingTab === 'puzzles' && (
+              puzzleLoading ? (
+                <Stack sx={{ alignItems: 'center', py: 4 }}>
+                  <CircularProgress size={26} />
+                </Stack>
+              ) : (
+                <List disablePadding>
+                  {visiblePuzzles.map((puzzle) => (
+                    <ListItemButton
+                      key={puzzle.id}
+                      selected={selectedPuzzle?.id === puzzle.id}
+                      onClick={() => selectPuzzle(puzzle)}
+                      sx={{ borderRadius: 1, mb: 0.5 }}
+                    >
+                      <ListItemText
+                        primary={`Puzzle ${puzzle.id}`}
+                        secondary={`${puzzle.rating} · ${puzzle.themes.map(cleanTheme).slice(0, 3).join(', ')}`}
+                        slotProps={{
+                          primary: { noWrap: true },
+                          secondary: { noWrap: true },
+                        }}
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+              )
+            )}
           </Box>
         </CardContent>
       </Card>
@@ -198,16 +426,27 @@ function TrainingPage({ themeMode }) {
                     fontWeight: 900,
                   }}
                 >
-                  {selectedOpening?.name || 'Opening'}
+                  {trainingTab === 'puzzles' ? `Puzzle ${selectedPuzzle?.id || ''}` : selectedOpening?.name || 'Opening'}
                 </Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" noWrap>
-                {selectedOpening?.moves.join(' ') || 'Pick an opening'}
+                {trainingTab === 'puzzles'
+                  ? selectedPuzzle?.themes.map(cleanTheme).join(', ') || 'Pick a puzzle'
+                  : selectedOpening?.moves.join(' ') || 'Pick an opening'}
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              {selectedOpening && <Chip label={selectedOpening.eco} variant="outlined" />}
-              <Chip label={`${moveIndex}/${Math.max(0, positions.length - 1)}`} variant="outlined" />
+              {trainingTab === 'puzzles' ? (
+                <>
+                  {selectedPuzzle && <Chip label={selectedPuzzle.rating} variant="outlined" />}
+                  <Chip label={puzzleStatus} color={puzzleSolved ? 'success' : 'default'} variant="outlined" />
+                </>
+              ) : (
+                <>
+                  {selectedOpening && <Chip label={selectedOpening.eco} variant="outlined" />}
+                  <Chip label={`${moveIndex}/${Math.max(0, positions.length - 1)}`} variant="outlined" />
+                </>
+              )}
             </Stack>
           </Stack>
 
@@ -222,65 +461,111 @@ function TrainingPage({ themeMode }) {
             }}
           >
             <Box>
-              <ChessBoard
-                position={currentFen}
-                playerColor="white"
-                selectedSquare={null}
-                themeMode={themeMode}
-                onSquareClick={() => {}}
-              />
+              {trainingTab === 'puzzles' ? (
+                <ChessBoard
+                  position={puzzleFen}
+                  playerColor={puzzlePlayerColor}
+                  selectedSquare={puzzleSelectedSquare}
+                  themeMode={themeMode}
+                  onSquareClick={handlePuzzleSquareClick}
+                />
+              ) : (
+                <ChessBoard
+                  position={currentFen}
+                  playerColor="white"
+                  selectedSquare={null}
+                  themeMode={themeMode}
+                  onSquareClick={() => {}}
+                />
+              )}
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<ChevronLeft />}
-                  onClick={previousMove}
-                  disabled={moveIndex === 0}
-                  sx={{ minWidth: 112 }}
-                >
-                  Previous
-                </Button>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  endIcon={<ChevronRight />}
-                  onClick={nextMove}
-                  disabled={moveIndex >= positions.length - 1}
-                  sx={{ minWidth: 112 }}
-                >
-                  Next
-                </Button>
+                {trainingTab === 'puzzles' ? (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    endIcon={<ChevronRight />}
+                    onClick={nextPuzzle}
+                    disabled={puzzles.length === 0}
+                    sx={{ minWidth: 112 }}
+                  >
+                    Next puzzle
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<ChevronLeft />}
+                      onClick={previousMove}
+                      disabled={moveIndex === 0}
+                      sx={{ minWidth: 112 }}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      endIcon={<ChevronRight />}
+                      onClick={nextMove}
+                      disabled={moveIndex >= positions.length - 1}
+                      sx={{ minWidth: 112 }}
+                    >
+                      Next
+                    </Button>
+                  </>
+                )}
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {currentMove}
+                {trainingTab === 'puzzles' ? puzzleStatus : currentMove}
               </Typography>
             </Box>
 
             <Paper variant="outlined" sx={{ p: 2, maxHeight: { lg: 520 }, overflow: 'auto' }}>
               <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
-                Moves
+                {trainingTab === 'puzzles' ? 'Puzzle' : 'Moves'}
               </Typography>
-              <Stack spacing={0.5}>
-                <Button
-                  size="small"
-                  variant={moveIndex === 0 ? 'contained' : 'text'}
-                  onClick={() => setMoveIndex(0)}
-                  sx={{ justifyContent: 'flex-start' }}
-                >
-                  Start
-                </Button>
-                {selectedOpening?.moves.map((move, index) => (
+              {trainingTab === 'puzzles' ? (
+                <Stack spacing={1}>
+                  <Typography variant="body2">
+                    Rating: {selectedPuzzle?.rating || '-'}
+                  </Typography>
+                  <Typography variant="body2">
+                    Plays: {selectedPuzzle?.plays || '-'}
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                    {selectedPuzzle?.themes.map((theme) => (
+                      <Chip key={theme} size="small" label={cleanTheme(theme)} variant="outlined" />
+                    ))}
+                  </Stack>
+                  {puzzleSolved && (
+                    <Typography variant="body2" color="success.main" sx={{ fontWeight: 900 }}>
+                      Solved
+                    </Typography>
+                  )}
+                </Stack>
+              ) : (
+                <Stack spacing={0.5}>
                   <Button
-                    key={`${move}-${index}`}
                     size="small"
-                    variant={moveIndex === index + 1 ? 'contained' : 'text'}
-                    onClick={() => setMoveIndex(index + 1)}
-                    sx={{ justifyContent: 'space-between' }}
+                    variant={moveIndex === 0 ? 'contained' : 'text'}
+                    onClick={() => setMoveIndex(0)}
+                    sx={{ justifyContent: 'flex-start' }}
                   >
-                    <span>{index + 1}. {move}</span>
+                    Start
                   </Button>
-                ))}
-              </Stack>
+                  {selectedOpening?.moves.map((move, index) => (
+                    <Button
+                      key={`${move}-${index}`}
+                      size="small"
+                      variant={moveIndex === index + 1 ? 'contained' : 'text'}
+                      onClick={() => setMoveIndex(index + 1)}
+                      sx={{ justifyContent: 'space-between' }}
+                    >
+                      <span>{index + 1}. {move}</span>
+                    </Button>
+                  ))}
+                </Stack>
+              )}
             </Paper>
           </Box>
         </CardContent>
