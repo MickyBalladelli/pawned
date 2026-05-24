@@ -99,6 +99,40 @@ function puzzleStart(puzzle) {
   return chess
 }
 
+function puzzleSolverColor(puzzle) {
+  const chess = puzzleStart(puzzle)
+  return turnColor(chess)
+}
+
+function puzzlePositions(puzzle) {
+  if (!puzzle) {
+    return [startingFen]
+  }
+
+  const chess = new Chess(puzzle.fen)
+  const positions = [chess.fen()]
+
+  for (const uci of puzzle.moves) {
+    const move = applyUci(chess, uci)
+
+    if (!move) {
+      break
+    }
+
+    positions.push(chess.fen())
+  }
+
+  return positions
+}
+
+function puzzleMoveLabel(uci, index) {
+  if (!uci) {
+    return 'Start'
+  }
+
+  return `${index + 1}. ${uci.slice(0, 2)}-${uci.slice(2, 4)}`
+}
+
 function turnColor(chess) {
   return chess?.turn() === 'b' ? 'black' : 'white'
 }
@@ -118,6 +152,7 @@ function TrainingPage({ themeMode }) {
   const [selectedPuzzle, setSelectedPuzzle] = useState(null)
   const [puzzleFen, setPuzzleFen] = useState(startingFen)
   const [puzzleStep, setPuzzleStep] = useState(1)
+  const [puzzleViewIndex, setPuzzleViewIndex] = useState(null)
   const [puzzleSelectedSquare, setPuzzleSelectedSquare] = useState(null)
   const [puzzleStatus, setPuzzleStatus] = useState('Pick a puzzle')
   const [puzzleSolved, setPuzzleSolved] = useState(false)
@@ -176,6 +211,7 @@ function TrainingPage({ themeMode }) {
 
     setPuzzleFen(chess.fen())
     setPuzzleStep(1)
+    setPuzzleViewIndex(null)
     setPuzzleSelectedSquare(null)
     setPuzzleSolved(false)
     setPuzzleStatus(`${turnColor(chess)} to solve`)
@@ -211,14 +247,11 @@ function TrainingPage({ themeMode }) {
 
     return matches.slice(0, puzzlePreviewLimit)
   }, [filter, puzzles])
-  const puzzleBoard = useMemo(() => {
-    try {
-      return new Chess(puzzleFen)
-    } catch {
-      return new Chess()
-    }
-  }, [puzzleFen])
-  const puzzlePlayerColor = turnColor(puzzleBoard)
+  const selectedPuzzlePositions = useMemo(() => puzzlePositions(selectedPuzzle), [selectedPuzzle])
+  const viewedPuzzleFen = puzzleViewIndex === null
+    ? puzzleFen
+    : selectedPuzzlePositions[puzzleViewIndex] || puzzleFen
+  const puzzleBoardOrientation = puzzleSolverColor(selectedPuzzle)
 
   function selectOpening(opening) {
     setSelectedOpening(opening)
@@ -247,8 +280,39 @@ function TrainingPage({ themeMode }) {
     setSelectedPuzzle(puzzles[nextIndex])
   }
 
+  function previousPuzzleMove() {
+    setPuzzleViewIndex((current) => {
+      if (current === null) {
+        return selectedPuzzlePositions.length - 1
+      }
+
+      return Math.max(0, current - 1)
+    })
+    setPuzzleSelectedSquare(null)
+  }
+
+  function nextPuzzleMove() {
+    setPuzzleViewIndex((current) => {
+      if (current === null) {
+        return null
+      }
+
+      if (current >= selectedPuzzlePositions.length - 1) {
+        return null
+      }
+
+      return current + 1
+    })
+    setPuzzleSelectedSquare(null)
+  }
+
   function handlePuzzleMove(from, to) {
     if (!selectedPuzzle || puzzleSolved) {
+      return
+    }
+
+    if (puzzleViewIndex !== null) {
+      setPuzzleViewIndex(null)
       return
     }
 
@@ -502,8 +566,8 @@ function TrainingPage({ themeMode }) {
             <Box>
               {trainingTab === 'puzzles' ? (
                 <ChessBoard
-                  position={puzzleFen}
-                  playerColor={puzzlePlayerColor}
+                  position={viewedPuzzleFen}
+                  playerColor={puzzleBoardOrientation}
                   selectedSquare={puzzleSelectedSquare}
                   themeMode={themeMode}
                   onSquareClick={handlePuzzleSquareClick}
@@ -519,16 +583,37 @@ function TrainingPage({ themeMode }) {
               )}
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
                 {trainingTab === 'puzzles' ? (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    endIcon={<ChevronRight />}
-                    onClick={nextPuzzle}
-                    disabled={puzzles.length === 0}
-                    sx={{ minWidth: 112 }}
-                  >
-                    Next puzzle
-                  </Button>
+                  <>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<ChevronLeft />}
+                      onClick={previousPuzzleMove}
+                      disabled={!selectedPuzzle || selectedPuzzlePositions.length <= 1}
+                      sx={{ minWidth: 112 }}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      endIcon={<ChevronRight />}
+                      onClick={nextPuzzleMove}
+                      disabled={!selectedPuzzle || selectedPuzzlePositions.length <= 1 || puzzleViewIndex === null}
+                      sx={{ minWidth: 112 }}
+                    >
+                      Next
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={nextPuzzle}
+                      disabled={puzzles.length === 0}
+                      sx={{ minWidth: 112 }}
+                    >
+                      Next puzzle
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button
@@ -555,7 +640,9 @@ function TrainingPage({ themeMode }) {
                 )}
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                {trainingTab === 'puzzles' ? puzzleStatus : currentMove}
+                {trainingTab === 'puzzles'
+                  ? puzzleViewIndex === null ? puzzleStatus : puzzleMoveLabel(selectedPuzzle?.moves[puzzleViewIndex - 1], puzzleViewIndex - 1)
+                  : currentMove}
               </Typography>
             </Box>
 
@@ -574,6 +661,27 @@ function TrainingPage({ themeMode }) {
                   <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
                     {selectedPuzzle?.themes.map((theme) => (
                       <Chip key={theme} size="small" label={cleanTheme(theme)} variant="outlined" />
+                    ))}
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    <Button
+                      size="small"
+                      variant={puzzleViewIndex === 0 ? 'contained' : 'text'}
+                      onClick={() => setPuzzleViewIndex(0)}
+                      sx={{ justifyContent: 'flex-start' }}
+                    >
+                      Start
+                    </Button>
+                    {selectedPuzzle?.moves.map((move, index) => (
+                      <Button
+                        key={`${move}-${index}`}
+                        size="small"
+                        variant={puzzleViewIndex === index + 1 ? 'contained' : 'text'}
+                        onClick={() => setPuzzleViewIndex(index + 1)}
+                        sx={{ justifyContent: 'space-between' }}
+                      >
+                        <span>{puzzleMoveLabel(move, index)}</span>
+                      </Button>
                     ))}
                   </Stack>
                   {puzzleSolved && (
