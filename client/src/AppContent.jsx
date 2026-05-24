@@ -45,13 +45,13 @@ import {
   Search,
   Send,
   Settings,
-  SportsEsports,
   EditOff
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
 import ChannelSettingsToggles from './ChannelSettingsToggles'
 import ChannelMessageList from './ChannelMessageList'
 import ChannelMembershipDialog from './ChannelMembershipDialog'
+import ChessIcon from './ChessIcon'
 import ChessPage from './ChessPage'
 import { requestJson } from './requestJson'
 
@@ -728,7 +728,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             }}
           >
             <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
-            <Tab icon={<SportsEsports />} iconPosition="start" value="chess" label="Chess" />
+            <Tab icon={<ChessIcon />} iconPosition="start" value="chess" label="Chess" />
           </Tabs>
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
             

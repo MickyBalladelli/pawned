@@ -32,10 +32,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Refresh,
-  SportsEsports,
 } from '@mui/icons-material'
 import ChessBoard from './ChessBoard'
 import ChessGameChat from './ChessGameChat'
+import ChessIcon from './ChessIcon'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -925,7 +925,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               </TextField>
               <Button
                 variant="outlined"
-                startIcon={<SportsEsports />}
+                startIcon={<ChessIcon />}
                 onClick={createBotGame}
                 disabled={busy}
                 sx={{ flex: 1 }}
@@ -1008,7 +1008,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           >
             <Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-                <SportsEsports color="primary" />
+                <ChessIcon color="primary" />
                 <Typography
                   variant="h5"
                   component="h2"
