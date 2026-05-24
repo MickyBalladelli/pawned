@@ -106,6 +106,12 @@ function getInitial(username) {
 }
 
 function getInitialActiveView() {
+  const params = new URLSearchParams(window.location.search)
+
+  if (params.has('chessGame')) {
+    return 'chess'
+  }
+
   return localStorage.getItem(activeViewStorageKey) === 'chess' ? 'chess' : 'chat'
 }
 
@@ -170,6 +176,12 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
 
     setActiveView(value)
     localStorage.setItem(activeViewStorageKey, value)
+
+    if (value === 'chat') {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('chessGame')
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    }
   }
 
   const loadChannels = useCallback(async () => {

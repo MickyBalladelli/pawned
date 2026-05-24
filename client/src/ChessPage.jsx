@@ -214,6 +214,13 @@ function addMoveOnce(current, move) {
 }
 
 function getInitialSelectedGameId() {
+  const params = new URLSearchParams(window.location.search)
+  const queryGameId = Number(params.get('chessGame'))
+
+  if (Number.isFinite(queryGameId) && queryGameId > 0) {
+    return queryGameId
+  }
+
   const value = localStorage.getItem(selectedGameStorageKey)
   const numericValue = Number(value)
 
@@ -226,6 +233,18 @@ function setStoredSelectedGameId(gameId) {
   } else {
     localStorage.removeItem(selectedGameStorageKey)
   }
+}
+
+function setUrlSelectedGameId(gameId) {
+  const url = new URL(window.location.href)
+
+  if (gameId) {
+    url.searchParams.set('chessGame', String(gameId))
+  } else {
+    url.searchParams.delete('chessGame')
+  }
+
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
 function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, onError, onNotice }) {
@@ -349,6 +368,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
   useEffect(() => {
     setStoredSelectedGameId(selectedGameId)
+    setUrlSelectedGameId(selectedGameId)
   }, [selectedGameId])
 
   useEffect(() => {
