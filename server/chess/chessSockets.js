@@ -3,6 +3,7 @@ const {
   listChessMoves,
   makeChessMove,
   resignChessGame,
+  timeoutChessGame,
   cancelChessGame,
 } = require('./chessStore')
 const { playBotTurn } = require('./chessBotRunner')
@@ -16,7 +17,9 @@ function emitGameUpdate(io, game) {
 }
 
 function emitMoveMade(io, result) {
-  io.to(chessRoom(result.game.id)).emit('chess:moveMade', result)
+  if (result.move) {
+    io.to(chessRoom(result.game.id)).emit('chess:moveMade', result)
+  }
   emitGameUpdate(io, result.game)
 }
 
@@ -96,6 +99,23 @@ function registerChessSockets(io, socket, { pool }) {
       callback?.({ game })
     } catch (err) {
       callback?.({ error: err.message || 'Failed to resign chess game' })
+    }
+  })
+
+  socket.on('chess:timeout', async (data, callback) => {
+    const { gameId } = data || {}
+
+    if (!gameId) {
+      callback?.({ error: 'Game id is required' })
+      return
+    }
+
+    try {
+      const game = await timeoutChessGame(pool, gameId, socket.data.user)
+      emitGameUpdate(io, game)
+      callback?.({ game })
+    } catch (err) {
+      callback?.({ error: err.message || 'Failed to timeout chess game' })
     }
   })
 

@@ -4,6 +4,7 @@ const { normalizeBotLevel } = require('./chessBot')
 
 const startingFen = new Chess().fen()
 const chessBotUsername = 'VelaBot'
+const timeControls = new Set([60, 300, 600, 5400])
 
 function normalizeColor(color) {
   return color === 'black' ? 'black' : 'white'
@@ -27,6 +28,51 @@ function colorForUser(game, userId) {
 
 function currentTurnColor(fen) {
   return new Chess(fen).turn() === 'w' ? 'white' : 'black'
+}
+
+function normalizeTimeControlSeconds(value) {
+  if (value === null || value === undefined || value === '' || value === 'unlimited') {
+    return null
+  }
+
+  const seconds = Number(value)
+  return timeControls.has(seconds) ? seconds : null
+}
+
+function timeControlMilliseconds(seconds) {
+  return seconds ? seconds * 1000 : null
+}
+
+function timestampMs(value) {
+  if (!value) {
+    return null
+  }
+
+  const date = value instanceof Date ? value : new Date(value)
+  const ms = date.getTime()
+  return Number.isFinite(ms) ? ms : null
+}
+
+function applyClock(game, now = new Date()) {
+  if (!game?.time_control_seconds || game.status !== 'active' || !game.clock_started_at) {
+    return game
+  }
+
+  const startedMs = timestampMs(game.clock_started_at)
+
+  if (!startedMs) {
+    return game
+  }
+
+  const elapsed = Math.max(0, now.getTime() - startedMs)
+  const whiteTimeMs = Number(game.white_time_ms)
+  const blackTimeMs = Number(game.black_time_ms)
+
+  return {
+    ...game,
+    white_time_ms: game.turn_color === 'white' ? Math.max(0, whiteTimeMs - elapsed) : whiteTimeMs,
+    black_time_ms: game.turn_color === 'black' ? Math.max(0, blackTimeMs - elapsed) : blackTimeMs,
+  }
 }
 
 function statusFromChess(chess, fallbackStatus = 'active') {
@@ -67,6 +113,9 @@ function mapGame(row) {
     chat_channel_id: row.chat_channel_id === null || row.chat_channel_id === undefined ? null : Number(row.chat_channel_id),
     winner_user_id: row.winner_user_id === null ? null : Number(row.winner_user_id),
     bot_level: row.bot_level === null || row.bot_level === undefined ? null : Number(row.bot_level),
+    time_control_seconds: row.time_control_seconds === null || row.time_control_seconds === undefined ? null : Number(row.time_control_seconds),
+    white_time_ms: row.white_time_ms === null || row.white_time_ms === undefined ? null : Number(row.white_time_ms),
+    black_time_ms: row.black_time_ms === null || row.black_time_ms === undefined ? null : Number(row.black_time_ms),
     is_bot_game: Boolean(row.is_bot_game),
     turn_color: row.turn_color || currentTurnColor(row.fen),
   }
@@ -90,6 +139,10 @@ async function createChessTables(pool) {
       ended_at TIMESTAMP,
       is_bot_game BOOLEAN DEFAULT FALSE,
       bot_level INTEGER,
+      time_control_seconds INTEGER,
+      white_time_ms INTEGER,
+      black_time_ms INTEGER,
+      clock_started_at TIMESTAMP,
       deleted_at TIMESTAMP
     )
   `)
@@ -100,6 +153,10 @@ async function createChessTables(pool) {
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS chat_channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL')
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS chat_closed_at TIMESTAMP')
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS time_control_seconds INTEGER')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS white_time_ms INTEGER')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS black_time_ms INTEGER')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS clock_started_at TIMESTAMP')
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chess_moves (
@@ -244,6 +301,8 @@ async function listChessGames(pool, user, scope = 'mine') {
 async function createChessGame(pool, user, options = {}) {
   const color = normalizeColor(options.color)
   const opponentUserId = options.opponentUserId ? Number(options.opponentUserId) : null
+  const timeControlSeconds = normalizeTimeControlSeconds(options.timeControlSeconds)
+  const timeControlMs = timeControlMilliseconds(timeControlSeconds)
 
   if (opponentUserId && opponentUserId === Number(user.id)) {
     throw new Error('Opponent must be another user')
@@ -255,11 +314,22 @@ async function createChessGame(pool, user, options = {}) {
 
   const result = await pool.query(
     `
-      INSERT INTO chess_games (white_user_id, black_user_id, creator_user_id, fen, status, turn_color)
-      VALUES ($1, $2, $3, $4, $5, 'white')
+      INSERT INTO chess_games (
+        white_user_id,
+        black_user_id,
+        creator_user_id,
+        fen,
+        status,
+        turn_color,
+        time_control_seconds,
+        white_time_ms,
+        black_time_ms,
+        clock_started_at
+      )
+      VALUES ($1, $2, $3, $4, $5::varchar, 'white', $6::integer, $7::integer, $7::integer, CASE WHEN $5::varchar = 'active' AND $6::integer IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
       RETURNING id
     `,
-    [whiteUserId, blackUserId, user.id, startingFen, status]
+    [whiteUserId, blackUserId, user.id, startingFen, status, timeControlSeconds, timeControlMs]
   )
 
   const game = await getChessGame(pool, result.rows[0].id)
@@ -269,6 +339,8 @@ async function createChessGame(pool, user, options = {}) {
 async function createBotChessGame(pool, user, options = {}) {
   const playerColor = normalizeColor(options.color)
   const botLevel = normalizeBotLevel(options.level)
+  const timeControlSeconds = normalizeTimeControlSeconds(options.timeControlSeconds)
+  const timeControlMs = timeControlMilliseconds(timeControlSeconds)
   const bot = await getChessBotUser(pool)
   const whiteUserId = playerColor === 'white' ? user.id : bot.id
   const blackUserId = playerColor === 'black' ? user.id : bot.id
@@ -283,12 +355,16 @@ async function createBotChessGame(pool, user, options = {}) {
         status,
         turn_color,
         is_bot_game,
-        bot_level
+        bot_level,
+        time_control_seconds,
+        white_time_ms,
+        black_time_ms,
+        clock_started_at
       )
-      VALUES ($1, $2, $3, $4, 'active', 'white', true, $5)
+      VALUES ($1, $2, $3, $4, 'active', 'white', true, $5, $6::integer, $7::integer, $7::integer, CASE WHEN $6::integer IS NOT NULL THEN CURRENT_TIMESTAMP ELSE NULL END)
       RETURNING id
     `,
-    [whiteUserId, blackUserId, user.id, startingFen, botLevel]
+    [whiteUserId, blackUserId, user.id, startingFen, botLevel, timeControlSeconds, timeControlMs]
   )
 
   const game = await getChessGame(pool, result.rows[0].id)
@@ -370,7 +446,8 @@ async function joinChessGame(pool, gameId, user, options = {}) {
         UPDATE chess_games
         SET white_user_id = $1,
             black_user_id = $2,
-            status = $3,
+            status = $3::varchar,
+            clock_started_at = CASE WHEN $3::varchar = 'active' AND time_control_seconds IS NOT NULL THEN CURRENT_TIMESTAMP ELSE clock_started_at END,
             updated_at = CURRENT_TIMESTAMP
         WHERE id = $4
       `,
@@ -429,6 +506,35 @@ async function makeChessMove(pool, gameId, user, moveInput = {}) {
       throw new Error('Not your turn')
     }
 
+    const now = new Date()
+    const clockGame = applyClock(game, now)
+    const remainingMs = playerColor === 'white' ? clockGame.white_time_ms : clockGame.black_time_ms
+
+    if (game.time_control_seconds && remainingMs <= 0) {
+      const winnerUserId = oppositeColor(playerColor) === 'white' ? game.white_user_id : game.black_user_id
+
+      await client.query(
+        `
+          UPDATE chess_games
+          SET status = 'timeout',
+              winner_user_id = $1,
+              white_time_ms = $2,
+              black_time_ms = $3,
+              ended_at = $4,
+              clock_started_at = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = $5
+        `,
+        [winnerUserId, clockGame.white_time_ms, clockGame.black_time_ms, now, game.id]
+      )
+
+      await client.query('COMMIT')
+      return {
+        game: await getChessGame(pool, game.id),
+        move: null,
+      }
+    }
+
     const chess = new Chess(game.fen)
     const move = chess.move({
       from: moveInput.from,
@@ -444,7 +550,7 @@ async function makeChessMove(pool, gameId, user, moveInput = {}) {
     const status = statusFromChess(chess)
     const winnerUserId = winnerFromChess(chess, game)
     const nextTurnColor = currentTurnColor(fenAfter)
-    const endedAt = status === 'active' ? null : new Date()
+    const endedAt = status === 'active' ? null : now
     const moveCountResult = await client.query('SELECT COUNT(*)::integer AS count FROM chess_moves WHERE game_id = $1', [game.id])
     const moveNumber = Number(moveCountResult.rows[0].count) + 1
 
@@ -484,10 +590,23 @@ async function makeChessMove(pool, gameId, user, moveInput = {}) {
             turn_color = $3,
             winner_user_id = $4,
             ended_at = $5,
+            white_time_ms = $6,
+            black_time_ms = $7,
+            clock_started_at = $8,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6
+        WHERE id = $9
       `,
-      [fenAfter, status, nextTurnColor, winnerUserId, endedAt, game.id]
+      [
+        fenAfter,
+        status,
+        nextTurnColor,
+        winnerUserId,
+        endedAt,
+        clockGame.white_time_ms,
+        clockGame.black_time_ms,
+        status === 'active' && game.time_control_seconds ? now : null,
+        game.id,
+      ]
     )
 
     await client.query('COMMIT')
@@ -549,6 +668,62 @@ async function resignChessGame(pool, gameId, user) {
         WHERE id = $2
       `,
       [winnerUserId, game.id]
+    )
+
+    await client.query('COMMIT')
+    return getChessGame(pool, game.id)
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
+async function timeoutChessGame(pool, gameId, user) {
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    const result = await client.query('SELECT * FROM chess_games WHERE id = $1 FOR UPDATE', [gameId])
+    const game = mapGame(result.rows[0])
+
+    if (!game) {
+      throw new Error('Game not found')
+    }
+
+    if (game.status !== 'active') {
+      throw new Error('Game is not active')
+    }
+
+    if (!game.time_control_seconds) {
+      throw new Error('Game has no time limit')
+    }
+
+    const now = new Date()
+    const clockGame = applyClock(game, now)
+    const remainingMs = game.turn_color === 'white' ? clockGame.white_time_ms : clockGame.black_time_ms
+
+    if (remainingMs > 0) {
+      throw new Error('Time is not out')
+    }
+
+    const winnerUserId = game.turn_color === 'white' ? game.black_user_id : game.white_user_id
+
+    await client.query(
+      `
+        UPDATE chess_games
+        SET status = 'timeout',
+            winner_user_id = $1,
+            white_time_ms = $2,
+            black_time_ms = $3,
+            ended_at = $4,
+            clock_started_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $5
+      `,
+      [winnerUserId, clockGame.white_time_ms, clockGame.black_time_ms, now, game.id]
     )
 
     await client.query('COMMIT')
@@ -658,6 +833,7 @@ module.exports = {
   listChessMoves,
   makeChessMove,
   resignChessGame,
+  timeoutChessGame,
   cancelChessGame,
   deleteChessGame,
   canDeleteChessGame,

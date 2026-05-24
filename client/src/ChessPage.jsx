@@ -44,12 +44,20 @@ import {
   Timer,
 } from '@mui/icons-material'
 import ChessBoard from './ChessBoard'
+import ChessClock, { timeControlName } from './ChessClock'
 import ChessGameChat from './ChessGameChat'
 import ChessIcon from './ChessIcon'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const botLevels = [600, 800, 1000, 1200, 1400, 1600]
+const timeControls = [
+  { label: 'Bullet (1 min)', value: 60 },
+  { label: 'Blitz (5 mins)', value: 300 },
+  { label: 'Rapid (10 mins)', value: 600 },
+  { label: 'Classical (90 mins)', value: 5400 },
+  { label: 'Unlimited', value: 'unlimited' },
+]
 const selectedGameStorageKey = 'vela.chess.selectedGameId'
 
 function getAuthHeaders(authToken) {
@@ -340,6 +348,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [viewMoveIndex, setViewMoveIndex] = useState(null)
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
+  const [newGameTimeControl, setNewGameTimeControl] = useState(300)
   const [botLevel, setBotLevel] = useState(800)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [gameListTab, setGameListTab] = useState('active')
@@ -532,7 +541,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       }
 
       setSelectedGame(result.game)
-      setMoves((current) => addMoveOnce(current, result.move))
+      if (result.move) {
+        setMoves((current) => addMoveOnce(current, result.move))
+      }
       setViewMoveIndex(null)
       setSelectedSquare(null)
       setMoveError(null)
@@ -571,7 +582,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       const data = await requestJson('/api/chess/games', {
         method: 'POST',
         headers: authHeaders,
-        body: JSON.stringify({ color: newGameColor }),
+        body: JSON.stringify({
+          color: newGameColor,
+          timeControlSeconds: newGameTimeControl,
+        }),
       })
 
       setSelectedGameId(data.game.id)
@@ -596,6 +610,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         body: JSON.stringify({
           color: newGameColor,
           level: botLevel,
+          timeControlSeconds: newGameTimeControl,
         }),
       })
 
@@ -662,7 +677,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         }
 
         setSelectedGame(response.game)
-        setMoves((current) => addMoveOnce(current, response.move))
+        if (response.move) {
+          setMoves((current) => addMoveOnce(current, response.move))
+        }
         setViewMoveIndex(null)
         setSelectedSquare(null)
         setMoveError(null)
@@ -724,6 +741,38 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setBusy(false)
     }
   }
+
+  const timeoutGame = useCallback(async (gameId) => {
+    if (!gameId) {
+      return
+    }
+
+    try {
+      if (socket && socketConnected) {
+        socket.timeout(5000).emit('chess:timeout', { gameId }, (err, response) => {
+          if (err || response?.error) {
+            return
+          }
+
+          setSelectedGame(response.game)
+          loadGames()
+        })
+        return
+      }
+
+      const data = await requestJson(`/api/chess/games/${gameId}/timeout`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+
+      setSelectedGame(data.game)
+      loadGames()
+    } catch (err) {
+      if (err.message !== 'Time is not out') {
+        onError(err.message)
+      }
+    }
+  }, [authHeaders, loadGames, onError, socket, socketConnected])
 
   async function cancelGame() {
     if (!selectedGame) {
@@ -928,6 +977,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
                       Status: {statusLabel(game, authUser)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Time: {timeControlName(game.time_control_seconds)}
                     </Typography>
                     {winnerName(game) && (
                       <Typography variant="body2" color="text.secondary">
@@ -1144,6 +1196,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             </Box>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
               <Chip label={statusLabel(selectedGame, authUser)} color={statusColor(selectedGame, authUser)} variant="outlined" />
+              {selectedGame && (
+                <Chip label={timeControlName(selectedGame.time_control_seconds)} variant="outlined" />
+              )}
               <Chip label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
               {selectedGame && !playerColor && (
                 <Chip label="Viewer" variant="outlined" />
@@ -1196,6 +1251,13 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     {moveError}
                   </Alert>
                 )}
+                <Box sx={{ mb: 1 }}>
+                  <ChessClock
+                    game={selectedGame}
+                    playerColor={playerColor}
+                    onTimeout={timeoutGame}
+                  />
+                </Box>
                 <ChessBoard
                   boardSquares={boardSquares}
                   canMove={canMove}
@@ -1323,6 +1385,21 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               <ToggleButton value="white">Play as White</ToggleButton>
               <ToggleButton value="black">Play as Black</ToggleButton>
             </ToggleButtonGroup>
+
+            <TextField
+              select
+              label="Time"
+              size="small"
+              value={newGameTimeControl}
+              onChange={(event) => setNewGameTimeControl(event.target.value === 'unlimited' ? 'unlimited' : Number(event.target.value))}
+              fullWidth
+            >
+              {timeControls.map((control) => (
+                <MenuItem key={control.value} value={control.value}>
+                  {control.label}
+                </MenuItem>
+              ))}
+            </TextField>
 
             <Button
               variant="contained"

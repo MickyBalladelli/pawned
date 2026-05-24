@@ -9,6 +9,7 @@ const {
   listChessMoves,
   makeChessMove,
   resignChessGame,
+  timeoutChessGame,
   cancelChessGame,
   deleteChessGame,
   closeChessGameChat,
@@ -21,7 +22,9 @@ function emitGameUpdate(io, game) {
 }
 
 function emitMoveMade(io, result) {
-  io.to(`chess:game:${result.game.id}`).emit('chess:moveMade', result)
+  if (result.move) {
+    io.to(`chess:game:${result.game.id}`).emit('chess:moveMade', result)
+  }
   emitGameUpdate(io, result.game)
 }
 
@@ -63,6 +66,7 @@ function createChessRouter({ pool, authenticate, io }) {
       const game = await createChessGame(pool, req.user, {
         color: req.body?.color,
         opponentUserId: req.body?.opponentUserId,
+        timeControlSeconds: req.body?.timeControlSeconds,
       })
 
       emitGameUpdate(io, game)
@@ -79,6 +83,7 @@ function createChessRouter({ pool, authenticate, io }) {
       const game = await createBotChessGame(pool, req.user, {
         color: req.body?.color,
         level: req.body?.level,
+        timeControlSeconds: req.body?.timeControlSeconds,
       })
       const botResult = await playAndEmitBotTurn(pool, io, game.id)
       const activeGame = botResult?.game || game
@@ -147,6 +152,17 @@ function createChessRouter({ pool, authenticate, io }) {
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
       res.status(status).json({ error: err.message || 'Failed to resign chess game' })
+    }
+  })
+
+  router.post('/games/:id/timeout', async (req, res) => {
+    try {
+      const game = await timeoutChessGame(pool, req.params.id, req.user)
+      emitGameUpdate(io, game)
+      res.json({ game })
+    } catch (err) {
+      const status = err.message === 'Game not found' ? 404 : 400
+      res.status(status).json({ error: err.message || 'Failed to timeout chess game' })
     }
   })
 
