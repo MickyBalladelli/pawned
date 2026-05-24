@@ -899,7 +899,6 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             variant="contained"
             startIcon={<Add />}
             onClick={() => setCreateDialogOpen(true)}
-            
           >
             New game
           </Button>
