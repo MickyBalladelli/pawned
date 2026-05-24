@@ -150,7 +150,7 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, email, is_admin, avatar_url, show_channel_presence FROM users WHERE id = $1 AND is_verified = true',
+      'SELECT id, username, email, is_admin, avatar_url, show_channel_presence, show_chess_opening FROM users WHERE id = $1 AND is_verified = true',
       [session.userId]
     );
 
@@ -305,6 +305,7 @@ app.post('/api/auth/login', async (req, res) => {
                email,
                avatar_url,
                show_channel_presence,
+               show_chess_opening,
                verification_token,
                verification_token_expires_at
         FROM users
@@ -358,6 +359,7 @@ app.post('/api/auth/login', async (req, res) => {
         is_admin: user.is_admin,
         avatar_url: user.avatar_url,
         show_channel_presence: user.show_channel_presence,
+        show_chess_opening: user.show_chess_opening,
       },
     });
   } catch (err) {
@@ -546,6 +548,7 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
   const confirmNewPassword = typeof req.body.confirmNewPassword === 'string' ? req.body.confirmNewPassword : ''
   const avatarUrl = normalizeAvatarUrl(req.body.avatarUrl)
   const showChannelPresence = req.body.showChannelPresence !== false
+  const showChessOpening = req.body.showChessOpening !== false
 
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'Valid email is required' })
@@ -581,11 +584,12 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
         SET email = $1,
             password_hash = $2,
             avatar_url = $3,
-            show_channel_presence = $4
-        WHERE id = $5
-        RETURNING id, username, email, is_admin, avatar_url, show_channel_presence
+            show_channel_presence = $4,
+            show_chess_opening = $5
+        WHERE id = $6
+        RETURNING id, username, email, is_admin, avatar_url, show_channel_presence, show_chess_opening
       `,
-      [email, passwordHash, avatarUrl, showChannelPresence, req.user.id]
+      [email, passwordHash, avatarUrl, showChannelPresence, showChessOpening, req.user.id]
     )
 
     res.json({ user: result.rows[0], message: 'Settings saved' })
@@ -1045,7 +1049,7 @@ async function getUserFromToken(token) {
   }
 
   const result = await pool.query(
-    'SELECT id, username, email, is_admin, avatar_url, show_channel_presence FROM users WHERE id = $1 AND is_verified = true',
+    'SELECT id, username, email, is_admin, avatar_url, show_channel_presence, show_chess_opening FROM users WHERE id = $1 AND is_verified = true',
     [session.userId]
   )
 
@@ -1235,6 +1239,7 @@ async function createTables() {
         verified_at TIMESTAMP,
         avatar_url TEXT,
         show_channel_presence BOOLEAN DEFAULT TRUE,
+        show_chess_opening BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -1246,8 +1251,10 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_channel_presence BOOLEAN DEFAULT TRUE');
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_chess_opening BOOLEAN DEFAULT TRUE');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL');
+    await pool.query('UPDATE users SET show_chess_opening = true WHERE show_chess_opening IS NULL');
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_read_only BOOLEAN DEFAULT FALSE')
     await pool.query('UPDATE channels SET is_read_only = false WHERE is_read_only IS NULL')

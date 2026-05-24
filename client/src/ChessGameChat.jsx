@@ -58,10 +58,14 @@ function ChessGameChat({ authHeaders, authUser, game, socket, socketConnected, o
     }
 
     socket.on('receiveMessage', handleMessage)
+    socket.on('chess:notice', handleMessage)
+    socket.on('chess:chatMessage', handleMessage)
     socket.on('messageDeleted', handleDeletedMessage)
 
     return () => {
       socket.off('receiveMessage', handleMessage)
+      socket.off('chess:notice', handleMessage)
+      socket.off('chess:chatMessage', handleMessage)
       socket.off('messageDeleted', handleDeletedMessage)
       socket.emit('leaveChannel', channelId)
     }

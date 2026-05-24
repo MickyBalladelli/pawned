@@ -7,6 +7,7 @@ const {
   cancelChessGame,
 } = require('./chessStore')
 const { playBotTurn } = require('./chessBotRunner')
+const { postChessOpeningMessage } = require('./chessOpeningMessages')
 
 function chessRoom(gameId) {
   return `chess:game:${gameId}`
@@ -23,14 +24,39 @@ function emitMoveMade(io, result) {
   emitGameUpdate(io, result.game)
 }
 
+function emitChessNotice(io, game, user, type) {
+  if (!game.chat_channel_id) {
+    return
+  }
+
+  const content = `${user.username} has ${type === 'join' ? 'joined' : 'left'} the game`
+  const notice = {
+    id: `chess-presence-${Date.now()}-${user.id}-${type}-${game.id}`,
+    channel_id: Number(game.chat_channel_id),
+    username: user.username,
+    type,
+    is_presence_notice: true,
+    created_at: new Date().toISOString(),
+    content,
+  }
+
+  io.to(chessRoom(game.id)).emit('chess:chatMessage', notice)
+  io.to(String(game.chat_channel_id)).emit('chess:notice', notice)
+}
+
 async function playAndEmitBotTurn(pool, io, gameId) {
   const botResult = await playBotTurn(pool, gameId)
 
   if (botResult) {
-    emitMoveMade(io, botResult)
+    await emitMoveAndOpening(pool, io, botResult)
   }
 
   return botResult
+}
+
+async function emitMoveAndOpening(pool, io, result) {
+  emitMoveMade(io, result)
+  await postChessOpeningMessage(pool, io, result.game.id)
 }
 
 function registerChessSockets(io, socket, { pool }) {
@@ -45,8 +71,13 @@ function registerChessSockets(io, socket, { pool }) {
         return
       }
 
+      const alreadyJoined = socket.data.chessGameIds.has(String(game.id))
       socket.join(chessRoom(game.id))
       socket.data.chessGameIds.add(String(game.id))
+
+      if (!alreadyJoined) {
+        emitChessNotice(io, game, socket.data.user, 'join')
+      }
 
       const moves = await listChessMoves(pool, game.id)
       callback?.({ game, moves })
@@ -56,10 +87,21 @@ function registerChessSockets(io, socket, { pool }) {
     }
   })
 
-  socket.on('chess:leaveGame', (gameId, callback) => {
-    socket.leave(chessRoom(gameId))
-    socket.data.chessGameIds.delete(String(gameId))
-    callback?.({ ok: true })
+  socket.on('chess:leaveGame', async (gameId, callback) => {
+    try {
+      const game = await getChessGame(pool, gameId)
+      const wasJoined = socket.data.chessGameIds.has(String(gameId))
+
+      if (game && wasJoined) {
+        emitChessNotice(io, game, socket.data.user, 'leave')
+      }
+
+      socket.leave(chessRoom(gameId))
+      socket.data.chessGameIds.delete(String(gameId))
+      callback?.({ ok: true })
+    } catch (err) {
+      callback?.({ error: 'Failed to leave chess game' })
+    }
   })
 
   socket.on('chess:move', async (data, callback) => {
@@ -77,7 +119,7 @@ function registerChessSockets(io, socket, { pool }) {
         promotion,
       })
 
-      emitMoveMade(io, result)
+      await emitMoveAndOpening(pool, io, result)
       callback?.(result)
       await playAndEmitBotTurn(pool, io, result.game.id)
     } catch (err) {
@@ -133,6 +175,16 @@ function registerChessSockets(io, socket, { pool }) {
       callback?.({ game })
     } catch (err) {
       callback?.({ error: err.message || 'Failed to cancel chess game' })
+    }
+  })
+
+  socket.on('disconnect', async () => {
+    for (const gameId of socket.data.chessGameIds || []) {
+      const game = await getChessGame(pool, gameId).catch(() => null)
+
+      if (game) {
+        emitChessNotice(io, game, socket.data.user, 'leave')
+      }
     }
   })
 }

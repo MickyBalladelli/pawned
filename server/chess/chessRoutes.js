@@ -16,6 +16,7 @@ const {
 } = require('./chessStore')
 const { botLevels, openingBook } = require('./chessBot')
 const { playBotTurn } = require('./chessBotRunner')
+const { postChessOpeningMessage } = require('./chessOpeningMessages')
 
 function emitGameUpdate(io, game) {
   io.emit('chess:gameUpdated', game)
@@ -32,10 +33,15 @@ async function playAndEmitBotTurn(pool, io, gameId) {
   const botResult = await playBotTurn(pool, gameId)
 
   if (botResult) {
-    emitMoveMade(io, botResult)
+    await emitMoveAndOpening(pool, io, botResult)
   }
 
   return botResult
+}
+
+async function emitMoveAndOpening(pool, io, result) {
+  emitMoveMade(io, result)
+  await postChessOpeningMessage(pool, io, result.game.id)
 }
 
 function createChessRouter({ pool, authenticate, io }) {
@@ -135,7 +141,7 @@ function createChessRouter({ pool, authenticate, io }) {
         promotion: req.body?.promotion,
       })
 
-      emitMoveMade(io, result)
+      await emitMoveAndOpening(pool, io, result)
       await playAndEmitBotTurn(pool, io, result.game.id)
       res.status(201).json(result)
     } catch (err) {

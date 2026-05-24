@@ -1,4 +1,4 @@
-const openingBook = require('./openings.json')
+const openingBook = require('../../client/src/data/chessOpenings.json')
 
 const botLevels = [600, 800, 1000, 1200, 1400, 1600]
 const pieceValues = {
