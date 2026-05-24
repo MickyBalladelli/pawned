@@ -1143,6 +1143,16 @@ io.on('connection', async (socket) => {
         return
       }
 
+      const chessChatResult = await pool.query(
+        'SELECT id FROM chess_games WHERE chat_channel_id = $1 AND chat_closed_at IS NOT NULL LIMIT 1',
+        [channelId]
+      )
+
+      if (chessChatResult.rows.length > 0) {
+        callback?.({ error: 'Game chat is closed' })
+        return
+      }
+
       // Insert message into database
       const result = await pool.query(
         'INSERT INTO messages (channel_id, user_id, content) VALUES ($1, $2, $3) RETURNING *',

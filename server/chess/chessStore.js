@@ -64,6 +64,7 @@ function mapGame(row) {
     white_user_id: row.white_user_id === null ? null : Number(row.white_user_id),
     black_user_id: row.black_user_id === null ? null : Number(row.black_user_id),
     creator_user_id: row.creator_user_id === null || row.creator_user_id === undefined ? null : Number(row.creator_user_id),
+    chat_channel_id: row.chat_channel_id === null || row.chat_channel_id === undefined ? null : Number(row.chat_channel_id),
     winner_user_id: row.winner_user_id === null ? null : Number(row.winner_user_id),
     bot_level: row.bot_level === null || row.bot_level === undefined ? null : Number(row.bot_level),
     is_bot_game: Boolean(row.is_bot_game),
@@ -81,6 +82,8 @@ async function createChessTables(pool) {
       status VARCHAR(20) NOT NULL DEFAULT 'waiting',
       turn_color VARCHAR(10) NOT NULL DEFAULT 'white',
       creator_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      chat_channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL,
+      chat_closed_at TIMESTAMP,
       winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -94,6 +97,8 @@ async function createChessTables(pool) {
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS is_bot_game BOOLEAN DEFAULT FALSE')
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS bot_level INTEGER')
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS creator_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS chat_channel_id INTEGER REFERENCES channels(id) ON DELETE SET NULL')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS chat_closed_at TIMESTAMP')
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP')
 
   await pool.query(`
@@ -171,6 +176,29 @@ async function getChessGameForUser(pool, gameId, user) {
   }
 }
 
+async function ensureChessGameChat(pool, game, ownerUserId) {
+  if (game.chat_channel_id) {
+    return game
+  }
+
+  const channelResult = await pool.query(
+    `
+      INSERT INTO channels (name, description, is_private, owner_user_id)
+      VALUES ($1, $2, false, $3)
+      RETURNING id
+    `,
+    [`chess-${game.id}`, `Chat for chess game ${game.id}`, ownerUserId]
+  )
+  const channelId = channelResult.rows[0].id
+
+  await pool.query(
+    'UPDATE chess_games SET chat_channel_id = $1 WHERE id = $2',
+    [channelId, game.id]
+  )
+
+  return getChessGame(pool, game.id)
+}
+
 async function listChessGames(pool, user, scope = 'mine') {
   const params = []
   let where = ''
@@ -234,7 +262,8 @@ async function createChessGame(pool, user, options = {}) {
     [whiteUserId, blackUserId, user.id, startingFen, status]
   )
 
-  return getChessGame(pool, result.rows[0].id)
+  const game = await getChessGame(pool, result.rows[0].id)
+  return ensureChessGameChat(pool, game, user.id)
 }
 
 async function createBotChessGame(pool, user, options = {}) {
@@ -262,7 +291,38 @@ async function createBotChessGame(pool, user, options = {}) {
     [whiteUserId, blackUserId, user.id, startingFen, botLevel]
   )
 
-  return getChessGame(pool, result.rows[0].id)
+  const game = await getChessGame(pool, result.rows[0].id)
+  return ensureChessGameChat(pool, game, user.id)
+}
+
+async function closeChessGameChat(pool, gameId, user) {
+  const game = await getChessGame(pool, gameId)
+
+  if (!game) {
+    throw new Error('Game not found')
+  }
+
+  if (!['checkmate', 'draw', 'resigned', 'canceled'].includes(game.status)) {
+    throw new Error('Game is not finished')
+  }
+
+  const isCreator = Number(game.creator_user_id) === Number(user.id)
+
+  if (!user.is_admin && !isCreator) {
+    throw new Error('You cannot close this chat')
+  }
+
+  await pool.query(
+    `
+      UPDATE chess_games
+      SET chat_closed_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `,
+    [game.id]
+  )
+
+  return getChessGame(pool, game.id)
 }
 
 async function joinChessGame(pool, gameId, user, options = {}) {
@@ -590,6 +650,7 @@ module.exports = {
   getChessBotUser,
   getChessGame,
   getChessGameForUser,
+  ensureChessGameChat,
   listChessGames,
   createChessGame,
   createBotChessGame,
@@ -600,4 +661,5 @@ module.exports = {
   cancelChessGame,
   deleteChessGame,
   canDeleteChessGame,
+  closeChessGameChat,
 }

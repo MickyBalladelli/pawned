@@ -11,6 +11,7 @@ const {
   resignChessGame,
   cancelChessGame,
   deleteChessGame,
+  closeChessGameChat,
 } = require('./chessStore')
 const { botLevels, openingBook } = require('./chessBot')
 const { playBotTurn } = require('./chessBotRunner')
@@ -157,6 +158,17 @@ function createChessRouter({ pool, authenticate, io }) {
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
       res.status(status).json({ error: err.message || 'Failed to cancel chess game' })
+    }
+  })
+
+  router.post('/games/:id/close-chat', async (req, res) => {
+    try {
+      const game = await closeChessGameChat(pool, req.params.id, req.user)
+      emitGameUpdate(io, game)
+      res.json({ game })
+    } catch (err) {
+      const status = err.message === 'Game not found' ? 404 : 400
+      res.status(status).json({ error: err.message || 'Failed to close game chat' })
     }
   })
 

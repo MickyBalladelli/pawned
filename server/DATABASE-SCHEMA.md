@@ -47,6 +47,8 @@ Stores chess game state.
 | white_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | White player |
 | black_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | Black player |
 | creator_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | User who created the game |
+| chat_channel_id | INTEGER | REFERENCES channels(id) ON DELETE SET NULL | Attached game chat channel |
+| chat_closed_at | TIMESTAMP | | When game chat was closed |
 | fen | TEXT | NOT NULL | Current board state |
 | status | VARCHAR(20) | DEFAULT waiting | Game status |
 | turn_color | VARCHAR(10) | DEFAULT white | Player color to move |

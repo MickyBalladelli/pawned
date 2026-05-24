@@ -35,6 +35,7 @@ import {
   SportsEsports,
 } from '@mui/icons-material'
 import ChessBoard from './ChessBoard'
+import ChessGameChat from './ChessGameChat'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -737,6 +738,12 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     })
   }
 
+  function handleSelectedGameUpdated(game) {
+    setSelectedGame(game)
+    setGames((current) => current.map((item) => item.id === game.id ? game : item))
+    setCompletedGames((current) => current.map((item) => item.id === game.id ? game : item))
+  }
+
   function renderGameList(items, emptyText, options = {}) {
     if (items.length === 0) {
       return (
@@ -1059,8 +1066,8 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr', lg: 'minmax(320px, 560px) 220px' },
-                gap: { xs: 2, lg: 3 },
+                gridTemplateColumns: { xs: '1fr', lg: 'minmax(320px, 560px) minmax(320px, 1fr)' },
+                gap: { xs: 2, lg: 1 },
                 alignItems: 'start',
                 justifyContent: { xs: 'center', lg: 'start' },
               }}
@@ -1117,54 +1124,64 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 )}
               </Box>
 
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: 2,
-                  width: { xs: '100%', lg: 220 },
-                  maxHeight: { lg: 520 },
-                  overflow: 'auto',
-                }}
-              >
-                <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
-                  Moves
-                </Typography>
-                {moves.length === 0 ? (
-                  <Typography color="text.secondary">No moves yet</Typography>
-                ) : (
-                  <Stack spacing={0.75}>
-                    {moves.map((move, index) => (
-                      <Stack
-                        key={`${move.move_number}-${move.san}`}
-                        direction="row"
-                        spacing={1}
-                        onClick={() => {
-                          setViewMoveIndex(index)
-                          setSelectedSquare(null)
-                        }}
-                        sx={{
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          borderRadius: 1,
-                          cursor: 'pointer',
-                          px: 0.75,
-                          py: 0.25,
-                          bgcolor: viewMoveIndex === index ? 'action.selected' : 'transparent',
-                          '&:hover': {
-                            bgcolor: 'action.hover',
-                          },
-                        }}
-                      >
-                        <Typography variant="body2" color="text.secondary">
-                          {move.move_number}. {move.color}
-                        </Typography>
-                        <Typography sx={{ fontWeight: 800 }}>{move.san}</Typography>
-                      </Stack>
-                    ))}
-                    <Box ref={movesEndRef} />
-                  </Stack>
-                )}
-              </Paper>
+              <Stack spacing={1.5} sx={{ width: '100%', minWidth: 0 }}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    maxHeight: { lg: 245 },
+                    overflow: 'auto',
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
+                    Moves
+                  </Typography>
+                  {moves.length === 0 ? (
+                    <Typography color="text.secondary">No moves yet</Typography>
+                  ) : (
+                    <Stack spacing={0.75}>
+                      {moves.map((move, index) => (
+                        <Stack
+                          key={`${move.move_number}-${move.san}`}
+                          direction="row"
+                          spacing={1}
+                          onClick={() => {
+                            setViewMoveIndex(index)
+                            setSelectedSquare(null)
+                          }}
+                          sx={{
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            borderRadius: 1,
+                            cursor: 'pointer',
+                            px: 0.75,
+                            py: 0.25,
+                            bgcolor: viewMoveIndex === index ? 'action.selected' : 'transparent',
+                            '&:hover': {
+                              bgcolor: 'action.hover',
+                            },
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">
+                            {move.move_number}. {move.color}
+                          </Typography>
+                          <Typography sx={{ fontWeight: 800 }}>{move.san}</Typography>
+                        </Stack>
+                      ))}
+                      <Box ref={movesEndRef} />
+                    </Stack>
+                  )}
+                </Paper>
+                <ChessGameChat
+                  authHeaders={authHeaders}
+                  authUser={authUser}
+                  game={selectedGame}
+                  socket={socket}
+                  socketConnected={socketConnected}
+                  onError={onError}
+                  onGameUpdated={handleSelectedGameUpdated}
+                />
+              </Stack>
             </Box>
           )}
         </CardContent>
