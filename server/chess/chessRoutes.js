@@ -16,7 +16,7 @@ const { botLevels, openingBook } = require('./chessBot')
 const { playBotTurn } = require('./chessBotRunner')
 
 function emitGameUpdate(io, game) {
-  io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+  io.emit('chess:gameUpdated', game)
 }
 
 function emitMoveMade(io, result) {
@@ -163,7 +163,7 @@ function createChessRouter({ pool, authenticate, io }) {
   router.delete('/games/:id', async (req, res) => {
     try {
       const game = await deleteChessGame(pool, req.params.id, req.user)
-      io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameDeleted', { id: game.id })
+      io.emit('chess:gameDeleted', { id: game.id })
       res.json({ game })
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400

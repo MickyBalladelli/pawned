@@ -12,7 +12,7 @@ function chessRoom(gameId) {
 }
 
 function emitGameUpdate(io, game) {
-  io.to(chessRoom(game.id)).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameUpdated', game)
+  io.emit('chess:gameUpdated', game)
 }
 
 function emitMoveMade(io, result) {

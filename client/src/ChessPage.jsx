@@ -358,6 +358,8 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     }
 
     const handleGameUpdated = (game) => {
+      loadGames()
+
       if (getPlayerColor(game, authUser.id)) {
         setGames((current) => {
           const exists = current.some((item) => item.id === game.id)
@@ -432,7 +434,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       socket.off('chess:moveMade', handleMoveMade)
       socket.off('chess:gameDeleted')
     }
-  }, [authUser.id, selectedGameId, socket])
+  }, [authUser.id, loadGames, selectedGameId, socket])
 
   useEffect(() => {
     movesEndRef.current?.scrollIntoView({ block: 'nearest' })

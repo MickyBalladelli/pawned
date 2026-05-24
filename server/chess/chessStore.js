@@ -556,8 +556,9 @@ async function deleteChessGame(pool, gameId, user) {
   }
 
   const isCreator = Number(game.creator_user_id) === Number(user.id)
+  const isPlayer = Number(game.white_user_id) === Number(user.id) || Number(game.black_user_id) === Number(user.id)
 
-  if (!user.is_admin && !isCreator) {
+  if (!user.is_admin && !isCreator && !(game.status === 'canceled' && isPlayer)) {
     throw new Error('You cannot delete this game')
   }
 
@@ -580,7 +581,8 @@ function canDeleteChessGame(game, user) {
   }
 
   const isCreator = Number(game.creator_user_id) === Number(user.id)
-  return Boolean(user.is_admin || isCreator)
+  const isPlayer = Number(game.white_user_id) === Number(user.id) || Number(game.black_user_id) === Number(user.id)
+  return Boolean(user.is_admin || isCreator || (game.status === 'canceled' && isPlayer))
 }
 
 module.exports = {
