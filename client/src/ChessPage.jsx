@@ -9,6 +9,8 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  Checkbox,
+  FormControlLabel,
   List,
   ListItemButton,
   ListItemText,
@@ -223,6 +225,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [newGameColor, setNewGameColor] = useState('white')
   const [botLevel, setBotLevel] = useState(800)
   const [expandedGameIds, setExpandedGameIds] = useState(new Set())
+  const [showMyCompletedOnly, setShowMyCompletedOnly] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
@@ -242,12 +245,16 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     activeGames.filter((game) => !getPlayerColor(game, authUser.id))
   ), [activeGames, authUser.id])
   const visibleCompletedGames = useMemo(() => {
+    if (showMyCompletedOnly) {
+      return myCompletedGames
+    }
+
     const ownIds = new Set(myCompletedGames.map((game) => game.id))
     return [
       ...myCompletedGames,
       ...completedGames.filter((game) => !ownIds.has(game.id)),
     ]
-  }, [completedGames, myCompletedGames])
+  }, [completedGames, myCompletedGames, showMyCompletedOnly])
 
   const loadGames = useCallback(async () => {
     setLoading(true)
@@ -914,9 +921,27 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
           <Divider sx={{ my: 2 }} />
 
-          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            Completed games
-          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="overline" color="text.secondary">
+              Completed games
+            </Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={showMyCompletedOnly}
+                  onChange={(event) => setShowMyCompletedOnly(event.target.checked)}
+                />
+              }
+              label="Mine"
+              sx={{
+                mr: 0,
+                '& .MuiFormControlLabel-label': {
+                  fontSize: 12,
+                },
+              }}
+            />
+          </Stack>
           {renderGameList(visibleCompletedGames, 'No completed games', {
             compact: true,
             hideBotChip: true,

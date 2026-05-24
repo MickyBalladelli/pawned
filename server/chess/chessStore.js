@@ -561,19 +561,15 @@ async function deleteChessGame(pool, gameId, user) {
     throw new Error('You cannot delete this game')
   }
 
-  if (game.status === 'canceled') {
-    await pool.query('DELETE FROM chess_games WHERE id = $1', [game.id])
-  } else {
-    await pool.query(
-      `
-        UPDATE chess_games
-        SET deleted_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = $1
-      `,
-      [game.id]
-    )
-  }
+  await pool.query(
+    `
+      UPDATE chess_games
+      SET deleted_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+    `,
+    [game.id]
+  )
 
   return game
 }
