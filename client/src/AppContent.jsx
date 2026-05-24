@@ -42,6 +42,7 @@ import {
   Public,
   Refresh,
   Save,
+  School,
   Search,
   Send,
   Settings,
@@ -53,6 +54,7 @@ import ChannelMessageList from './ChannelMessageList'
 import ChannelMembershipDialog from './ChannelMembershipDialog'
 import ChessIcon from './ChessIcon'
 import ChessPage from './ChessPage'
+import TrainingPage from './TrainingPage'
 import { requestJson } from './requestJson'
 
 const emptyForm = {
@@ -135,7 +137,8 @@ function getInitialActiveView() {
     return 'chess'
   }
 
-  return localStorage.getItem(activeViewStorageKey) === 'chess' ? 'chess' : 'chat'
+  const storedView = localStorage.getItem(activeViewStorageKey)
+  return ['chat', 'chess', 'training'].includes(storedView) ? storedView : 'chat'
 }
 
 function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, onUserUpdated }) {
@@ -205,7 +208,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     setActiveView(value)
     localStorage.setItem(activeViewStorageKey, value)
 
-    if (value === 'chat') {
+    if (value !== 'chess') {
       const url = new URL(window.location.href)
       url.searchParams.delete('chessGame')
       window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
@@ -737,6 +740,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           >
             <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
             <Tab icon={<ChessIcon />} iconPosition="start" value="chess" label="Chess" />
+            <Tab icon={<School />} iconPosition="start" value="training" label="Training" />
           </Tabs>
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
             
@@ -746,7 +750,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               color="text.primary"
               sx={{ fontSize: { xs: 30, md: 34 }, fontWeight: 900, mb: 0 }}
             >
-              {activeView === 'chat' ? (isAdmin ? 'Channel Admin' : 'Channels') : 'Chess'}
+              {activeView === 'chat' ? (isAdmin ? 'Channel Admin' : 'Channels') : activeView === 'training' ? 'Training' : 'Chess'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -823,7 +827,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           />
         ) : (
           <>
-          {activeView === 'chess' ? (
+          {activeView === 'training' ? (
+            <TrainingPage themeMode={themeMode} />
+          ) : activeView === 'chess' ? (
             <ChessPage
               authToken={authToken}
               authUser={authUser}
