@@ -15,7 +15,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
   IconButton,
   List,
   ListItemButton,
@@ -24,7 +23,6 @@ import {
   MenuItem,
   Paper,
   Stack,
-  Switch,
   Tab,
   Tabs,
   TextField,
@@ -49,6 +47,7 @@ import {
   SportsEsports,
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
+import ChannelSettingsToggles from './ChannelSettingsToggles'
 import ChannelMessageList from './ChannelMessageList'
 import ChannelMembershipDialog from './ChannelMembershipDialog'
 import ChessPage from './ChessPage'
@@ -58,6 +57,7 @@ const emptyForm = {
   name: '',
   description: '',
   is_private: false,
+  is_read_only: false,
 }
 const activeViewStorageKey = 'vela.activeView'
 
@@ -148,6 +148,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   )
   const isAdmin = Boolean(authUser?.is_admin)
   const canUseSelectedChannel = Boolean(selectedChannel?.can_access)
+  const canWriteSelectedChannel = Boolean(
+    canUseSelectedChannel && (!selectedChannel?.is_read_only || isAdmin),
+  )
   const canManageSelectedChannel = Boolean(selectedChannel?.can_manage)
   const filteredChannels = useMemo(() => {
     const filter = channelFilter.trim().toLowerCase()
@@ -451,6 +454,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       name: channel.name,
       description: channel.description || '',
       is_private: Boolean(channel.is_private),
+      is_read_only: Boolean(channel.is_read_only),
     })
     setChannelDialogOpen(true)
     setSelectedChannelId(channel.id)
@@ -474,6 +478,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         name: form.name.trim(),
         description: form.description.trim(),
         is_private: isAdmin ? form.is_private : true,
+        is_read_only: isAdmin ? form.is_read_only : false,
       }
 
       const channel = editingId
@@ -607,6 +612,11 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     const message = draftMessage.trim()
 
     if (!selectedChannel || !message) {
+      return
+    }
+
+    if (!canWriteSelectedChannel) {
+      setError('Channel is read only')
       return
     }
 
@@ -879,6 +889,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                               label={channel.is_private ? 'Private' : 'Public'}
                               variant="outlined"
                             />
+                            {channel.is_read_only && (
+                              <Chip size="small" label="Read only" variant="outlined" />
+                            )}
                             {channel.request_status === 'pending' && (
                               <Chip size="small" label="Requested" variant="outlined" />
                             )}
@@ -1024,6 +1037,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                         color={selectedChannel.is_private ? 'secondary' : 'primary'}
                         variant="outlined"
                       />
+                      {selectedChannel.is_read_only && (
+                        <Chip
+                          label="Read only"
+                          color="warning"
+                          variant="outlined"
+                        />
+                      )}
                     </Stack>
                   )}
                 </Stack>
@@ -1068,17 +1088,27 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
                       <TextField
                         inputRef={messageInputRef}
-                        label={`Message #${selectedChannel.name}`}
+                        label={
+                          canWriteSelectedChannel
+                            ? `Message #${selectedChannel.name}`
+                            : 'Read only'
+                        }
                         value={draftMessage}
                         onChange={(event) => setDraftMessage(event.target.value)}
                         size="small"
                         fullWidth
+                        disabled={!canWriteSelectedChannel}
                       />
                       <Button
                         type="submit"
                         variant="contained"
                         endIcon={<Send />}
-                        disabled={!draftMessage.trim() || sendingMessage || !socketConnected}
+                        disabled={
+                          !draftMessage.trim() ||
+                          sendingMessage ||
+                          !socketConnected ||
+                          !canWriteSelectedChannel
+                        }
                         sx={{ minWidth: { xs: '100%', sm: 120 } }}
                       >
                         {sendingMessage ? 'Sending' : 'Send'}
@@ -1123,15 +1153,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 minRows={3}
               />
               {isAdmin ? (
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={form.is_private}
-                      onChange={(event) => updateForm('is_private', event.target.checked)}
-                    />
-                  }
-                  label="Private channel"
-                />
+                <ChannelSettingsToggles form={form} onChange={updateForm} />
               ) : (
                 <Alert severity="info">New channels are private</Alert>
               )}

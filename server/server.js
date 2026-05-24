@@ -658,9 +658,10 @@ app.get('/api/channels', authenticate, async (req, res) => {
 
 // Create a new channel
 app.post('/api/channels', authenticate, async (req, res) => {
-  const { name, description, is_private } = req.body;
-  const trimmedName = typeof name === 'string' ? name.trim() : '';
+  const { name, description, is_private, is_read_only } = req.body
+  const trimmedName = typeof name === 'string' ? name.trim() : ''
   const privateChannel = req.user.is_admin ? Boolean(is_private) : true
+  const readOnlyChannel = req.user.is_admin ? Boolean(is_read_only) : false
 
   if (!trimmedName) {
     return res.status(400).json({ error: 'Channel name is required' });
@@ -677,8 +678,8 @@ app.post('/api/channels', authenticate, async (req, res) => {
     }
 
     const channelResult = await client.query(
-      'INSERT INTO channels (name, description, is_private, owner_user_id) VALUES ($1, $2, $3, $4) RETURNING *',
-      [trimmedName, description || null, privateChannel, req.user.id]
+      'INSERT INTO channels (name, description, is_private, is_read_only, owner_user_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [trimmedName, description || null, privateChannel, readOnlyChannel, req.user.id]
     )
     const channel = channelResult.rows[0]
 
@@ -734,10 +735,13 @@ app.post('/api/channels', authenticate, async (req, res) => {
 
 // Update a channel
 app.put('/api/channels/:id', authenticate, requireChannelManager, async (req, res) => {
-  const { id } = req.params;
-  const { name, description, is_private } = req.body;
-  const trimmedName = typeof name === 'string' ? name.trim() : '';
+  const { id } = req.params
+  const { name, description, is_private, is_read_only } = req.body
+  const trimmedName = typeof name === 'string' ? name.trim() : ''
   const privateChannel = req.user.is_admin ? Boolean(is_private) : true
+  const readOnlyChannel = req.user.is_admin
+    ? Boolean(is_read_only)
+    : Boolean(req.channelAccess.channel.is_read_only)
 
   if (!trimmedName) {
     return res.status(400).json({ error: 'Channel name is required' });
@@ -749,9 +753,9 @@ app.put('/api/channels/:id', authenticate, requireChannelManager, async (req, re
     }
 
     const result = await pool.query(
-      'UPDATE channels SET name = $1, description = $2, is_private = $3 WHERE id = $4 RETURNING *',
-      [trimmedName, description || null, privateChannel, id]
-    );
+      'UPDATE channels SET name = $1, description = $2, is_private = $3, is_read_only = $4 WHERE id = $5 RETURNING *',
+      [trimmedName, description || null, privateChannel, readOnlyChannel, id]
+    )
     
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Channel not found' });
@@ -1143,6 +1147,11 @@ io.on('connection', async (socket) => {
         return
       }
 
+      if (access.channel.is_read_only && !socket.data.user.is_admin) {
+        callback?.({ error: 'Channel is read only' })
+        return
+      }
+
       const chessChatResult = await pool.query(
         'SELECT id FROM chess_games WHERE chat_channel_id = $1 AND chat_closed_at IS NOT NULL LIMIT 1',
         [channelId]
@@ -1206,6 +1215,7 @@ async function createTables() {
         name VARCHAR(100) UNIQUE NOT NULL,
         description TEXT,
         is_private BOOLEAN DEFAULT FALSE,
+        is_read_only BOOLEAN DEFAULT FALSE,
         owner_user_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
@@ -1239,6 +1249,8 @@ async function createTables() {
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL');
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
+    await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_read_only BOOLEAN DEFAULT FALSE')
+    await pool.query('UPDATE channels SET is_read_only = false WHERE is_read_only IS NULL')
 
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
 

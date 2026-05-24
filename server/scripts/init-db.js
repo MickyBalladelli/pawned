@@ -27,6 +27,7 @@ async function initializeDatabase() {
         name VARCHAR(100) UNIQUE NOT NULL,
         description TEXT,
         is_private BOOLEAN DEFAULT FALSE,
+        is_read_only BOOLEAN DEFAULT FALSE,
         owner_user_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -59,6 +60,8 @@ async function initializeDatabase() {
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL')
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL')
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
+    await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_read_only BOOLEAN DEFAULT FALSE')
+    await pool.query('UPDATE channels SET is_read_only = false WHERE is_read_only IS NULL')
     
     // Create messages table
     await pool.query(`
