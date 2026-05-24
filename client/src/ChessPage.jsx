@@ -979,7 +979,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     >
       <Card sx={{ width: { xs: '100%', lg: 360 }, maxWidth: '100%', justifySelf: 'start' }}>
         <CardContent>
-          <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Stack spacing={1.5} sx={{ mb: 2 }}>
             <Typography
               variant="h5"
               component="h2"
@@ -990,28 +990,29 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             >
               Chess
             </Typography>
-            <Tooltip title="Refresh games">
-              <span>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  startIcon={<Refresh />}
-                  onClick={loadGames}
-                  disabled={loading}
-                >
-                  Refresh
-                </Button>
-              </span>
-            </Tooltip>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                startIcon={<Add />}
+                onClick={() => setCreateDialogOpen(true)}
+                sx={{ flex: 1 }}
+              >
+                New game
+              </Button>
+              <Tooltip title="Refresh games">
+                <span>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Refresh />}
+                    onClick={loadGames}
+                    disabled={loading}
+                  >
+                    Refresh
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
           </Stack>
-
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            New game
-          </Button>
 
           <Divider sx={{ my: 2 }} />
 
