@@ -7,6 +7,7 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
   List,
   ListItemButton,
@@ -22,6 +23,8 @@ import {
 } from '@mui/material'
 import {
   Add,
+  ExpandLess,
+  ExpandMore,
   Casino,
   Refresh,
   SportsEsports,
@@ -88,13 +91,25 @@ function gameTitle(game) {
     return 'No game'
   }
 
-  return `Game ${game.id}`
+  return `#${game.id}`
 }
 
 function playerName(game, color) {
+  if (game?.is_bot_game) {
+    const username = color === 'white' ? game?.white_username : game?.black_username
+
+    if (username === 'VelaBot') {
+      return `Bot ${game.bot_level || ''}`.trim()
+    }
+  }
+
   return color === 'white'
     ? game?.white_username || 'Open'
     : game?.black_username || 'Open'
+}
+
+function matchupLabel(game) {
+  return `${playerName(game, 'white')} vs ${playerName(game, 'black')}`
 }
 
 function openColorForGame(game) {
@@ -157,6 +172,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
   const [botLevel, setBotLevel] = useState(800)
+  const [expandedGameIds, setExpandedGameIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
@@ -525,6 +541,20 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     }
   }
 
+  function toggleGameExpanded(gameId) {
+    setExpandedGameIds((current) => {
+      const next = new Set(current)
+
+      if (next.has(gameId)) {
+        next.delete(gameId)
+      } else {
+        next.add(gameId)
+      }
+
+      return next
+    })
+  }
+
   function renderGameList(items, emptyText, options = {}) {
     if (items.length === 0) {
       return (
@@ -538,26 +568,79 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       <List disablePadding>
         {items.map((game) => {
           const action = options.action?.(game)
+          const expanded = expandedGameIds.has(game.id)
 
           return (
-            <ListItemButton
-              key={game.id}
-              selected={Number(game.id) === Number(selectedGameId)}
-              onClick={() => options.onClick ? options.onClick(game) : setSelectedGameId(game.id)}
-              disabled={options.disabled?.(game)}
-              sx={{ borderRadius: 1, mb: 0.5 }}
-            >
-              <ListItemText
-                primary={gameTitle(game)}
-                secondary={`${playerName(game, 'white')} vs ${playerName(game, 'black')}`}
-              />
-              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                {game.is_bot_game && (
-                  <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
-                )}
-                <Chip size="small" label={action || statusLabel(game)} variant="outlined" />
-              </Stack>
-            </ListItemButton>
+            <Box key={game.id} sx={{ mb: 0.5 }}>
+              <ListItemButton
+                selected={Number(game.id) === Number(selectedGameId)}
+                onClick={() => options.onClick ? options.onClick(game) : setSelectedGameId(game.id)}
+                disabled={options.disabled?.(game)}
+                sx={{ borderRadius: 1 }}
+              >
+                <ListItemText
+                  primary={`${gameTitle(game)} · ${matchupLabel(game)}`}
+                  slotProps={{
+                    primary: {
+                      noWrap: true,
+                    },
+                  }}
+                  sx={{
+                    minWidth: 0,
+                    mr: 1,
+                  }}
+                />
+                <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                  {game.is_bot_game && !options.hideBotChip && (
+                    <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
+                  )}
+                  <Chip
+                    size="small"
+                    label={action || statusLabel(game)}
+                    variant="outlined"
+                    sx={{ maxWidth: 116 }}
+                  />
+                  <Box
+                    component="span"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      toggleGameExpanded(game.id)
+                    }}
+                    sx={{ display: 'inline-flex', color: 'text.secondary' }}
+                  >
+                    {expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                  </Box>
+                </Stack>
+              </ListItemButton>
+              <Collapse in={expanded} timeout="auto" unmountOnExit>
+                <Paper variant="outlined" sx={{ mt: 0.5, p: 1.25 }}>
+                  <Stack spacing={0.75}>
+                    <Typography variant="body2" color="text.secondary">
+                      White: {playerName(game, 'white')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Black: {playerName(game, 'black')}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Status: {statusLabel(game)}
+                    </Typography>
+                    {game.is_bot_game && (
+                      <Typography variant="body2" color="text.secondary">
+                        Bot level: {game.bot_level}
+                      </Typography>
+                    )}
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      onClick={() => options.onClick ? options.onClick(game) : setSelectedGameId(game.id)}
+                      disabled={options.disabled?.(game)}
+                    >
+                      {action || 'View'}
+                    </Button>
+                  </Stack>
+                </Paper>
+              </Collapse>
+            </Box>
           )
         })}
       </List>
@@ -686,7 +769,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
             Completed games
           </Typography>
-          {renderGameList(visibleCompletedGames, 'No completed games')}
+          {renderGameList(visibleCompletedGames, 'No completed games', {
+            compact: true,
+            hideBotChip: true,
+          })}
         </CardContent>
       </Card>
 
@@ -712,7 +798,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 </Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary">
-                {selectedGame ? `${playerName(selectedGame, 'white')} vs ${playerName(selectedGame, 'black')}` : 'Pick a game'}
+                {selectedGame ? matchupLabel(selectedGame) : 'Pick a game'}
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
