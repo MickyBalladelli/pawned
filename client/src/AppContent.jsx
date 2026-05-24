@@ -62,6 +62,27 @@ const emptyForm = {
   is_read_only: false,
 }
 const activeViewStorageKey = 'vela.activeView'
+const channelNameCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+})
+
+function getChannelSortName(channel) {
+  return String(channel.name || '').trim()
+}
+
+function compareChannels(left, right) {
+  const leftName = getChannelSortName(left)
+  const rightName = getChannelSortName(right)
+  const leftStartsWithNumber = /^\d/.test(leftName)
+  const rightStartsWithNumber = /^\d/.test(rightName)
+
+  if (leftStartsWithNumber !== rightStartsWithNumber) {
+    return leftStartsWithNumber ? -1 : 1
+  }
+
+  return channelNameCollator.compare(leftName, rightName)
+}
 
 let socketIoClientPromise
 
@@ -158,15 +179,17 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     const filter = channelFilter.trim().toLowerCase()
 
     if (!filter) {
-      return channels
+      return [...channels].sort(compareChannels)
     }
 
-    return channels.filter((channel) => {
-      return (
-        channel.name?.toLowerCase().includes(filter) ||
-        channel.description?.toLowerCase().includes(filter)
-      )
-    })
+    return channels
+      .filter((channel) => {
+        return (
+          channel.name?.toLowerCase().includes(filter) ||
+          channel.description?.toLowerCase().includes(filter)
+        )
+      })
+      .sort(compareChannels)
   }, [channelFilter, channels])
 
   const getAuthHeaders = useCallback(() => {
@@ -708,12 +731,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             <Tab icon={<SportsEsports />} iconPosition="start" value="chess" label="Chess" />
           </Tabs>
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-              {activeView === 'chat' ? <Forum color="primary" /> : <SportsEsports color="primary" />}
-              <Typography variant="overline" color="text.secondary">
-                {activeView === 'chat' ? 'Chat operations' : 'Chess table'}
-              </Typography>
-            </Stack>
+            
             <Typography
               variant="h3"
               component="h1"
