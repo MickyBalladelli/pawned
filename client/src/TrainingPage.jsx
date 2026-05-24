@@ -33,6 +33,24 @@ const puzzleDifficulties = [
   { value: 'expert', label: 'Expert', range: '2001-2600' },
 ]
 
+function solvedPuzzleStorageKey(userId) {
+  return `vela.training.solvedPuzzles.${userId || 'guest'}`
+}
+
+function readSolvedPuzzles(userId) {
+  try {
+    const value = localStorage.getItem(solvedPuzzleStorageKey(userId))
+    const ids = JSON.parse(value || '[]')
+    return new Set(Array.isArray(ids) ? ids : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function writeSolvedPuzzles(userId, ids) {
+  localStorage.setItem(solvedPuzzleStorageKey(userId), JSON.stringify([...ids]))
+}
+
 function buildPositions(opening) {
   if (!opening) {
     return [startingFen]
@@ -141,7 +159,7 @@ function cleanTheme(theme) {
   return String(theme || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
-function TrainingPage({ themeMode }) {
+function TrainingPage({ authUser, themeMode }) {
   const [trainingTab, setTrainingTab] = useState('openings')
   const [filter, setFilter] = useState('')
   const [selectedOpening, setSelectedOpening] = useState(openingsBook.openings[0])
@@ -156,6 +174,11 @@ function TrainingPage({ themeMode }) {
   const [puzzleSelectedSquare, setPuzzleSelectedSquare] = useState(null)
   const [puzzleStatus, setPuzzleStatus] = useState('Pick a puzzle')
   const [puzzleSolved, setPuzzleSolved] = useState(false)
+  const [solvedPuzzleIds, setSolvedPuzzleIds] = useState(() => readSolvedPuzzles(authUser?.id))
+
+  useEffect(() => {
+    setSolvedPuzzleIds(readSolvedPuzzles(authUser?.id))
+  }, [authUser?.id])
 
   useEffect(() => {
     let cancelled = false
@@ -252,6 +275,7 @@ function TrainingPage({ themeMode }) {
     ? puzzleFen
     : selectedPuzzlePositions[puzzleViewIndex] || puzzleFen
   const puzzleBoardOrientation = puzzleSolverColor(selectedPuzzle)
+  const selectedPuzzleWasSolved = Boolean(selectedPuzzle && solvedPuzzleIds.has(selectedPuzzle.id))
 
   function selectOpening(opening) {
     setSelectedOpening(opening)
@@ -268,6 +292,19 @@ function TrainingPage({ themeMode }) {
 
   function selectPuzzle(puzzle) {
     setSelectedPuzzle(puzzle)
+  }
+
+  function markPuzzleSolved(puzzleId) {
+    setSolvedPuzzleIds((current) => {
+      if (current.has(puzzleId)) {
+        return current
+      }
+
+      const next = new Set(current)
+      next.add(puzzleId)
+      writeSolvedPuzzles(authUser?.id, next)
+      return next
+    })
   }
 
   function nextPuzzle() {
@@ -339,6 +376,7 @@ function TrainingPage({ themeMode }) {
       setPuzzleFen(chess.fen())
       setPuzzleStep(nextStep)
       setPuzzleSolved(true)
+      markPuzzleSolved(selectedPuzzle.id)
       setPuzzleSelectedSquare(null)
       setPuzzleStatus('Solved')
       return
@@ -352,6 +390,9 @@ function TrainingPage({ themeMode }) {
     setPuzzleSelectedSquare(null)
     setPuzzleStatus(nextStep >= selectedPuzzle.moves.length ? 'Solved' : `${turnColor(chess)} to solve`)
     setPuzzleSolved(nextStep >= selectedPuzzle.moves.length)
+    if (nextStep >= selectedPuzzle.moves.length) {
+      markPuzzleSolved(selectedPuzzle.id)
+    }
   }
 
   function handlePuzzleSquareClick(square) {
@@ -497,6 +538,9 @@ function TrainingPage({ themeMode }) {
                           secondary: { noWrap: true },
                         }}
                       />
+                      {solvedPuzzleIds.has(puzzle.id) && (
+                        <Chip size="small" label="Solved" color="success" variant="outlined" />
+                      )}
                     </ListItemButton>
                   ))}
                 </List>
@@ -684,11 +728,14 @@ function TrainingPage({ themeMode }) {
                       </Button>
                     ))}
                   </Stack>
-                  {puzzleSolved && (
+                  {(puzzleSolved || selectedPuzzleWasSolved) && (
                     <Typography variant="body2" color="success.main" sx={{ fontWeight: 900 }}>
-                      Solved
+                      {puzzleSolved ? 'Solved' : 'Solved before'}
                     </Typography>
                   )}
+                  <Typography variant="body2" color="text.secondary">
+                    Solved: {solvedPuzzleIds.size}
+                  </Typography>
                 </Stack>
               ) : (
                 <Stack spacing={0.5}>
