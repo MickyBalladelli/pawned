@@ -39,6 +39,7 @@ import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const botLevels = [600, 800, 1000, 1200, 1400, 1600]
+const selectedGameStorageKey = 'vela.chess.selectedGameId'
 
 function getAuthHeaders(authToken) {
   return { Authorization: `Bearer ${authToken}` }
@@ -212,12 +213,27 @@ function addMoveOnce(current, move) {
   return exists ? current : [...current, move]
 }
 
+function getInitialSelectedGameId() {
+  const value = localStorage.getItem(selectedGameStorageKey)
+  const numericValue = Number(value)
+
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : null
+}
+
+function setStoredSelectedGameId(gameId) {
+  if (gameId) {
+    localStorage.setItem(selectedGameStorageKey, String(gameId))
+  } else {
+    localStorage.removeItem(selectedGameStorageKey)
+  }
+}
+
 function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, onError, onNotice }) {
   const [games, setGames] = useState([])
   const [openGames, setOpenGames] = useState([])
   const [activeGames, setActiveGames] = useState([])
   const [completedGames, setCompletedGames] = useState([])
-  const [selectedGameId, setSelectedGameId] = useState(null)
+  const [selectedGameId, setSelectedGameId] = useState(getInitialSelectedGameId)
   const [selectedGame, setSelectedGame] = useState(null)
   const [moves, setMoves] = useState([])
   const [viewMoveIndex, setViewMoveIndex] = useState(null)
@@ -330,6 +346,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       cancelled = true
     }
   }, [loadGame, selectedGameId])
+
+  useEffect(() => {
+    setStoredSelectedGameId(selectedGameId)
+  }, [selectedGameId])
 
   useEffect(() => {
     if (!socket || !selectedGameId) {
