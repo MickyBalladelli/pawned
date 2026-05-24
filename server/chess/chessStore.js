@@ -63,6 +63,7 @@ function mapGame(row) {
     id: Number(row.id),
     white_user_id: row.white_user_id === null ? null : Number(row.white_user_id),
     black_user_id: row.black_user_id === null ? null : Number(row.black_user_id),
+    creator_user_id: row.creator_user_id === null || row.creator_user_id === undefined ? null : Number(row.creator_user_id),
     winner_user_id: row.winner_user_id === null ? null : Number(row.winner_user_id),
     bot_level: row.bot_level === null || row.bot_level === undefined ? null : Number(row.bot_level),
     is_bot_game: Boolean(row.is_bot_game),
@@ -79,17 +80,21 @@ async function createChessTables(pool) {
       fen TEXT NOT NULL,
       status VARCHAR(20) NOT NULL DEFAULT 'waiting',
       turn_color VARCHAR(10) NOT NULL DEFAULT 'white',
+      creator_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       ended_at TIMESTAMP,
       is_bot_game BOOLEAN DEFAULT FALSE,
-      bot_level INTEGER
+      bot_level INTEGER,
+      deleted_at TIMESTAMP
     )
   `)
 
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS is_bot_game BOOLEAN DEFAULT FALSE')
   await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS bot_level INTEGER')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS creator_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
+  await pool.query('ALTER TABLE chess_games ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP')
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chess_moves (
@@ -153,19 +158,32 @@ async function getChessGame(pool, gameId, client = pool) {
   return mapGame(result.rows[0])
 }
 
+async function getChessGameForUser(pool, gameId, user) {
+  const game = await getChessGame(pool, gameId)
+
+  if (!game) {
+    return null
+  }
+
+  return {
+    ...game,
+    can_delete: canDeleteChessGame(game, user),
+  }
+}
+
 async function listChessGames(pool, user, scope = 'mine') {
   const params = []
   let where = ''
 
   if (scope === 'open') {
-    where = "WHERE g.status = 'waiting' AND (g.white_user_id IS NULL OR g.black_user_id IS NULL)"
+    where = "WHERE g.deleted_at IS NULL AND g.status = 'waiting' AND (g.white_user_id IS NULL OR g.black_user_id IS NULL)"
   } else if (scope === 'active') {
-    where = "WHERE g.status = 'active'"
+    where = "WHERE g.deleted_at IS NULL AND g.status = 'active'"
   } else if (scope === 'completed') {
-    where = "WHERE g.status IN ('checkmate', 'draw', 'resigned', 'canceled')"
+    where = "WHERE g.deleted_at IS NULL AND g.status IN ('checkmate', 'draw', 'resigned', 'canceled')"
   } else {
     params.push(user.id)
-    where = 'WHERE g.white_user_id = $1 OR g.black_user_id = $1'
+    where = 'WHERE g.deleted_at IS NULL AND (g.white_user_id = $1 OR g.black_user_id = $1)'
   }
 
   const result = await pool.query(
@@ -185,7 +203,14 @@ async function listChessGames(pool, user, scope = 'mine') {
     params
   )
 
-  return result.rows.map(mapGame)
+  return result.rows.map((row) => {
+    const game = mapGame(row)
+
+    return {
+      ...game,
+      can_delete: canDeleteChessGame(game, user),
+    }
+  })
 }
 
 async function createChessGame(pool, user, options = {}) {
@@ -202,11 +227,11 @@ async function createChessGame(pool, user, options = {}) {
 
   const result = await pool.query(
     `
-      INSERT INTO chess_games (white_user_id, black_user_id, fen, status, turn_color)
-      VALUES ($1, $2, $3, $4, 'white')
+      INSERT INTO chess_games (white_user_id, black_user_id, creator_user_id, fen, status, turn_color)
+      VALUES ($1, $2, $3, $4, $5, 'white')
       RETURNING id
     `,
-    [whiteUserId, blackUserId, startingFen, status]
+    [whiteUserId, blackUserId, user.id, startingFen, status]
   )
 
   return getChessGame(pool, result.rows[0].id)
@@ -224,16 +249,17 @@ async function createBotChessGame(pool, user, options = {}) {
       INSERT INTO chess_games (
         white_user_id,
         black_user_id,
+        creator_user_id,
         fen,
         status,
         turn_color,
         is_bot_game,
         bot_level
       )
-      VALUES ($1, $2, $3, 'active', 'white', true, $4)
+      VALUES ($1, $2, $3, $4, 'active', 'white', true, $5)
       RETURNING id
     `,
-    [whiteUserId, blackUserId, startingFen, botLevel]
+    [whiteUserId, blackUserId, user.id, startingFen, botLevel]
   )
 
   return getChessGame(pool, result.rows[0].id)
@@ -517,10 +543,55 @@ async function cancelChessGame(pool, gameId, user) {
   }
 }
 
+async function deleteChessGame(pool, gameId, user) {
+  const result = await pool.query('SELECT * FROM chess_games WHERE id = $1', [gameId])
+  const game = mapGame(result.rows[0])
+
+  if (!game) {
+    throw new Error('Game not found')
+  }
+
+  if (!['checkmate', 'draw', 'resigned', 'canceled'].includes(game.status)) {
+    throw new Error('Only completed games can be deleted')
+  }
+
+  const isCreator = Number(game.creator_user_id) === Number(user.id)
+
+  if (!user.is_admin && !isCreator) {
+    throw new Error('You cannot delete this game')
+  }
+
+  if (game.status === 'canceled') {
+    await pool.query('DELETE FROM chess_games WHERE id = $1', [game.id])
+  } else {
+    await pool.query(
+      `
+        UPDATE chess_games
+        SET deleted_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $1
+      `,
+      [game.id]
+    )
+  }
+
+  return game
+}
+
+function canDeleteChessGame(game, user) {
+  if (!game || game.deleted_at || !['checkmate', 'draw', 'resigned', 'canceled'].includes(game.status)) {
+    return false
+  }
+
+  const isCreator = Number(game.creator_user_id) === Number(user.id)
+  return Boolean(user.is_admin || isCreator)
+}
+
 module.exports = {
   createChessTables,
   getChessBotUser,
   getChessGame,
+  getChessGameForUser,
   listChessGames,
   createChessGame,
   createBotChessGame,
@@ -529,4 +600,6 @@ module.exports = {
   makeChessMove,
   resignChessGame,
   cancelChessGame,
+  deleteChessGame,
+  canDeleteChessGame,
 }

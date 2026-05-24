@@ -46,12 +46,14 @@ Stores chess game state.
 | id | SERIAL | PRIMARY KEY | Unique identifier for the game |
 | white_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | White player |
 | black_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | Black player |
+| creator_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | User who created the game |
 | fen | TEXT | NOT NULL | Current board state |
 | status | VARCHAR(20) | DEFAULT waiting | Game status |
 | turn_color | VARCHAR(10) | DEFAULT white | Player color to move |
 | winner_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | Winner, when game has one |
 | is_bot_game | BOOLEAN | DEFAULT FALSE | Whether this game uses VelaBot |
 | bot_level | INTEGER | | VelaBot level for bot games |
+| deleted_at | TIMESTAMP | | Soft-delete time for completed games |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When the game was created |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When the game last changed |
 | ended_at | TIMESTAMP | | When the game ended |

@@ -1,6 +1,7 @@
 const express = require('express')
 const {
   getChessGame,
+  getChessGameForUser,
   listChessGames,
   createChessGame,
   createBotChessGame,
@@ -9,6 +10,7 @@ const {
   makeChessMove,
   resignChessGame,
   cancelChessGame,
+  deleteChessGame,
 } = require('./chessStore')
 const { botLevels, openingBook } = require('./chessBot')
 const { playBotTurn } = require('./chessBotRunner')
@@ -91,7 +93,7 @@ function createChessRouter({ pool, authenticate, io }) {
 
   router.get('/games/:id', async (req, res) => {
     try {
-      const game = await getChessGame(pool, req.params.id)
+      const game = await getChessGameForUser(pool, req.params.id, req.user)
 
       if (!game) {
         return res.status(404).json({ error: 'Game not found' })
@@ -155,6 +157,17 @@ function createChessRouter({ pool, authenticate, io }) {
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
       res.status(status).json({ error: err.message || 'Failed to cancel chess game' })
+    }
+  })
+
+  router.delete('/games/:id', async (req, res) => {
+    try {
+      const game = await deleteChessGame(pool, req.params.id, req.user)
+      io.to(`chess:game:${game.id}`).to(`user:${game.white_user_id}`).to(`user:${game.black_user_id}`).emit('chess:gameDeleted', { id: game.id })
+      res.json({ game })
+    } catch (err) {
+      const status = err.message === 'Game not found' ? 404 : 400
+      res.status(status).json({ error: err.message || 'Failed to delete chess game' })
     }
   })
 

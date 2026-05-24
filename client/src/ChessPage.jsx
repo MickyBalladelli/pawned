@@ -23,9 +23,12 @@ import {
 } from '@mui/material'
 import {
   Add,
+  Delete,
   ExpandLess,
   ExpandMore,
   Casino,
+  ChevronLeft,
+  ChevronRight,
   Refresh,
   SportsEsports,
 } from '@mui/icons-material'
@@ -169,6 +172,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [selectedGameId, setSelectedGameId] = useState(null)
   const [selectedGame, setSelectedGame] = useState(null)
   const [moves, setMoves] = useState([])
+  const [viewMoveIndex, setViewMoveIndex] = useState(null)
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
   const [botLevel, setBotLevel] = useState(800)
@@ -181,7 +185,11 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
   const playerColor = getPlayerColor(selectedGame, authUser.id)
   const canMove = Boolean(selectedGame?.status === 'active' && playerColor === selectedGame.turn_color)
-  const boardSquares = useMemo(() => parseFenBoard(selectedGame?.fen), [selectedGame?.fen])
+  const viewedFen = viewMoveIndex === null
+    ? selectedGame?.fen
+    : moves[viewMoveIndex]?.fen_after
+  const boardSquares = useMemo(() => parseFenBoard(viewedFen), [viewedFen])
+  const isViewingHistory = viewMoveIndex !== null
   const myActiveGames = useMemo(() => games.filter(isActiveGame), [games])
   const myCompletedGames = useMemo(() => games.filter(isCompletedGame), [games])
   const watchGames = useMemo(() => (
@@ -235,6 +243,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGame(data.game)
       setMoves(data.moves || [])
+      setViewMoveIndex(null)
       setSelectedSquare(null)
     } catch (err) {
       onError(err.message)
@@ -282,6 +291,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGame(response.game)
       setMoves(response.moves || [])
+      setViewMoveIndex(null)
     })
 
     return () => {
@@ -344,16 +354,30 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGame(result.game)
       setMoves((current) => addMoveOnce(current, result.move))
+      setViewMoveIndex(null)
       setSelectedSquare(null)
       setMoveError(null)
     }
 
     socket.on('chess:gameUpdated', handleGameUpdated)
     socket.on('chess:moveMade', handleMoveMade)
+    socket.on('chess:gameDeleted', ({ id }) => {
+      setGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
+      setOpenGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
+      setActiveGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
+      setCompletedGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
+
+      if (Number(selectedGameId) === Number(id)) {
+        setSelectedGameId(null)
+        setSelectedGame(null)
+        setMoves([])
+      }
+    })
 
     return () => {
       socket.off('chess:gameUpdated', handleGameUpdated)
       socket.off('chess:moveMade', handleMoveMade)
+      socket.off('chess:gameDeleted')
     }
   }, [authUser.id, selectedGameId, socket])
 
@@ -399,6 +423,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setGames((current) => [data.game, ...current])
       setSelectedGame(data.game)
       setMoves(data.moves || [])
+      setViewMoveIndex(null)
       onNotice(`Bot game created at ${data.game.bot_level || botLevel}`)
       loadGames()
     } catch (err) {
@@ -457,6 +482,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
         setSelectedGame(response.game)
         setMoves((current) => addMoveOnce(current, response.move))
+        setViewMoveIndex(null)
         setSelectedSquare(null)
         setMoveError(null)
       },
@@ -464,7 +490,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   }
 
   function handleSquareClick(square) {
-    if (!selectedGame || !canMove) {
+    if (!selectedGame || !canMove || isViewingHistory) {
       return
     }
 
@@ -541,6 +567,33 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     }
   }
 
+  async function deleteGame(game) {
+    setBusy(true)
+
+    try {
+      await requestJson(`/api/chess/games/${game.id}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+
+      setGames((current) => current.filter((item) => item.id !== game.id))
+      setCompletedGames((current) => current.filter((item) => item.id !== game.id))
+
+      if (Number(selectedGameId) === Number(game.id)) {
+        setSelectedGameId(null)
+        setSelectedGame(null)
+        setMoves([])
+      }
+
+      onNotice('Game deleted')
+      loadGames()
+    } catch (err) {
+      onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   function toggleGameExpanded(gameId) {
     setExpandedGameIds((current) => {
       const next = new Set(current)
@@ -552,6 +605,40 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       }
 
       return next
+    })
+  }
+
+  function showPreviousMove() {
+    if (moves.length === 0) {
+      return
+    }
+
+    setSelectedSquare(null)
+    setViewMoveIndex((current) => {
+      if (current === null) {
+        return moves.length - 1
+      }
+
+      return Math.max(0, current - 1)
+    })
+  }
+
+  function showNextMove() {
+    if (moves.length === 0) {
+      return
+    }
+
+    setSelectedSquare(null)
+    setViewMoveIndex((current) => {
+      if (current === null) {
+        return null
+      }
+
+      if (current >= moves.length - 1) {
+        return null
+      }
+
+      return current + 1
     })
   }
 
@@ -629,14 +716,28 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                         Bot level: {game.bot_level}
                       </Typography>
                     )}
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => options.onClick ? options.onClick(game) : setSelectedGameId(game.id)}
-                      disabled={options.disabled?.(game)}
-                    >
-                      {action || 'View'}
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => options.onClick ? options.onClick(game) : setSelectedGameId(game.id)}
+                        disabled={options.disabled?.(game)}
+                      >
+                        {action || 'View'}
+                      </Button>
+                      {options.allowDelete && game.can_delete && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          startIcon={<Delete />}
+                          onClick={() => deleteGame(game)}
+                          disabled={busy}
+                        >
+                          Delete
+                        </Button>
+                      )}
+                    </Stack>
                   </Stack>
                 </Paper>
               </Collapse>
@@ -772,6 +873,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           {renderGameList(visibleCompletedGames, 'No completed games', {
             compact: true,
             hideBotChip: true,
+            allowDelete: true,
           })}
         </CardContent>
       </Card>
@@ -858,15 +960,45 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 <ChessBoard
                   boardSquares={boardSquares}
                   canMove={canMove}
-                  position={selectedGame.fen}
+                  position={viewedFen}
                   playerColor={playerColor}
                   selectedSquare={selectedSquare}
                   themeMode={themeMode}
                   onSquareClick={handleSquareClick}
                 />
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+                  <Tooltip title="Previous move">
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ChevronLeft />}
+                        onClick={showPreviousMove}
+                        disabled={moves.length === 0}
+                        sx={{ minWidth: 112 }}
+                      >
+                        Previous
+                      </Button>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Next move">
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        endIcon={<ChevronRight />}
+                        onClick={showNextMove}
+                        disabled={moves.length === 0 || viewMoveIndex === null}
+                        sx={{ minWidth: 112 }}
+                      >
+                        Next
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </Stack>
                 {selectedGame.status === 'active' && (
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    {!playerColor ? 'Viewing game' : canMove ? 'Your turn' : 'Waiting for opponent'}
+                    {isViewingHistory ? `Viewing move ${viewMoveIndex + 1}` : !playerColor ? 'Viewing game' : canMove ? 'Your turn' : 'Waiting for opponent'}
                   </Typography>
                 )}
               </Box>
@@ -887,12 +1019,27 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   <Typography color="text.secondary">No moves yet</Typography>
                 ) : (
                   <Stack spacing={0.75}>
-                    {moves.map((move) => (
+                    {moves.map((move, index) => (
                       <Stack
                         key={`${move.move_number}-${move.san}`}
                         direction="row"
                         spacing={1}
-                        sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+                        onClick={() => {
+                          setViewMoveIndex(index)
+                          setSelectedSquare(null)
+                        }}
+                        sx={{
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          borderRadius: 1,
+                          cursor: 'pointer',
+                          px: 0.75,
+                          py: 0.25,
+                          bgcolor: viewMoveIndex === index ? 'action.selected' : 'transparent',
+                          '&:hover': {
+                            bgcolor: 'action.hover',
+                          },
+                        }}
                       >
                         <Typography variant="body2" color="text.secondary">
                           {move.move_number}. {move.color}

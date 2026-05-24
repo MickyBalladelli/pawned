@@ -112,6 +112,7 @@ The server automatically creates three tables:
 - `POST /api/chess/games/:id/moves` - Make a move
 - `POST /api/chess/games/:id/resign` - Resign a game
 - `POST /api/chess/games/:id/cancel` - Cancel a waiting game
+- `DELETE /api/chess/games/:id` - Hide a completed game as admin or creator, hard-delete canceled games
 
 ## Socket Events
 
