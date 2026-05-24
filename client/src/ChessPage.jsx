@@ -30,12 +30,16 @@ import {
 import {
   Add,
   Delete,
+  Dangerous,
+  EmojiEvents,
   ExpandLess,
   ExpandMore,
   Casino,
   ChevronLeft,
   ChevronRight,
+  Flag,
   Refresh,
+  Timer,
 } from '@mui/icons-material'
 import ChessBoard from './ChessBoard'
 import ChessGameChat from './ChessGameChat'
@@ -119,6 +123,22 @@ function playerName(game, color) {
     : game?.black_username || 'Open'
 }
 
+function winnerName(game) {
+  if (!game?.winner_user_id) {
+    return null
+  }
+
+  if (Number(game.winner_user_id) === Number(game.white_user_id)) {
+    return playerName(game, 'white')
+  }
+
+  if (Number(game.winner_user_id) === Number(game.black_user_id)) {
+    return playerName(game, 'black')
+  }
+
+  return game.winner_username || 'Unknown'
+}
+
 function matchupLabel(game) {
   return `${playerName(game, 'white')} vs ${playerName(game, 'black')}`
 }
@@ -128,7 +148,7 @@ function openColorForGame(game) {
 }
 
 function isCompletedGame(game) {
-  return ['checkmate', 'draw', 'resigned', 'canceled'].includes(game?.status)
+  return ['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game?.status)
 }
 
 function isActiveGame(game) {
@@ -156,20 +176,30 @@ function statusLabel(game, user = null) {
     const playerColor = user ? getPlayerColor(game, user.id) : null
 
     if (!playerColor || !game.winner_user_id) {
-      return 'Mate'
+      return 'Checkmate'
     }
 
-    return Number(game.winner_user_id) === Number(user.id) ? 'Won' : 'Lost'
+    return Number(game.winner_user_id) === Number(user.id) ? 'Won by checkmate' : 'Lost by checkmate'
   }
 
   if (game.status === 'resigned') {
     const playerColor = user ? getPlayerColor(game, user.id) : null
 
     if (!playerColor || !game.winner_user_id) {
-      return 'Won'
+      return 'Resigned'
     }
 
-    return Number(game.winner_user_id) === Number(user.id) ? 'Won' : 'Lost'
+    return Number(game.winner_user_id) === Number(user.id) ? 'Won by resignation' : 'Lost by resignation'
+  }
+
+  if (game.status === 'timeout') {
+    const playerColor = user ? getPlayerColor(game, user.id) : null
+
+    if (!playerColor || !game.winner_user_id) {
+      return 'Timeout'
+    }
+
+    return Number(game.winner_user_id) === Number(user.id) ? 'Won on time' : 'Lost on time'
   }
 
   return game.status
@@ -188,7 +218,7 @@ function statusColor(game, user = null) {
     return 'info'
   }
 
-  if (game.status === 'checkmate' || game.status === 'resigned') {
+  if (game.status === 'checkmate' || game.status === 'resigned' || game.status === 'timeout') {
     const playerColor = user ? getPlayerColor(game, user.id) : null
 
     if (playerColor && Number(game.winner_user_id) !== Number(user.id)) {
@@ -207,6 +237,51 @@ function statusColor(game, user = null) {
   }
 
   return 'default'
+}
+
+function gameResultIcon(game, user = null) {
+  if (!user || !['checkmate', 'resigned', 'timeout'].includes(game?.status)) {
+    return null
+  }
+
+  const playerColor = getPlayerColor(game, user.id)
+
+  if (!playerColor || !game.winner_user_id) {
+    return null
+  }
+
+  const won = Number(game.winner_user_id) === Number(user.id)
+
+  return {
+    color: won ? 'success.main' : 'error.main',
+    icon: won ? <EmojiEvents fontSize="small" /> : <Dangerous fontSize="small" />,
+    tooltip: statusLabel(game, user),
+  }
+}
+
+function gameReasonIcon(game) {
+  if (game?.status === 'checkmate') {
+    return {
+      icon: <ChessIcon fontSize="small" />,
+      tooltip: 'Checkmate',
+    }
+  }
+
+  if (game?.status === 'resigned') {
+    return {
+      icon: <Flag fontSize="small" />,
+      tooltip: 'Resignation',
+    }
+  }
+
+  if (game?.status === 'timeout') {
+    return {
+      icon: <Timer fontSize="small" />,
+      tooltip: 'Timeout',
+    }
+  }
+
+  return null
 }
 
 function addMoveOnce(current, move) {
@@ -765,6 +840,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         {items.map((game) => {
           const action = options.action?.(game)
           const expanded = expandedGameIds.has(game.id)
+          const resultIcon = !action ? gameResultIcon(game, authUser) : null
+          const reasonIcon = !action ? gameReasonIcon(game) : null
+          const statusIcon = resultIcon || reasonIcon
 
           return (
             <Box key={game.id} sx={{ mb: 0.5 }}>
@@ -790,13 +868,40 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   {game.is_bot_game && !options.hideBotChip && (
                     <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
                   )}
-                  <Chip
-                    size="small"
-                    label={action || statusLabel(game, authUser)}
-                    color={action ? 'primary' : statusColor(game, authUser)}
-                    variant="outlined"
-                    sx={{ maxWidth: 116 }}
-                  />
+                  {statusIcon ? (
+                    <Tooltip title={statusIcon.tooltip}>
+                      <Box
+                        component="span"
+                        sx={{
+                          color: statusIcon.color || 'text.secondary',
+                          display: 'inline-flex',
+                        }}
+                      >
+                        {statusIcon.icon}
+                      </Box>
+                    </Tooltip>
+                  ) : (
+                    <Chip
+                      size="small"
+                      label={action || statusLabel(game, authUser)}
+                      color={action ? 'primary' : statusColor(game, authUser)}
+                      variant="outlined"
+                      sx={{ maxWidth: 116 }}
+                    />
+                  )}
+                  {resultIcon && reasonIcon && (
+                    <Tooltip title={reasonIcon.tooltip}>
+                      <Box
+                        component="span"
+                        sx={{
+                          color: 'text.secondary',
+                          display: 'inline-flex',
+                        }}
+                      >
+                        {reasonIcon.icon}
+                      </Box>
+                    </Tooltip>
+                  )}
                   <Box
                     component="span"
                     onClick={(event) => {
@@ -821,6 +926,11 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     <Typography variant="body2" color="text.secondary">
                       Status: {statusLabel(game, authUser)}
                     </Typography>
+                    {winnerName(game) && (
+                      <Typography variant="body2" color="text.secondary">
+                        Winner: {winnerName(game)}
+                      </Typography>
+                    )}
                     {game.is_bot_game && (
                       <Typography variant="body2" color="text.secondary">
                         Bot level: {game.bot_level}

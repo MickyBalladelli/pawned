@@ -208,7 +208,7 @@ async function listChessGames(pool, user, scope = 'mine') {
   } else if (scope === 'active') {
     where = "WHERE g.deleted_at IS NULL AND g.status = 'active'"
   } else if (scope === 'completed') {
-    where = "WHERE g.deleted_at IS NULL AND g.status IN ('checkmate', 'draw', 'resigned', 'canceled')"
+    where = "WHERE g.deleted_at IS NULL AND g.status IN ('checkmate', 'draw', 'resigned', 'timeout', 'canceled')"
   } else {
     params.push(user.id)
     where = 'WHERE g.deleted_at IS NULL AND (g.white_user_id = $1 OR g.black_user_id = $1)'
@@ -302,7 +302,7 @@ async function closeChessGameChat(pool, gameId, user) {
     throw new Error('Game not found')
   }
 
-  if (!['checkmate', 'draw', 'resigned', 'canceled'].includes(game.status)) {
+  if (!['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game.status)) {
     throw new Error('Game is not finished')
   }
 
@@ -611,7 +611,7 @@ async function deleteChessGame(pool, gameId, user) {
     throw new Error('Game not found')
   }
 
-  if (!['checkmate', 'draw', 'resigned', 'canceled'].includes(game.status)) {
+  if (!['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game.status)) {
     throw new Error('Only completed games can be deleted')
   }
 
@@ -636,7 +636,7 @@ async function deleteChessGame(pool, gameId, user) {
 }
 
 function canDeleteChessGame(game, user) {
-  if (!game || game.deleted_at || !['checkmate', 'draw', 'resigned', 'canceled'].includes(game.status)) {
+  if (!game || game.deleted_at || !['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game.status)) {
     return false
   }
 
