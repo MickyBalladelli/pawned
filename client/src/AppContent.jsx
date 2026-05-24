@@ -36,6 +36,7 @@ import {
   Edit,
   Forum,
   Group,
+  HourglassEmpty,
   LightMode,
   Lock,
   Public,
@@ -45,6 +46,7 @@ import {
   Send,
   Settings,
   SportsEsports,
+  EditOff
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
 import ChannelSettingsToggles from './ChannelSettingsToggles'
@@ -875,6 +877,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                           color: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
                           borderColor: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
                         },
+                        '&.Mui-selected .channel-list-icon': {
+                          color: themeMode === 'dark' ? 'primary.contrastText' : '#05070a',
+                        },
                       }}
                     >
                       <ListItemText
@@ -883,17 +888,36 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                             <Typography sx={{ color: themeMode === 'dark' ? 'text.primary' : '#05070a', fontWeight: 900 }}>
                               #{channel.name}
                             </Typography>
-                            <Chip
-                              size="small"
-                              icon={channel.is_private ? <Lock /> : <Public />}
-                              label={channel.is_private ? 'Private' : 'Public'}
-                              variant="outlined"
-                            />
+                            <Tooltip title={channel.is_private ? 'Private' : 'Public'}>
+                              <Box
+                                className="channel-list-icon"
+                                component="span"
+                                sx={{ color: 'text.secondary', display: 'inline-flex' }}
+                              >
+                                {channel.is_private ? <Lock fontSize="small" /> : <Public fontSize="small" />}
+                              </Box>
+                            </Tooltip>
                             {channel.is_read_only && (
-                              <Chip size="small" label="Read only" variant="outlined" />
+                              <Tooltip title="Read only">
+                                <Box
+                                  className="channel-list-icon"
+                                  component="span"
+                                  sx={{ color: 'text.secondary', display: 'inline-flex' }}
+                                >
+                                  <EditOff fontSize="small" />
+                                </Box>
+                              </Tooltip>
                             )}
                             {channel.request_status === 'pending' && (
-                              <Chip size="small" label="Requested" variant="outlined" />
+                              <Tooltip title="Requested">
+                                <Box
+                                  className="channel-list-icon"
+                                  component="span"
+                                  sx={{ color: 'text.secondary', display: 'inline-flex' }}
+                                >
+                                  <HourglassEmpty fontSize="small" />
+                                </Box>
+                              </Tooltip>
                             )}
                             {channel.can_manage && channel.pending_request_count > 0 && (
                               <Badge badgeContent={channel.pending_request_count} color="error">
