@@ -719,11 +719,19 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             value={activeView}
             onChange={handleActiveViewChange}
             sx={{
-              minHeight: 44,
+              minHeight: 36,
               borderBottom: { xs: 1, md: 0 },
               borderColor: 'divider',
               '& .MuiTab-root': {
-                minHeight: 44,
+                minHeight: 36,
+                minWidth: 0,
+                px: { xs: 1, sm: 1.25 },
+                py: 0.5,
+                fontSize: { xs: '0.75rem', sm: '0.8125rem' },
+              },
+              '& .MuiTab-iconWrapper': {
+                fontSize: 18,
+                mr: 0.5,
               },
             }}
           >

@@ -21,6 +21,8 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -340,6 +342,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [newGameColor, setNewGameColor] = useState('white')
   const [botLevel, setBotLevel] = useState(800)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [gameListTab, setGameListTab] = useState('active')
   const [expandedGameIds, setExpandedGameIds] = useState(new Set())
   const [showMyCompletedOnly, setShowMyCompletedOnly] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -977,8 +980,23 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         alignItems: 'start',
       }}
     >
-      <Card sx={{ width: { xs: '100%', lg: 360 }, maxWidth: '100%', justifySelf: 'start' }}>
-        <CardContent>
+      <Card
+        sx={{
+          width: { xs: '100%', lg: 360 },
+          maxWidth: '100%',
+          maxHeight: { lg: 'calc(100vh - 190px)' },
+          justifySelf: 'start',
+          overflow: 'hidden',
+        }}
+      >
+        <CardContent
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: { lg: 'calc(100vh - 190px)' },
+            minHeight: 0,
+          }}
+        >
           <Stack spacing={1.5} sx={{ mb: 2 }}>
             <Typography
               variant="h5"
@@ -1016,65 +1034,86 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
           <Divider sx={{ my: 2 }} />
 
-          <Typography variant="overline" color="text.secondary">
-            My active games
-          </Typography>
-          {loading ? (
-            <Stack sx={{ alignItems: 'center', py: 4 }}>
-              <CircularProgress size={26} />
-            </Stack>
-          ) : (
-            renderGameList(myActiveGames, 'No active games')
-          )}
+          <Tabs
+            value={gameListTab}
+            onChange={(event, value) => setGameListTab(value)}
+            variant="fullWidth"
+            sx={{
+              minHeight: 32,
+              mb: 1,
+              '& .MuiTab-root': {
+                minHeight: 32,
+                minWidth: 0,
+                px: { xs: 0.5, sm: 1 },
+                py: 0.25,
+                fontSize: { xs: '0.68rem', sm: '0.75rem' },
+              },
+            }}
+          >
+            <Tab label="Active" value="active" />
+            <Tab label="Open" value="open" />
+            <Tab label="Live" value="watch" />
+            <Tab label="Done" value="completed" />
+          </Tabs>
 
-          <Divider sx={{ my: 2 }} />
+          <Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
+            {gameListTab === 'active' && (
+              loading ? (
+                <Stack sx={{ alignItems: 'center', py: 4 }}>
+                  <CircularProgress size={26} />
+                </Stack>
+              ) : (
+                renderGameList(myActiveGames, 'No active games')
+              )
+            )}
 
-          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            Open games
-          </Typography>
-          {renderGameList(openGames, 'No open games', {
-            action: (game) => `Join as ${openColorForGame(game)}`,
-            disabled: () => busy,
-            onClick: (game) => joinGame(game.id),
-          })}
+            {gameListTab === 'open' && renderGameList(openGames, 'No open games', {
+              action: (game) => `Join as ${openColorForGame(game)}`,
+              disabled: () => busy,
+              onClick: (game) => joinGame(game.id),
+            })}
 
-          <Divider sx={{ my: 2 }} />
+            {gameListTab === 'watch' && renderGameList(watchGames, 'No live games', {
+              action: () => 'View',
+            })}
 
-          <Typography variant="overline" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-            Watch live
-          </Typography>
-          {renderGameList(watchGames, 'No live games', {
-            action: () => 'View',
-          })}
-
-          <Divider sx={{ my: 2 }} />
-
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="overline" color="text.secondary">
-              Completed games
-            </Typography>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  size="small"
-                  checked={showMyCompletedOnly}
-                  onChange={(event) => setShowMyCompletedOnly(event.target.checked)}
-                />
-              }
-              label="Mine"
-              sx={{
-                mr: 0,
-                '& .MuiFormControlLabel-label': {
-                  fontSize: 12,
-                },
-              }}
-            />
-          </Stack>
-          {renderGameList(visibleCompletedGames, 'No completed games', {
-            compact: true,
-            hideBotChip: true,
-            allowDelete: true,
-          })}
+            {gameListTab === 'completed' && (
+              <>
+                <Stack 
+                  direction="row" 
+                  spacing={1} 
+                  sx={{ 
+                    alignItems: 'center', 
+                    justifyContent: 'flex-end', 
+                    mb: 1,
+                    mr: 3, 
+                  }}
+                >
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={showMyCompletedOnly}
+                        onChange={(event) => setShowMyCompletedOnly(event.target.checked)}
+                      />
+                    }
+                    label="Mine"
+                    sx={{
+                      mr: 0,
+                      '& .MuiFormControlLabel-label': {
+                        fontSize: 12,
+                      },
+                    }}
+                  />
+                </Stack>
+                {renderGameList(visibleCompletedGames, 'No completed games', {
+                  compact: true,
+                  hideBotChip: true,
+                  allowDelete: true,
+                })}
+              </>
+            )}
+          </Box>
         </CardContent>
       </Card>
 
