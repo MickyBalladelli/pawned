@@ -214,7 +214,13 @@ function AccountSettingsPage({ authToken, user, onBack, onUserUpdated }) {
             </Stack>
           </Stack>
 
-          <Button type="submit" variant="contained" startIcon={<Save />} disabled={saving}>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            startIcon={<Save />} 
+            disabled={saving}
+            sx={{ alignSelf: 'center', width: '300px', px: 4 }}
+          >
             {saving ? 'Saving' : 'Save settings'}
           </Button>
         </Stack>
