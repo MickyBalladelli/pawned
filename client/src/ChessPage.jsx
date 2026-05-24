@@ -127,7 +127,7 @@ function isActiveGame(game) {
   return game?.status === 'active' || game?.status === 'waiting'
 }
 
-function statusLabel(game) {
+function statusLabel(game, user = null) {
   if (!game) {
     return 'Idle'
   }
@@ -145,14 +145,60 @@ function statusLabel(game) {
   }
 
   if (game.status === 'checkmate') {
-    return `Checkmate: ${game.winner_username || 'winner'}`
+    const playerColor = user ? getPlayerColor(game, user.id) : null
+
+    if (!playerColor || !game.winner_user_id) {
+      return 'Mate'
+    }
+
+    return Number(game.winner_user_id) === Number(user.id) ? 'Won' : 'Lost'
   }
 
   if (game.status === 'resigned') {
-    return `${game.winner_username || 'Winner'} won`
+    const playerColor = user ? getPlayerColor(game, user.id) : null
+
+    if (!playerColor || !game.winner_user_id) {
+      return 'Won'
+    }
+
+    return Number(game.winner_user_id) === Number(user.id) ? 'Won' : 'Lost'
   }
 
   return game.status
+}
+
+function statusColor(game, user = null) {
+  if (!game) {
+    return 'default'
+  }
+
+  if (game.status === 'active') {
+    return 'success'
+  }
+
+  if (game.status === 'waiting') {
+    return 'info'
+  }
+
+  if (game.status === 'checkmate' || game.status === 'resigned') {
+    const playerColor = user ? getPlayerColor(game, user.id) : null
+
+    if (playerColor && Number(game.winner_user_id) !== Number(user.id)) {
+      return 'error'
+    }
+
+    return 'success'
+  }
+
+  if (game.status === 'draw') {
+    return 'warning'
+  }
+
+  if (game.status === 'canceled') {
+    return 'default'
+  }
+
+  return 'default'
 }
 
 function addMoveOnce(current, move) {
@@ -683,7 +729,8 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   )}
                   <Chip
                     size="small"
-                    label={action || statusLabel(game)}
+                    label={action || statusLabel(game, authUser)}
+                    color={action ? 'primary' : statusColor(game, authUser)}
                     variant="outlined"
                     sx={{ maxWidth: 116 }}
                   />
@@ -709,7 +756,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                       Black: {playerName(game, 'black')}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Status: {statusLabel(game)}
+                      Status: {statusLabel(game, authUser)}
                     </Typography>
                     {game.is_bot_game && (
                       <Typography variant="body2" color="text.secondary">
@@ -904,7 +951,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              <Chip label={statusLabel(selectedGame)} color={selectedGame?.status === 'active' ? 'success' : 'default'} variant="outlined" />
+              <Chip label={statusLabel(selectedGame, authUser)} color={statusColor(selectedGame, authUser)} variant="outlined" />
               <Chip label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
               {selectedGame && !playerColor && (
                 <Chip label="Viewer" variant="outlined" />
