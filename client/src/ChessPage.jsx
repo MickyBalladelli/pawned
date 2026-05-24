@@ -9,6 +9,10 @@ import {
   CircularProgress,
   Collapse,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Checkbox,
   FormControlLabel,
   List,
@@ -260,6 +264,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [selectedSquare, setSelectedSquare] = useState(null)
   const [newGameColor, setNewGameColor] = useState('white')
   const [botLevel, setBotLevel] = useState(800)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [expandedGameIds, setExpandedGameIds] = useState(new Set())
   const [showMyCompletedOnly, setShowMyCompletedOnly] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -494,6 +499,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setSelectedGameId(data.game.id)
       setGames((current) => [data.game, ...current])
       onNotice('Chess game created')
+      setCreateDialogOpen(false)
       loadGames()
     } catch (err) {
       onError(err.message)
@@ -521,6 +527,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setMoves(data.moves || [])
       setViewMoveIndex(null)
       onNotice(`Bot game created at ${data.game.bot_level || botLevel}`)
+      setCreateDialogOpen(false)
       loadGames()
     } catch (err) {
       onError(err.message)
@@ -888,52 +895,14 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             </Tooltip>
           </Stack>
 
-          <Stack spacing={1.5}>
-            <ToggleButtonGroup
-              value={newGameColor}
-              exclusive
-              size="small"
-              onChange={(event, value) => value && setNewGameColor(value)}
-              fullWidth
-            >
-              <ToggleButton value="white">Play as White</ToggleButton>
-              <ToggleButton value="black">Play as Black</ToggleButton>
-            </ToggleButtonGroup>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={createGame}
-              disabled={busy}
-              fullWidth
-            >
-              New human game
-            </Button>
-            <Stack direction="row" spacing={1}>
-              <TextField
-                select
-                label="Bot level"
-                size="small"
-                value={botLevel}
-                onChange={(event) => setBotLevel(Number(event.target.value))}
-                sx={{ width: 132 }}
-              >
-                {botLevels.map((level) => (
-                  <MenuItem key={level} value={level}>
-                    {level}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Button
-                variant="outlined"
-                startIcon={<ChessIcon />}
-                onClick={createBotGame}
-                disabled={busy}
-                sx={{ flex: 1 }}
-              >
-                New bot game
-              </Button>
-            </Stack>
-          </Stack>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => setCreateDialogOpen(true)}
+            
+          >
+            New game
+          </Button>
 
           <Divider sx={{ my: 2 }} />
 
@@ -1186,6 +1155,69 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           )}
         </CardContent>
       </Card>
+      <Dialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle>Create Game</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5} sx={{ pt: 1 }}>
+            <ToggleButtonGroup
+              value={newGameColor}
+              exclusive
+              size="small"
+              onChange={(event, value) => value && setNewGameColor(value)}
+              fullWidth
+            >
+              <ToggleButton value="white">Play as White</ToggleButton>
+              <ToggleButton value="black">Play as Black</ToggleButton>
+            </ToggleButtonGroup>
+
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={createGame}
+              disabled={busy}
+              fullWidth
+            >
+              New human game
+            </Button>
+
+            <Divider />
+
+            <TextField
+              select
+              label="Bot level"
+              size="small"
+              value={botLevel}
+              onChange={(event) => setBotLevel(Number(event.target.value))}
+              fullWidth
+            >
+              {botLevels.map((level) => (
+                <MenuItem key={level} value={level}>
+                  {level}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button
+              variant="outlined"
+              startIcon={<ChessIcon />}
+              onClick={createBotGame}
+              disabled={busy}
+              fullWidth
+            >
+              New bot game
+            </Button>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCreateDialogOpen(false)} disabled={busy}>
+            Cancel
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   )
 }
