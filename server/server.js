@@ -57,7 +57,7 @@ const userSelectColumns = `
 `
 
 function isAdminUser(user) {
-  return Boolean(user?.is_admin || user?.role === 'admin')
+  return Boolean(user?.is_admin || user?.role === 'admin' || user?.role === 'developer')
 }
 
 function isModeratorUser(user) {
@@ -664,7 +664,7 @@ app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
                created_at
         FROM users
         ORDER BY is_blocked ASC,
-                 CASE role WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END,
+                 CASE role WHEN 'admin' THEN 0 WHEN 'developer' THEN 1 WHEN 'moderator' THEN 2 ELSE 3 END,
                  LOWER(username) ASC
       `
     )
@@ -679,8 +679,8 @@ app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
 app.put('/api/users/:id/role', authenticate, requireAdmin, async (req, res) => {
   const role = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : ''
 
-  if (!['user', 'moderator', 'admin'].includes(role)) {
-    return res.status(400).json({ error: 'Role must be user, moderator, or admin' })
+  if (!['user', 'developer', 'moderator', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Role must be user, developer, moderator, or admin' })
   }
 
   if (Number(req.params.id) === Number(req.user.id) && role !== 'admin') {
@@ -696,7 +696,7 @@ app.put('/api/users/:id/role', authenticate, requireAdmin, async (req, res) => {
         WHERE id = $3
         RETURNING id, username, email, is_admin, role, is_blocked, is_verified, avatar_url, created_at
       `,
-      [role, role === 'admin', req.params.id]
+      [role, role === 'admin' || role === 'developer', req.params.id]
     )
 
     if (result.rows.length === 0) {
@@ -1450,7 +1450,8 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_chess_opening BOOLEAN DEFAULT TRUE');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
     await pool.query("UPDATE users SET role = 'admin' WHERE is_admin = true AND role <> 'admin'");
-    await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'moderator', 'admin')");
+    await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'developer', 'moderator', 'admin')");
+    await pool.query("UPDATE users SET is_admin = true WHERE role IN ('admin', 'developer')");
     await pool.query('UPDATE users SET is_blocked = false WHERE is_blocked IS NULL');
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL');
     await pool.query('UPDATE users SET show_chess_opening = true WHERE show_chess_opening IS NULL');

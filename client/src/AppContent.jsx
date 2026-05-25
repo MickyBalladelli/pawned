@@ -174,7 +174,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     () => channels.find((channel) => channel.id === selectedChannelId),
     [channels, selectedChannelId],
   )
-  const isAdmin = Boolean(authUser?.is_admin)
+  const isAdmin = Boolean(authUser?.is_admin || authUser?.role === 'admin' || authUser?.role === 'developer')
   const isModerator = Boolean(isAdmin || authUser?.role === 'moderator')
   const canUseSelectedChannel = Boolean(selectedChannel?.can_access)
   const canWriteSelectedChannel = Boolean(

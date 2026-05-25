@@ -145,7 +145,7 @@ function ChessGameChat({ authHeaders, authUser, game, socket, socketConnected, o
   }
 
   const canClose = !chatClosed && ['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game.status) && (
-    authUser.is_admin || Number(game.creator_user_id) === Number(authUser.id)
+    authUser.is_admin || authUser.role === 'admin' || authUser.role === 'developer' || Number(game.creator_user_id) === Number(authUser.id)
   )
 
   return (

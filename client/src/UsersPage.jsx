@@ -14,7 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { AdminPanelSettings, Block, Person, Refresh, Shield } from '@mui/icons-material'
+import { AdminPanelSettings, Block, Code, Person, Refresh, Shield } from '@mui/icons-material'
 import { requestJson } from './requestJson'
 
 function getInitial(username) {
@@ -38,7 +38,27 @@ function roleIcon(role) {
     return <Shield fontSize="small" />
   }
 
+  if (role === 'developer') {
+    return <Code fontSize="small" />
+  }
+
   return <Person fontSize="small" />
+}
+
+function roleColor(role) {
+  if (role === 'admin') {
+    return 'error'
+  }
+
+  if (role === 'moderator') {
+    return 'warning'
+  }
+
+  if (role === 'developer') {
+    return 'success'
+  }
+
+  return 'default'
 }
 
 function UsersPage({ authToken, authUser, onError, onNotice }) {
@@ -202,7 +222,7 @@ function UsersPage({ authToken, authUser, onError, onNotice }) {
                               size="small"
                               icon={roleIcon(role)}
                               label={role}
-                              color={role === 'admin' ? 'error' : role === 'moderator' ? 'warning' : 'default'}
+                              color={roleColor(role)}
                               variant={role === 'user' ? 'outlined' : 'filled'}
                             />
                             {user.is_blocked && (
@@ -225,6 +245,7 @@ function UsersPage({ authToken, authUser, onError, onNotice }) {
                         sx={{ minWidth: 170 }}
                       >
                         <MenuItem value="user">User</MenuItem>
+                        <MenuItem value="developer">Developer</MenuItem>
                         <MenuItem value="moderator">Moderator</MenuItem>
                         <MenuItem value="admin">Admin</MenuItem>
                       </TextField>

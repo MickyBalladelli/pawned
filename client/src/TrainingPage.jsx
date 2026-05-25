@@ -277,7 +277,7 @@ function TrainingPage({ authToken, authUser, themeMode }) {
     : selectedPuzzlePositions[puzzleViewIndex] || puzzleFen
   const puzzleBoardOrientation = puzzleSolverColor(selectedPuzzle)
   const selectedPuzzleWasSolved = Boolean(selectedPuzzle && solvedPuzzleIds.has(selectedPuzzle.id))
-  const isAdmin = Boolean(authUser?.is_admin)
+  const isAdmin = Boolean(authUser?.is_admin || authUser?.role === 'admin' || authUser?.role === 'developer')
 
   function selectOpening(opening) {
     setSelectedOpening(opening)

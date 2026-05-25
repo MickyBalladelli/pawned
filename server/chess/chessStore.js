@@ -6,6 +6,10 @@ const startingFen = new Chess().fen()
 const chessBotUsername = 'VelaBot'
 const timeControls = new Set([60, 300, 600, 5400])
 
+function isAdminUser(user) {
+  return Boolean(user?.is_admin || user?.role === 'admin' || user?.role === 'developer')
+}
+
 function normalizeColor(color) {
   return color === 'black' ? 'black' : 'white'
 }
@@ -384,7 +388,7 @@ async function closeChessGameChat(pool, gameId, user) {
 
   const isCreator = Number(game.creator_user_id) === Number(user.id)
 
-  if (!user.is_admin && !isCreator) {
+  if (!isAdminUser(user) && !isCreator) {
     throw new Error('You cannot close this chat')
   }
 
@@ -793,7 +797,7 @@ async function deleteChessGame(pool, gameId, user) {
   const isCreator = Number(game.creator_user_id) === Number(user.id)
   const isPlayer = Number(game.white_user_id) === Number(user.id) || Number(game.black_user_id) === Number(user.id)
 
-  if (!user.is_admin && !isCreator && !(game.status === 'canceled' && isPlayer)) {
+  if (!isAdminUser(user) && !isCreator && !(game.status === 'canceled' && isPlayer)) {
     throw new Error('You cannot delete this game')
   }
 
@@ -817,7 +821,7 @@ function canDeleteChessGame(game, user) {
 
   const isCreator = Number(game.creator_user_id) === Number(user.id)
   const isPlayer = Number(game.white_user_id) === Number(user.id) || Number(game.black_user_id) === Number(user.id)
-  return Boolean(user.is_admin || isCreator || (game.status === 'canceled' && isPlayer))
+  return Boolean(isAdminUser(user) || isCreator || (game.status === 'canceled' && isPlayer))
 }
 
 module.exports = {

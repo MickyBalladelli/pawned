@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Avatar, Box, Chip, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material'
-import { AdminPanelSettings, Shield } from '@mui/icons-material'
+import { AdminPanelSettings, Code, Shield } from '@mui/icons-material'
 
 const groupWindowMs = 5 * 60 * 1000
 
@@ -60,7 +60,7 @@ function getMessageRole(message) {
 }
 
 function canModerateUser(authUser, message) {
-  const authRole = authUser?.role || (authUser?.is_admin ? 'admin' : 'user')
+  const authRole = authUser?.is_admin || authUser?.role === 'developer' ? 'admin' : authUser?.role || 'user'
   const messageRole = getMessageRole(message)
 
   if (Number(message.user_id) === Number(authUser.id)) {
@@ -78,7 +78,7 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
   const [messageMenu, setMessageMenu] = useState(null)
 
   function openMessageMenu(event, message) {
-    const canDelete = message.user_id === authUser.id || authUser.is_admin || authUser.role === 'moderator'
+    const canDelete = message.user_id === authUser.id || authUser.is_admin || authUser.role === 'admin' || authUser.role === 'developer' || authUser.role === 'moderator'
     const canBlock = Boolean(onBlockUser && canModerateUser(authUser, message))
 
     if (!canDelete && !canBlock) {
@@ -161,6 +161,7 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
         const role = getMessageRole(message)
         const isAdminMessage = role === 'admin'
         const isModeratorMessage = role === 'moderator'
+        const isDeveloperMessage = role === 'developer'
 
         return (
           <Box
@@ -175,7 +176,13 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
               pb: 0.125,
               textAlign: 'left',
               '&:hover': {
-                bgcolor: isAdminMessage ? 'rgba(211, 47, 47, 0.16)' : isModeratorMessage ? 'rgba(237, 108, 2, 0.14)' : 'action.hover',
+                bgcolor: isAdminMessage
+                  ? 'rgba(211, 47, 47, 0.16)'
+                  : isModeratorMessage
+                    ? 'rgba(237, 108, 2, 0.14)'
+                    : isDeveloperMessage
+                      ? 'rgba(46, 125, 50, 0.14)'
+                      : 'action.hover',
               },
               '&:hover .message-time': {
                 opacity: 1,
@@ -192,8 +199,8 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                   fontSize: 14,
                   fontWeight: 800,
                   bgcolor: 'primary.main',
-                  border: isAdminMessage ? '2px solid' : isModeratorMessage ? '1px solid' : 0,
-                  borderColor: isAdminMessage ? 'error.main' : 'warning.main',
+                  border: isAdminMessage ? '2px solid' : isModeratorMessage || isDeveloperMessage ? '1px solid' : 0,
+                  borderColor: isAdminMessage ? 'error.main' : isModeratorMessage ? 'warning.main' : 'success.main',
                 }}
               >
                 {getInitial(message.username)}
@@ -228,7 +235,13 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                       fontSize: 14,
                       fontWeight: isAdminMessage ? 950 : 800,
                       lineHeight: 1.25,
-                      color: isAdminMessage ? 'error.main' : isModeratorMessage ? 'warning.main' : 'text.primary',
+                      color: isAdminMessage
+                        ? 'error.main'
+                        : isModeratorMessage
+                          ? 'warning.main'
+                          : isDeveloperMessage
+                            ? 'success.main'
+                            : 'text.primary',
                     }}
                   >
                     {message.username}
@@ -248,6 +261,15 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                       icon={<Shield />}
                       label="mod"
                       color="warning"
+                      sx={{ height: 20, fontWeight: 900 }}
+                    />
+                  )}
+                  {isDeveloperMessage && (
+                    <Chip
+                      size="small"
+                      icon={<Code />}
+                      label="dev"
+                      color="success"
                       sx={{ height: 20, fontWeight: 900 }}
                     />
                   )}
