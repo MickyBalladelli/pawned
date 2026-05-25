@@ -1,6 +1,12 @@
 const fs = require('fs/promises')
 const path = require('path')
-const tf = require('@tensorflow/tfjs')
+let tf
+
+try {
+  tf = require('@tensorflow/tfjs-node')
+} catch {
+  tf = require('@tensorflow/tfjs')
+}
 const { actionCount } = require('./actionSpace')
 const { inputSize } = require('./boardEncoding')
 
