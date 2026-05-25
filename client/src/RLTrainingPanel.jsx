@@ -4,14 +4,16 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   CircularProgress,
-  Divider,
+  IconButton,
   Paper,
   Stack,
   TextField,
   Typography,
 } from '@mui/material'
-import { PlayArrow, Stop, Sync } from '@mui/icons-material'
+import { ExpandLess, ExpandMore, PlayArrow, Stop, Sync } from '@mui/icons-material'
+import RLTrainingCurrentJob from './RLTrainingCurrentJob'
 import RLTrainingGameViewer from './RLTrainingGameViewer'
 import { requestJson } from './requestJson'
 
@@ -44,36 +46,6 @@ function readStoredConfig() {
   }
 }
 
-function formatDate(value) {
-  if (!value) {
-    return '-'
-  }
-
-  return new Intl.DateTimeFormat(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value))
-}
-
-function formatDuration(milliseconds = 0) {
-  const totalSeconds = Math.floor(milliseconds / 1000)
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`
-  }
-
-  if (minutes > 0) {
-    return `${minutes}m ${seconds}s`
-  }
-
-  return `${seconds}s`
-}
-
 function numericFieldValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0
 }
@@ -98,6 +70,7 @@ function RLTrainingPanel({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [parametersExpanded, setParametersExpanded] = useState(true)
   const authHeaders = useMemo(() => (
     authToken ? { Authorization: `Bearer ${authToken}` } : {}
   ), [authToken])
@@ -281,119 +254,136 @@ function RLTrainingPanel({
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={2}>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={1.5}
-            sx={{ alignItems: 'stretch' }}
-          >
-            <TextField
-              label="Iterations"
-              type="number"
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 900 }}>
+              Training controls
+            </Typography>
+            <IconButton
               size="small"
-              value={config.iterations}
-              onChange={(event) => updateConfig('iterations', event.target.value)}
-              inputProps={{ min: 1 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Games / iteration"
-              type="number"
-              size="small"
-              value={config.gamesPerIteration}
-              onChange={(event) => updateConfig('gamesPerIteration', event.target.value)}
-              inputProps={{ min: 1 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Checkpoint every"
-              type="number"
-              size="small"
-              value={config.checkpointEvery}
-              onChange={(event) => updateConfig('checkpointEvery', event.target.value)}
-              inputProps={{ min: 1 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Max plies"
-              type="number"
-              size="small"
-              value={config.maxPlies}
-              onChange={(event) => updateConfig('maxPlies', event.target.value)}
-              inputProps={{ min: 20 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
+              aria-label={parametersExpanded ? 'Collapse training parameters' : 'Expand training parameters'}
+              onClick={() => setParametersExpanded((current) => !current)}
+            >
+              {parametersExpanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+            </IconButton>
           </Stack>
 
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={1.5}
-            sx={{ alignItems: 'stretch' }}
-          >
-            <TextField
-              label="Ply delay (ms)"
-              type="number"
-              size="small"
-              value={config.plyDelayMs}
-              onChange={(event) => updateConfig('plyDelayMs', event.target.value)}
-              inputProps={{ min: 10 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Parallel games"
-              type="number"
-              size="small"
-              value={config.parallelGames}
-              onChange={(event) => updateConfig('parallelGames', event.target.value)}
-              inputProps={{ min: 1 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Workers"
-              type="number"
-              size="small"
-              value={config.workerCount}
-              onChange={(event) => updateConfig('workerCount', event.target.value)}
-              inputProps={{ min: 1 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Train samples"
-              type="number"
-              size="small"
-              value={config.trainSampleLimit}
-              onChange={(event) => updateConfig('trainSampleLimit', event.target.value)}
-              inputProps={{ min: 32 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Train batch"
-              type="number"
-              size="small"
-              value={config.trainBatchSize}
-              onChange={(event) => updateConfig('trainBatchSize', event.target.value)}
-              inputProps={{ min: 16 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Replay samples"
-              type="number"
-              size="small"
-              value={config.replaySampleLimit}
-              onChange={(event) => updateConfig('replaySampleLimit', event.target.value)}
-              inputProps={{ min: 0 }}
-              sx={{ flex: 1 }}
-              disabled={isRunning || saving}
-            />
-          </Stack>
+          <Collapse in={parametersExpanded} timeout="auto" unmountOnExit>
+            <Stack spacing={2}>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={1.5}
+                sx={{ alignItems: 'stretch' }}
+              >
+                <TextField
+                  label="Iterations"
+                  type="number"
+                  size="small"
+                  value={config.iterations}
+                  onChange={(event) => updateConfig('iterations', event.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Games / iteration"
+                  type="number"
+                  size="small"
+                  value={config.gamesPerIteration}
+                  onChange={(event) => updateConfig('gamesPerIteration', event.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Checkpoint every"
+                  type="number"
+                  size="small"
+                  value={config.checkpointEvery}
+                  onChange={(event) => updateConfig('checkpointEvery', event.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Max plies"
+                  type="number"
+                  size="small"
+                  value={config.maxPlies}
+                  onChange={(event) => updateConfig('maxPlies', event.target.value)}
+                  inputProps={{ min: 20 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+              </Stack>
+
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={1.5}
+                sx={{ alignItems: 'stretch' }}
+              >
+                <TextField
+                  label="Ply delay (ms)"
+                  type="number"
+                  size="small"
+                  value={config.plyDelayMs}
+                  onChange={(event) => updateConfig('plyDelayMs', event.target.value)}
+                  inputProps={{ min: 10 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Parallel games"
+                  type="number"
+                  size="small"
+                  value={config.parallelGames}
+                  onChange={(event) => updateConfig('parallelGames', event.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Workers"
+                  type="number"
+                  size="small"
+                  value={config.workerCount}
+                  onChange={(event) => updateConfig('workerCount', event.target.value)}
+                  inputProps={{ min: 1 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Train samples"
+                  type="number"
+                  size="small"
+                  value={config.trainSampleLimit}
+                  onChange={(event) => updateConfig('trainSampleLimit', event.target.value)}
+                  inputProps={{ min: 32 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Train batch"
+                  type="number"
+                  size="small"
+                  value={config.trainBatchSize}
+                  onChange={(event) => updateConfig('trainBatchSize', event.target.value)}
+                  inputProps={{ min: 16 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+                <TextField
+                  label="Replay samples"
+                  type="number"
+                  size="small"
+                  value={config.replaySampleLimit}
+                  onChange={(event) => updateConfig('replaySampleLimit', event.target.value)}
+                  inputProps={{ min: 0 }}
+                  sx={{ flex: 1 }}
+                  disabled={isRunning || saving}
+                />
+              </Stack>
+            </Stack>
+          </Collapse>
 
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
             <Button
@@ -425,6 +415,11 @@ function RLTrainingPanel({
         </Stack>
       </Paper>
 
+      <RLTrainingCurrentJob
+        job={job}
+        totalGamesRemaining={totalGamesRemaining}
+      />
+
       <RLTrainingGameViewer
         games={job?.activeGames || []}
         fallbackGame={job?.selfPlayGame}
@@ -433,59 +428,6 @@ function RLTrainingPanel({
         themeMode={themeMode}
         onSelectedGameIdChange={onSelectedGameIdChange}
       />
-
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack spacing={1.25}>
-          <Typography variant="h6" sx={{ fontWeight: 900 }}>
-            Current job
-          </Typography>
-          <Divider />
-          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-            <Chip label={`ID: ${job?.id || '-'}`} variant="outlined" />
-            <Chip label={`Started: ${formatDate(job?.startedAt)}`} variant="outlined" />
-            <Chip label={`Time: ${formatDuration(job?.elapsedMs)}`} variant="outlined" />
-            <Chip label={`By: ${job?.startedBy?.username || '-'}`} variant="outlined" />
-          </Stack>
-          {job?.config && (
-            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-              <Chip label={`${job.config.iterations} iterations`} variant="outlined" />
-              <Chip label={`${job.config.gamesPerIteration} games`} variant="outlined" />
-              <Chip label={`${job.config.checkpointEvery} checkpoint`} variant="outlined" />
-              <Chip label={`${job.config.maxPlies} plies`} variant="outlined" />
-              <Chip label={`${job.config.plyDelayMs}ms / ply`} variant="outlined" />
-              <Chip label={`${job.config.parallelGames} parallel games`} variant="outlined" />
-              <Chip label={`${job.config.workerCount} workers`} variant="outlined" />
-              <Chip label={`${job.config.trainSampleLimit} train samples`} variant="outlined" />
-              <Chip label={`${job.config.trainBatchSize} train batch`} variant="outlined" />
-              <Chip label={`${job.config.replaySampleLimit ?? 0} replay samples`} variant="outlined" />
-            </Stack>
-          )}
-          {job && (
-            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
-              <Chip label={`Iteration: ${job.iteration || 0}`} variant="outlined" />
-              <Chip label={`Games: ${job.totalGames || 0}`} variant="outlined" />
-              <Chip label={`Total left: ${totalGamesRemaining}`} variant="outlined" />
-              <Chip label={`Active: ${job.activeGames?.length || 0}`} variant="outlined" />
-              <Chip label={`Samples: ${job.totalSamples || 0}`} variant="outlined" />
-              <Chip label={`Replay: ${job.replaySamples || 0}`} variant="outlined" />
-              <Chip label={`Loss: ${job.lastLoss || '-'}`} variant="outlined" />
-            </Stack>
-          )}
-          <Typography variant="body2" color="text.secondary">
-            {job?.message || 'No job yet'}
-          </Typography>
-          {job?.storage && (
-            <Typography variant="caption" color="text.secondary">
-              Data: {job.storage.gamesPath} / {job.storage.samplesPath}
-            </Typography>
-          )}
-          {job?.lastCheckpoint && (
-            <Typography variant="caption" color="text.secondary">
-              Checkpoint: {job.lastCheckpoint}
-            </Typography>
-          )}
-        </Stack>
-      </Paper>
     </Stack>
   )
 }
