@@ -163,3 +163,7 @@ unreal-client/Vela/
 
 builds/
 build/
+
+# RL training output
+server/rlTraining/data/
+server/rlTraining/checkpoints/

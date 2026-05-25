@@ -1,73 +1,8 @@
-const { Chess } = require('chess.js')
+const { createModel, saveModel, tf } = require('./modelStore')
+const { playSelfPlayGame } = require('./selfPlayEngine')
+const { saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
 
 let activeJob = null
-
-function randomItem(items) {
-  return items[Math.floor(Math.random() * items.length)]
-}
-
-function createSelfPlayPreview() {
-  const chess = new Chess()
-  return {
-    initialFen: chess.fen(),
-    currentFen: chess.fen(),
-    result: 'in progress',
-    moves: [],
-  }
-}
-
-function appendPreviewMove(game, maxPlies) {
-  const chess = new Chess(game.currentFen || game.initialFen)
-  const legalMoves = chess.moves({ verbose: true })
-
-  if (chess.isGameOver() || !legalMoves.length || game.moves.length >= maxPlies) {
-    return createSelfPlayPreview()
-  }
-
-  const move = randomItem(legalMoves)
-
-  chess.move(move)
-
-  return {
-    ...game,
-    currentFen: chess.fen(),
-    result: chess.isDraw() ? 'draw' : chess.isCheckmate() ? 'checkmate' : 'in progress',
-    moves: [
-      ...game.moves,
-      {
-        ply: game.moves.length + 1,
-        moveNumber: Math.ceil((game.moves.length + 1) / 2),
-        color: move.color === 'w' ? 'white' : 'black',
-        san: move.san,
-        uci: `${move.from}${move.to}${move.promotion || ''}`,
-        fen: chess.fen(),
-      },
-    ],
-  }
-}
-
-function advanceSelfPlayPreview(job) {
-  if (!job.selfPlayGame) {
-    job.selfPlayGame = createSelfPlayPreview()
-  }
-
-  const now = Date.now()
-  const lastMoveAt = job.lastPreviewMoveAt || 0
-  const plyDelayMs = job.config?.plyDelayMs || 25
-  const elapsed = now - lastMoveAt
-
-  if (elapsed < plyDelayMs) {
-    return
-  }
-
-  const movesToAdd = Math.min(20, Math.floor(elapsed / plyDelayMs))
-
-  for (let index = 0; index < movesToAdd; index += 1) {
-    job.selfPlayGame = appendPreviewMove(job.selfPlayGame, job.config?.maxPlies || 400)
-  }
-
-  job.lastPreviewMoveAt = lastMoveAt + movesToAdd * plyDelayMs
-}
 
 function sanitizePositiveInteger(value, fallback, min, max) {
   const number = Number(value)
@@ -86,16 +21,13 @@ function sanitizeTrainingConfig(config = {}) {
     checkpointEvery: sanitizePositiveInteger(config.checkpointEvery, 10, 1, 10000),
     maxPlies: sanitizePositiveInteger(config.maxPlies, 400, 20, 1000),
     plyDelayMs: sanitizePositiveInteger(config.plyDelayMs, 25, 10, 5000),
+    trainSampleLimit: sanitizePositiveInteger(config.trainSampleLimit, 512, 32, 4096),
   }
 }
 
 function publicJob(job) {
   if (!job) {
     return null
-  }
-
-  if (job.status === 'running') {
-    advanceSelfPlayPreview(job)
   }
 
   return {
@@ -106,8 +38,119 @@ function publicJob(job) {
     startedAt: job.startedAt,
     stoppedAt: job.stoppedAt,
     message: job.message,
+    iteration: job.iteration,
+    gamesInIteration: job.gamesInIteration,
+    totalGames: job.totalGames,
+    totalSamples: job.totalSamples,
+    lastLoss: job.lastLoss,
+    lastCheckpoint: job.lastCheckpoint,
+    storage: {
+      gamesPath,
+      samplesPath,
+    },
     selfPlayGame: job.selfPlayGame,
   }
+}
+
+function sampleTrainingRows(samples, limit) {
+  if (samples.length <= limit) {
+    return samples
+  }
+
+  const rows = []
+
+  for (let index = 0; index < limit; index += 1) {
+    rows.push(samples[Math.floor(Math.random() * samples.length)])
+  }
+
+  return rows
+}
+
+async function trainOnSamples(job) {
+  const rows = sampleTrainingRows(job.pendingSamples, job.config.trainSampleLimit)
+
+  if (!rows.length) {
+    return
+  }
+
+  const xs = tf.tensor2d(rows.map((row) => row.state))
+  const policyY = tf.tensor1d(rows.map((row) => row.action))
+  const valueY = tf.tensor2d(rows.map((row) => [row.value]))
+
+  try {
+    const loss = await job.model.fit(xs, [policyY, valueY], {
+      epochs: 1,
+      batchSize: Math.min(64, rows.length),
+      shuffle: true,
+      verbose: 0,
+    })
+
+    const lossValue = Array.isArray(loss.history.loss)
+      ? loss.history.loss[0]
+      : loss.history.loss
+
+    job.lastLoss = Number(lossValue).toFixed(4)
+    job.pendingSamples = []
+  } finally {
+    xs.dispose()
+    policyY.dispose()
+    valueY.dispose()
+  }
+}
+
+async function maybeCheckpoint(job) {
+  if (job.iteration <= 0 || job.iteration % job.config.checkpointEvery !== 0) {
+    return
+  }
+
+  job.lastCheckpoint = await saveModel(job.model, job.id, job.iteration)
+}
+
+async function runTrainingStep(job) {
+  if (job.status !== 'running') {
+    return
+  }
+
+  try {
+    const { game, samples } = playSelfPlayGame(job.model, {
+      maxPlies: job.config.maxPlies,
+      explorationRate: Math.max(0.05, 0.35 - job.iteration / Math.max(job.config.iterations, 1)),
+    })
+
+    await saveGame(game)
+    await saveSamples(samples)
+
+    job.selfPlayGame = game
+    job.pendingSamples.push(...samples)
+    job.gamesInIteration += 1
+    job.totalGames += 1
+    job.totalSamples += samples.length
+    job.message = `Generated game ${job.totalGames}`
+
+    if (job.gamesInIteration >= job.config.gamesPerIteration) {
+      job.message = `Training iteration ${job.iteration + 1}`
+      await trainOnSamples(job)
+      job.iteration += 1
+      job.gamesInIteration = 0
+      await maybeCheckpoint(job)
+    }
+
+    if (job.iteration >= job.config.iterations) {
+      job.status = 'completed'
+      job.stoppedAt = new Date().toISOString()
+      job.message = 'Training completed'
+      await maybeCheckpoint(job)
+      return
+    }
+  } catch (err) {
+    job.status = 'failed'
+    job.stoppedAt = new Date().toISOString()
+    job.message = err.message
+    console.error('RL training failed:', err)
+    return
+  }
+
+  job.timer = setTimeout(() => runTrainingStep(job), job.config.plyDelayMs)
 }
 
 function getTrainingJob() {
@@ -116,7 +159,6 @@ function getTrainingJob() {
 
 function startTrainingJob(config, user) {
   if (activeJob?.status === 'running') {
-    advanceSelfPlayPreview(activeJob)
     return publicJob(activeJob)
   }
 
@@ -133,9 +175,19 @@ function startTrainingJob(config, user) {
     startedAt: new Date().toISOString(),
     stoppedAt: null,
     message: 'Training job started',
-    selfPlayGame: createSelfPlayPreview(),
-    lastPreviewMoveAt: Date.now(),
+    iteration: 0,
+    gamesInIteration: 0,
+    totalGames: 0,
+    totalSamples: 0,
+    lastLoss: null,
+    lastCheckpoint: null,
+    pendingSamples: [],
+    selfPlayGame: null,
+    model: createModel(),
+    timer: null,
   }
+
+  activeJob.timer = setTimeout(() => runTrainingStep(activeJob), 0)
 
   return publicJob(activeJob)
 }
@@ -143,6 +195,10 @@ function startTrainingJob(config, user) {
 function stopTrainingJob(user) {
   if (!activeJob || activeJob.status !== 'running') {
     return publicJob(activeJob)
+  }
+
+  if (activeJob.timer) {
+    clearTimeout(activeJob.timer)
   }
 
   activeJob = {
@@ -158,6 +214,10 @@ function stopTrainingJob(user) {
 function stopAllTrainingJobs(message = 'Stopped') {
   if (!activeJob || activeJob.status !== 'running') {
     return publicJob(activeJob)
+  }
+
+  if (activeJob.timer) {
+    clearTimeout(activeJob.timer)
   }
 
   activeJob = {

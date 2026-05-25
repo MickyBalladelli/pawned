@@ -21,6 +21,7 @@ const defaultConfig = {
   checkpointEvery: 10,
   maxPlies: 400,
   plyDelayMs: 25,
+  trainSampleLimit: 512,
 }
 
 function formatDate(value) {
@@ -262,6 +263,16 @@ function RLTrainingPanel({ authToken, themeMode }) {
               fullWidth
               disabled={isRunning || saving}
             />
+            <TextField
+              label="Train samples"
+              type="number"
+              size="small"
+              value={config.trainSampleLimit}
+              onChange={(event) => updateConfig('trainSampleLimit', event.target.value)}
+              inputProps={{ min: 32 }}
+              fullWidth
+              disabled={isRunning || saving}
+            />
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -312,11 +323,30 @@ function RLTrainingPanel({ authToken, themeMode }) {
               <Chip label={`${job.config.checkpointEvery} checkpoint`} variant="outlined" />
               <Chip label={`${job.config.maxPlies} plies`} variant="outlined" />
               <Chip label={`${job.config.plyDelayMs}ms / ply`} variant="outlined" />
+              <Chip label={`${job.config.trainSampleLimit} train samples`} variant="outlined" />
+            </Stack>
+          )}
+          {job && (
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+              <Chip label={`Iteration: ${job.iteration || 0}`} variant="outlined" />
+              <Chip label={`Games: ${job.totalGames || 0}`} variant="outlined" />
+              <Chip label={`Samples: ${job.totalSamples || 0}`} variant="outlined" />
+              <Chip label={`Loss: ${job.lastLoss || '-'}`} variant="outlined" />
             </Stack>
           )}
           <Typography variant="body2" color="text.secondary">
             {job?.message || 'No job yet'}
           </Typography>
+          {job?.storage && (
+            <Typography variant="caption" color="text.secondary">
+              Data: {job.storage.gamesPath} / {job.storage.samplesPath}
+            </Typography>
+          )}
+          {job?.lastCheckpoint && (
+            <Typography variant="caption" color="text.secondary">
+              Checkpoint: {job.lastCheckpoint}
+            </Typography>
+          )}
         </Stack>
       </Paper>
 
