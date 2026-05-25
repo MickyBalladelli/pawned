@@ -41,6 +41,8 @@ async function initializeDatabase() {
         username VARCHAR(50) UNIQUE NOT NULL,
         password_hash TEXT,
         is_admin BOOLEAN DEFAULT FALSE,
+        role VARCHAR(20) NOT NULL DEFAULT 'user',
+        is_blocked BOOLEAN DEFAULT FALSE,
         is_verified BOOLEAN DEFAULT TRUE,
         verification_token TEXT UNIQUE,
         verification_token_expires_at TIMESTAMP,
@@ -51,6 +53,8 @@ async function initializeDatabase() {
     `);
 
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE')
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'")
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT UNIQUE')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP')
@@ -58,6 +62,9 @@ async function initializeDatabase() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_channel_presence BOOLEAN DEFAULT TRUE')
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL')
+    await pool.query("UPDATE users SET role = 'admin' WHERE is_admin = true AND role <> 'admin'")
+    await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'moderator', 'admin')")
+    await pool.query('UPDATE users SET is_blocked = false WHERE is_blocked IS NULL')
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL')
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_read_only BOOLEAN DEFAULT FALSE')
@@ -104,13 +111,14 @@ async function initializeDatabase() {
 
     await pool.query(
       `
-        INSERT INTO users (username, password_hash, is_admin) VALUES
-        ('Admin', $1, true),
-        ('Player1', NULL, false),
-        ('Player2', NULL, false),
-        ('Player3', NULL, false)
+        INSERT INTO users (username, password_hash, is_admin, role) VALUES
+        ('Admin', $1, true, 'admin'),
+        ('Player1', NULL, false, 'user'),
+        ('Player2', NULL, false, 'user'),
+        ('Player3', NULL, false, 'user')
         ON CONFLICT (username) DO UPDATE
-        SET password_hash = COALESCE(users.password_hash, EXCLUDED.password_hash);
+        SET password_hash = COALESCE(users.password_hash, EXCLUDED.password_hash),
+            role = CASE WHEN users.is_admin THEN 'admin' ELSE users.role END;
       `,
       [defaultAdminPasswordHash]
     );

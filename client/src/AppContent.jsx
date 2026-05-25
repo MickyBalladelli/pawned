@@ -46,7 +46,8 @@ import {
   Search,
   Send,
   Settings,
-  EditOff
+  EditOff,
+  People
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
 import ChannelSettingsToggles from './ChannelSettingsToggles'
@@ -55,6 +56,7 @@ import ChannelMembershipDialog from './ChannelMembershipDialog'
 import ChessIcon from './ChessIcon'
 import ChessPage from './ChessPage'
 import TrainingPage from './TrainingPage'
+import UsersPage from './UsersPage'
 import { requestJson } from './requestJson'
 
 const emptyForm = {
@@ -138,7 +140,7 @@ function getInitialActiveView() {
   }
 
   const storedView = localStorage.getItem(activeViewStorageKey)
-  return ['chat', 'chess', 'training'].includes(storedView) ? storedView : 'chat'
+  return ['chat', 'chess', 'training', 'users'].includes(storedView) ? storedView : 'chat'
 }
 
 function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, onUserUpdated }) {
@@ -173,6 +175,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     [channels, selectedChannelId],
   )
   const isAdmin = Boolean(authUser?.is_admin)
+  const isModerator = Boolean(isAdmin || authUser?.role === 'moderator')
   const canUseSelectedChannel = Boolean(selectedChannel?.can_access)
   const canWriteSelectedChannel = Boolean(
     canUseSelectedChannel && (!selectedChannel?.is_read_only || isAdmin),
@@ -199,6 +202,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     return authToken ? { Authorization: `Bearer ${authToken}` } : {}
   }, [authToken])
   const authHeaders = useMemo(() => getAuthHeaders(), [getAuthHeaders])
+
+  useEffect(() => {
+    if (activeView === 'users' && !isAdmin) {
+      setActiveView('chat')
+      localStorage.setItem(activeViewStorageKey, 'chat')
+    }
+  }, [activeView, isAdmin])
 
   function handleActiveViewChange(event, value) {
     if (!value) {
@@ -388,6 +398,19 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           loadChannels()
         })
 
+        liveSocket.on('userUpdated', (user) => {
+          if (Number(user.id) !== Number(authUser.id)) {
+            return
+          }
+
+          if (user.is_blocked) {
+            onLogout()
+            return
+          }
+
+          onUserUpdated(user)
+        })
+
         liveSocket.on('channelMembershipRemoved', () => {
           setNotice('You were removed from a private channel')
           setMessages([])
@@ -408,7 +431,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       setSocket(null)
       setSocketConnected(false)
     }
-  }, [authToken, authUser.show_channel_presence, loadChannels])
+  }, [authToken, authUser.id, authUser.show_channel_presence, loadChannels, onLogout, onUserUpdated])
 
   useEffect(() => {
     const load = Promise.resolve().then(() => loadMessages(selectedChannelId))
@@ -614,6 +637,26 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     }
   }
 
+  async function handleBlockUser(userId) {
+    if (!isModerator || !userId || Number(userId) === Number(authUser.id)) {
+      return
+    }
+
+    setError(null)
+    setNotice(null)
+
+    try {
+      const data = await requestJson(`/api/users/${userId}/block`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ blocked: true }),
+      })
+      setNotice(data.message)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+
   async function handleRequestMembership(channel) {
     setRequestingChannelId(channel.id)
     setError(null)
@@ -741,6 +784,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
             <Tab icon={<ChessIcon />} iconPosition="start" value="chess" label="Chess" />
             <Tab icon={<School />} iconPosition="start" value="training" label="Training" />
+            {isAdmin && <Tab icon={<People />} iconPosition="start" value="users" label="Users" />}
           </Tabs>
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
             
@@ -750,7 +794,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               color="text.primary"
               sx={{ fontSize: { xs: 30, md: 34 }, fontWeight: 900, mb: 0 }}
             >
-              {activeView === 'chat' ? (isAdmin ? 'Channel Admin' : 'Channels') : activeView === 'training' ? 'Training' : 'Chess'}
+              {activeView === 'chat'
+                ? (isAdmin ? 'Channel Admin' : 'Channels')
+                : activeView === 'training'
+                  ? 'Training'
+                  : activeView === 'users'
+                    ? 'Users'
+                    : 'Chess'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -829,6 +879,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           <>
           {activeView === 'training' ? (
             <TrainingPage authToken={authToken} authUser={authUser} themeMode={themeMode} />
+          ) : activeView === 'users' ? (
+            <UsersPage
+              authToken={authToken}
+              authUser={authUser}
+              onError={setError}
+              onNotice={setNotice}
+            />
           ) : activeView === 'chess' ? (
             <ChessPage
               authToken={authToken}
@@ -1125,6 +1182,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                     messages={messages}
                     endRef={messagesEndRef}
                     onDeleteMessage={handleDeleteMessage}
+                    onBlockUser={handleBlockUser}
                   />
                 )}
                 </Box>

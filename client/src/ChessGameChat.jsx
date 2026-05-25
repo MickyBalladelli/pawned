@@ -128,6 +128,18 @@ function ChessGameChat({ authHeaders, authUser, game, socket, socketConnected, o
     }
   }
 
+  async function blockUser(userId) {
+    try {
+      await requestJson(`/api/users/${userId}/block`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ blocked: true }),
+      })
+    } catch (err) {
+      onError(err.message)
+    }
+  }
+
   if (!channelId) {
     return null
   }
@@ -154,6 +166,7 @@ function ChessGameChat({ authHeaders, authUser, game, socket, socketConnected, o
             messages={messages}
             endRef={endRef}
             onDeleteMessage={deleteMessage}
+            onBlockUser={blockUser}
           />
         )}
       </Box>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Avatar, Box, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material'
+import { Avatar, Box, Chip, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material'
+import { AdminPanelSettings, Shield } from '@mui/icons-material'
 
 const groupWindowMs = 5 * 60 * 1000
 
@@ -50,11 +51,37 @@ function shouldShowHeader(message, previousMessage) {
   return messageDate - previousDate > groupWindowMs
 }
 
-function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
+function getMessageRole(message) {
+  if (message.role) {
+    return message.role
+  }
+
+  return message.is_admin ? 'admin' : 'user'
+}
+
+function canModerateUser(authUser, message) {
+  const authRole = authUser?.role || (authUser?.is_admin ? 'admin' : 'user')
+  const messageRole = getMessageRole(message)
+
+  if (Number(message.user_id) === Number(authUser.id)) {
+    return false
+  }
+
+  if (authRole === 'admin') {
+    return true
+  }
+
+  return authRole === 'moderator' && messageRole === 'user'
+}
+
+function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlockUser }) {
   const [messageMenu, setMessageMenu] = useState(null)
 
   function openMessageMenu(event, message) {
-    if (message.user_id !== authUser.id && !authUser.is_admin) {
+    const canDelete = message.user_id === authUser.id || authUser.is_admin || authUser.role === 'moderator'
+    const canBlock = Boolean(onBlockUser && canModerateUser(authUser, message))
+
+    if (!canDelete && !canBlock) {
       return
     }
 
@@ -63,6 +90,8 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
       mouseX: event.clientX + 2,
       mouseY: event.clientY - 6,
       message,
+      canDelete,
+      canBlock,
     })
   }
 
@@ -76,6 +105,15 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
 
     if (message) {
       await onDeleteMessage(message)
+    }
+  }
+
+  async function handleBlockUser() {
+    const message = messageMenu?.message
+    closeMessageMenu()
+
+    if (message) {
+      await onBlockUser(message.user_id)
     }
   }
 
@@ -120,6 +158,9 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
         }
 
         const hasHeader = shouldShowHeader(message, messages[index - 1])
+        const role = getMessageRole(message)
+        const isAdminMessage = role === 'admin'
+        const isModeratorMessage = role === 'moderator'
 
         return (
           <Box
@@ -134,7 +175,7 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
               pb: 0.125,
               textAlign: 'left',
               '&:hover': {
-                bgcolor: 'action.hover',
+                bgcolor: isAdminMessage ? 'rgba(211, 47, 47, 0.16)' : isModeratorMessage ? 'rgba(237, 108, 2, 0.14)' : 'action.hover',
               },
               '&:hover .message-time': {
                 opacity: 1,
@@ -151,6 +192,8 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
                   fontSize: 14,
                   fontWeight: 800,
                   bgcolor: 'primary.main',
+                  border: isAdminMessage ? '2px solid' : isModeratorMessage ? '1px solid' : 0,
+                  borderColor: isAdminMessage ? 'error.main' : 'warning.main',
                 }}
               >
                 {getInitial(message.username)}
@@ -183,13 +226,31 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
                     component="span"
                     sx={{
                       fontSize: 14,
-                      fontWeight: 800,
+                      fontWeight: isAdminMessage ? 950 : 800,
                       lineHeight: 1.25,
-                      color: 'text.primary',
+                      color: isAdminMessage ? 'error.main' : isModeratorMessage ? 'warning.main' : 'text.primary',
                     }}
                   >
                     {message.username}
                   </Typography>
+                  {isAdminMessage && (
+                    <Chip
+                      size="small"
+                      icon={<AdminPanelSettings />}
+                      label="admin"
+                      color="error"
+                      sx={{ height: 20, fontWeight: 900 }}
+                    />
+                  )}
+                  {isModeratorMessage && (
+                    <Chip
+                      size="small"
+                      icon={<Shield />}
+                      label="mod"
+                      color="warning"
+                      sx={{ height: 20, fontWeight: 900 }}
+                    />
+                  )}
                   <Tooltip title={formatFullTime(message.created_at)}>
                     <Typography
                       component="span"
@@ -209,6 +270,7 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
                   fontSize: 14,
                   lineHeight: 1.35,
                   color: 'text.primary',
+                  fontWeight: isAdminMessage ? 650 : 400,
                 }}
               >
                 {message.content}
@@ -228,7 +290,8 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage }) {
             : undefined
         }
       >
-        <MenuItem onClick={handleDeleteMessage}>Delete message</MenuItem>
+        {messageMenu?.canDelete && <MenuItem onClick={handleDeleteMessage}>Delete message</MenuItem>}
+        {messageMenu?.canBlock && <MenuItem onClick={handleBlockUser}>Block user</MenuItem>}
       </Menu>
     </Box>
   )

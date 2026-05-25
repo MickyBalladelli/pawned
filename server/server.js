@@ -44,6 +44,25 @@ const mailTransport = nodemailer.createTransport({
 })
 
 const channelNameConflictError = 'Channel name is already taken'
+const userSelectColumns = `
+  id,
+  username,
+  email,
+  is_admin,
+  role,
+  is_blocked,
+  avatar_url,
+  show_channel_presence,
+  show_chess_opening
+`
+
+function isAdminUser(user) {
+  return Boolean(user?.is_admin || user?.role === 'admin')
+}
+
+function isModeratorUser(user) {
+  return Boolean(isAdminUser(user) || user?.role === 'moderator')
+}
 
 function getAuthToken(req) {
   const header = req.get('Authorization') || '';
@@ -156,7 +175,7 @@ async function authenticate(req, res, next) {
 
   try {
     const result = await pool.query(
-      'SELECT id, username, email, is_admin, avatar_url, show_channel_presence, show_chess_opening FROM users WHERE id = $1 AND is_verified = true',
+      `SELECT ${userSelectColumns} FROM users WHERE id = $1 AND is_verified = true AND is_blocked = false`,
       [session.userId]
     );
 
@@ -179,11 +198,19 @@ async function authenticate(req, res, next) {
 }
 
 function requireAdmin(req, res, next) {
-  if (!req.user?.is_admin) {
+  if (!isAdminUser(req.user)) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
   next();
+}
+
+function requireModerator(req, res, next) {
+  if (!isModeratorUser(req.user)) {
+    return res.status(403).json({ error: 'Moderator access required' })
+  }
+
+  next()
 }
 
 async function getChannelAccess(channelId, user) {
@@ -216,8 +243,8 @@ async function getChannelAccess(channelId, user) {
 
   const isOwner = Number(channel.owner_user_id) === Number(user.id)
   const isMember = Boolean(channel.membership_status)
-  const canManage = Boolean(user.is_admin || isOwner)
-  const canAccess = Boolean(user.is_admin || !channel.is_private || isOwner || isMember)
+  const canManage = Boolean(isAdminUser(user) || isOwner)
+  const canAccess = Boolean(isAdminUser(user) || !channel.is_private || isOwner || isMember)
 
   return {
     channel,
@@ -312,6 +339,8 @@ app.post('/api/auth/login', async (req, res) => {
                username,
                password_hash,
                is_admin,
+               role,
+               is_blocked,
                is_verified,
                email,
                avatar_url,
@@ -329,6 +358,10 @@ app.post('/api/auth/login', async (req, res) => {
 
     if (!user || !passwordMatches(password, user.password_hash)) {
       return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    if (user.is_blocked) {
+      return res.status(403).json({ error: 'Account blocked' })
     }
 
     if (!user.is_verified) {
@@ -368,6 +401,8 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username,
         email: user.email,
         is_admin: user.is_admin,
+        role: user.role,
+        is_blocked: user.is_blocked,
         avatar_url: user.avatar_url,
         show_channel_presence: user.show_channel_presence,
         show_chess_opening: user.show_chess_opening,
@@ -598,7 +633,7 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
             show_channel_presence = $4,
             show_chess_opening = $5
         WHERE id = $6
-        RETURNING id, username, email, is_admin, avatar_url, show_channel_presence, show_chess_opening
+        RETURNING id, username, email, is_admin, role, is_blocked, avatar_url, show_channel_presence, show_chess_opening
       `,
       [email, passwordHash, avatarUrl, showChannelPresence, showChessOpening, req.user.id]
     )
@@ -611,6 +646,116 @@ app.put('/api/auth/settings', authenticate, async (req, res) => {
 
     console.error('Error updating settings:', err)
     res.status(500).json({ error: 'Failed to update settings' })
+  }
+})
+
+app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+        SELECT id,
+               username,
+               email,
+               is_admin,
+               role,
+               is_blocked,
+               is_verified,
+               avatar_url,
+               created_at
+        FROM users
+        ORDER BY is_blocked ASC,
+                 CASE role WHEN 'admin' THEN 0 WHEN 'moderator' THEN 1 ELSE 2 END,
+                 LOWER(username) ASC
+      `
+    )
+
+    res.json(result.rows)
+  } catch (err) {
+    console.error('Error fetching users:', err)
+    res.status(500).json({ error: 'Failed to fetch users' })
+  }
+})
+
+app.put('/api/users/:id/role', authenticate, requireAdmin, async (req, res) => {
+  const role = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : ''
+
+  if (!['user', 'moderator', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Role must be user, moderator, or admin' })
+  }
+
+  if (Number(req.params.id) === Number(req.user.id) && role !== 'admin') {
+    return res.status(400).json({ error: 'You cannot remove your own admin role' })
+  }
+
+  try {
+    const result = await pool.query(
+      `
+        UPDATE users
+        SET role = $1,
+            is_admin = $2
+        WHERE id = $3
+        RETURNING id, username, email, is_admin, role, is_blocked, is_verified, avatar_url, created_at
+      `,
+      [role, role === 'admin', req.params.id]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    io.to(`user:${req.params.id}`).emit('userUpdated', result.rows[0])
+    res.json({ user: result.rows[0], message: 'Role updated' })
+  } catch (err) {
+    console.error('Error updating user role:', err)
+    res.status(500).json({ error: 'Failed to update user role' })
+  }
+})
+
+app.put('/api/users/:id/block', authenticate, requireModerator, async (req, res) => {
+  const blocked = req.body.blocked !== false
+
+  if (Number(req.params.id) === Number(req.user.id)) {
+    return res.status(400).json({ error: 'You cannot block yourself' })
+  }
+
+  try {
+    const targetResult = await pool.query(
+      'SELECT id, role, is_admin FROM users WHERE id = $1',
+      [req.params.id]
+    )
+    const target = targetResult.rows[0]
+
+    if (!target) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    if (!isAdminUser(req.user) && isModeratorUser(target)) {
+      return res.status(403).json({ error: 'Moderators can only block regular users' })
+    }
+
+    const result = await pool.query(
+      `
+        UPDATE users
+        SET is_blocked = $1
+        WHERE id = $2
+        RETURNING id, username, email, is_admin, role, is_blocked, is_verified, avatar_url, created_at
+      `,
+      [blocked, req.params.id]
+    )
+
+    if (blocked) {
+      for (const [token, session] of sessions.entries()) {
+        if (Number(session.userId) === Number(req.params.id)) {
+          sessions.delete(token)
+        }
+      }
+    }
+
+    io.to(`user:${req.params.id}`).emit('userUpdated', result.rows[0])
+    res.json({ user: result.rows[0], message: blocked ? 'User blocked' : 'User unblocked' })
+  } catch (err) {
+    console.error('Error updating user block:', err)
+    res.status(500).json({ error: 'Failed to update user block' })
   }
 })
 
@@ -648,9 +793,9 @@ app.get('/api/channels', authenticate, async (req, res) => {
 
     res.json(result.rows.map((channel) => {
       const isOwner = Number(channel.owner_user_id) === Number(req.user.id)
-      const canManage = Boolean(req.user.is_admin || isOwner)
+      const canManage = Boolean(isAdminUser(req.user) || isOwner)
       const canAccess = Boolean(
-        req.user.is_admin ||
+        isAdminUser(req.user) ||
         !channel.is_private ||
         isOwner ||
         channel.membership_status === 'active'
@@ -675,8 +820,8 @@ app.get('/api/channels', authenticate, async (req, res) => {
 app.post('/api/channels', authenticate, async (req, res) => {
   const { name, description, is_private, is_read_only } = req.body
   const trimmedName = typeof name === 'string' ? name.trim() : ''
-  const privateChannel = req.user.is_admin ? Boolean(is_private) : true
-  const readOnlyChannel = req.user.is_admin ? Boolean(is_read_only) : false
+  const privateChannel = isAdminUser(req.user) ? Boolean(is_private) : true
+  const readOnlyChannel = isAdminUser(req.user) ? Boolean(is_read_only) : false
 
   if (!trimmedName) {
     return res.status(400).json({ error: 'Channel name is required' });
@@ -753,8 +898,8 @@ app.put('/api/channels/:id', authenticate, requireChannelManager, async (req, re
   const { id } = req.params
   const { name, description, is_private, is_read_only } = req.body
   const trimmedName = typeof name === 'string' ? name.trim() : ''
-  const privateChannel = req.user.is_admin ? Boolean(is_private) : true
-  const readOnlyChannel = req.user.is_admin
+  const privateChannel = isAdminUser(req.user) ? Boolean(is_private) : true
+  const readOnlyChannel = isAdminUser(req.user)
     ? Boolean(is_read_only)
     : Boolean(req.channelAccess.channel.is_read_only)
 
@@ -1010,7 +1155,7 @@ app.get('/api/channels/:id/messages', authenticate, requireChannelAccess, async 
   
   try {
     const result = await pool.query(
-      'SELECT m.*, u.username, u.avatar_url FROM messages m JOIN users u ON m.user_id = u.id WHERE m.channel_id = $1 ORDER BY m.created_at DESC LIMIT $2',
+      'SELECT m.*, u.username, u.avatar_url, u.is_admin, u.role, u.is_blocked FROM messages m JOIN users u ON m.user_id = u.id WHERE m.channel_id = $1 ORDER BY m.created_at DESC LIMIT $2',
       [id, limit]
     );
     res.json(result.rows);
@@ -1034,7 +1179,7 @@ app.delete('/api/messages/:id', authenticate, async (req, res) => {
       return res.status(404).json({ error: 'Message not found' })
     }
 
-    if (message.user_id !== req.user.id && !req.user.is_admin) {
+    if (message.user_id !== req.user.id && !isModeratorUser(req.user)) {
       return res.status(403).json({ error: 'You can only delete your own messages' })
     }
 
@@ -1060,11 +1205,33 @@ async function getUserFromToken(token) {
   }
 
   const result = await pool.query(
-    'SELECT id, username, email, is_admin, avatar_url, show_channel_presence, show_chess_opening FROM users WHERE id = $1 AND is_verified = true',
+    `SELECT ${userSelectColumns} FROM users WHERE id = $1 AND is_verified = true AND is_blocked = false`,
     [session.userId]
   )
 
   return result.rows[0] || null
+}
+
+async function refreshSocketUser(socket) {
+  const result = await pool.query(
+    `SELECT ${userSelectColumns} FROM users WHERE id = $1 AND is_verified = true AND is_blocked = false`,
+    [socket.data.user.id]
+  )
+  const user = result.rows[0]
+
+  if (!user) {
+    socket.emit('chatError', 'Account blocked')
+    socket.disconnect(true)
+    return null
+  }
+
+  socket.data.user = user
+  if (isAdminUser(user)) {
+    socket.join('admins')
+  } else {
+    socket.leave('admins')
+  }
+  return user
 }
 
 // Socket.IO connection handling
@@ -1084,7 +1251,7 @@ io.on('connection', async (socket) => {
   socket.data.channelIds = new Set()
   socket.join(`user:${user.id}`)
 
-  if (user.is_admin) {
+  if (isAdminUser(user)) {
     socket.join('admins')
   }
 
@@ -1093,6 +1260,13 @@ io.on('connection', async (socket) => {
   // Join a channel
   socket.on('joinChannel', async (channelId, callback) => {
     try {
+      const liveUser = await refreshSocketUser(socket)
+
+      if (!liveUser) {
+        callback?.({ error: 'Account blocked' })
+        return
+      }
+
       const access = await getChannelAccess(channelId, socket.data.user)
 
       if (!access || !access.canAccess) {
@@ -1150,6 +1324,13 @@ io.on('connection', async (socket) => {
     }
     
     try {
+      const liveUser = await refreshSocketUser(socket)
+
+      if (!liveUser) {
+        callback?.({ error: 'Account blocked' })
+        return
+      }
+
       const access = await getChannelAccess(channelId, socket.data.user)
 
       if (!access) {
@@ -1162,7 +1343,7 @@ io.on('connection', async (socket) => {
         return
       }
 
-      if (access.channel.is_read_only && !socket.data.user.is_admin) {
+      if (access.channel.is_read_only && !isAdminUser(socket.data.user)) {
         callback?.({ error: 'Channel is read only' })
         return
       }
@@ -1185,7 +1366,7 @@ io.on('connection', async (socket) => {
       
       const messageData = result.rows[0]
       const messageResult = await pool.query(
-        'SELECT m.*, u.username, u.avatar_url FROM messages m JOIN users u ON m.user_id = u.id WHERE m.id = $1',
+        'SELECT m.*, u.username, u.avatar_url, u.is_admin, u.role, u.is_blocked FROM messages m JOIN users u ON m.user_id = u.id WHERE m.id = $1',
         [messageData.id]
       )
       const messageWithUser = messageResult.rows[0]
@@ -1244,6 +1425,8 @@ async function createTables() {
         username VARCHAR(50) UNIQUE NOT NULL,
         password_hash TEXT,
         is_admin BOOLEAN DEFAULT FALSE,
+        role VARCHAR(20) NOT NULL DEFAULT 'user',
+        is_blocked BOOLEAN DEFAULT FALSE,
         is_verified BOOLEAN DEFAULT TRUE,
         verification_token TEXT UNIQUE,
         verification_token_expires_at TIMESTAMP,
@@ -1256,6 +1439,8 @@ async function createTables() {
     `);
 
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255) UNIQUE');
+    await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'");
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT TRUE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token TEXT UNIQUE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires_at TIMESTAMP');
@@ -1264,6 +1449,9 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_channel_presence BOOLEAN DEFAULT TRUE');
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_chess_opening BOOLEAN DEFAULT TRUE');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
+    await pool.query("UPDATE users SET role = 'admin' WHERE is_admin = true AND role <> 'admin'");
+    await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'moderator', 'admin')");
+    await pool.query('UPDATE users SET is_blocked = false WHERE is_blocked IS NULL');
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL');
     await pool.query('UPDATE users SET show_chess_opening = true WHERE show_chess_opening IS NULL');
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
@@ -1274,10 +1462,12 @@ async function createTables() {
 
     await pool.query(
       `
-        INSERT INTO users (username, password_hash, is_admin)
-        VALUES ('Admin', $1, true)
+        INSERT INTO users (username, password_hash, is_admin, role)
+        VALUES ('Admin', $1, true, 'admin')
         ON CONFLICT (username) DO UPDATE
-        SET password_hash = COALESCE(users.password_hash, EXCLUDED.password_hash)
+        SET password_hash = COALESCE(users.password_hash, EXCLUDED.password_hash),
+            is_admin = true,
+            role = 'admin'
       `,
       [defaultAdminPasswordHash]
     );
