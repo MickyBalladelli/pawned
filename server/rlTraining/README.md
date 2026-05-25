@@ -37,6 +37,7 @@ Training terms:
 - Workers: number of trainer worker threads used for chess simulation.
 - Train samples: maximum move samples used in one train step.
 - Train batch: TensorFlow batch size used inside one train step.
+- Replay samples: saved move samples loaded from disk and mixed into train steps.
 - Game: one self-play chess game.
 - Sample: one training row from one position. It stores board state, chosen move, and final reward.
 - Loss: current model training error. Lower usually better, but not perfect proof.

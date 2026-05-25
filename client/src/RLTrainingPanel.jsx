@@ -25,6 +25,7 @@ const defaultConfig = {
   workerCount: 4,
   trainSampleLimit: 512,
   trainBatchSize: 256,
+  replaySampleLimit: 50000,
 }
 const trainingConfigStorageKey = 'vela.rlTraining.config'
 
@@ -374,6 +375,23 @@ function RLTrainingPanel({
             />
           </Stack>
 
+          <Stack
+            direction={{ xs: 'column', md: 'row' }}
+            spacing={1.5}
+            sx={{ alignItems: 'stretch' }}
+          >
+            <TextField
+              label="Replay samples"
+              type="number"
+              size="small"
+              value={config.replaySampleLimit}
+              onChange={(event) => updateConfig('replaySampleLimit', event.target.value)}
+              inputProps={{ min: 0 }}
+              fullWidth
+              disabled={isRunning || saving}
+            />
+          </Stack>
+
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
             <Button
               variant="contained"
@@ -419,14 +437,14 @@ function RLTrainingPanel({
             Current job
           </Typography>
           <Divider />
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
             <Chip label={`ID: ${job?.id || '-'}`} variant="outlined" />
             <Chip label={`Started: ${formatDate(job?.startedAt)}`} variant="outlined" />
             <Chip label={`Time: ${formatDuration(job?.elapsedMs)}`} variant="outlined" />
             <Chip label={`By: ${job?.startedBy?.username || '-'}`} variant="outlined" />
           </Stack>
           {job?.config && (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
               <Chip label={`${job.config.iterations} iterations`} variant="outlined" />
               <Chip label={`${job.config.gamesPerIteration} games`} variant="outlined" />
               <Chip label={`${job.config.checkpointEvery} checkpoint`} variant="outlined" />
@@ -436,14 +454,16 @@ function RLTrainingPanel({
               <Chip label={`${job.config.workerCount} workers`} variant="outlined" />
               <Chip label={`${job.config.trainSampleLimit} train samples`} variant="outlined" />
               <Chip label={`${job.config.trainBatchSize} train batch`} variant="outlined" />
+              <Chip label={`${job.config.replaySampleLimit ?? 0} replay samples`} variant="outlined" />
             </Stack>
           )}
           {job && (
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
               <Chip label={`Iteration: ${job.iteration || 0}`} variant="outlined" />
               <Chip label={`Games: ${job.totalGames || 0}`} variant="outlined" />
               <Chip label={`Active: ${job.activeGames?.length || 0}`} variant="outlined" />
               <Chip label={`Samples: ${job.totalSamples || 0}`} variant="outlined" />
+              <Chip label={`Replay: ${job.replaySamples || 0}`} variant="outlined" />
               <Chip label={`Loss: ${job.lastLoss || '-'}`} variant="outlined" />
             </Stack>
           )}

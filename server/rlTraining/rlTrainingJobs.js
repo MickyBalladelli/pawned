@@ -1,5 +1,5 @@
 const { createModel, saveModel, tf } = require('./modelStore')
-const { saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
+const { loadReplaySamples, saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
 const { TrainingWorkerPool } = require('./workerPool')
 
 let activeJob = null
@@ -25,6 +25,7 @@ function sanitizeTrainingConfig(config = {}) {
     workerCount: sanitizePositiveInteger(config.workerCount, 4, 1, 32),
     trainSampleLimit: sanitizePositiveInteger(config.trainSampleLimit, 512, 32, 4096),
     trainBatchSize: sanitizePositiveInteger(config.trainBatchSize, 256, 16, 2048),
+    replaySampleLimit: sanitizePositiveInteger(config.replaySampleLimit, 50000, 0, 250000),
   }
 }
 
@@ -49,6 +50,7 @@ function publicJob(job, options = {}) {
     gamesInIteration: job.gamesInIteration,
     totalGames: job.totalGames,
     totalSamples: job.totalSamples,
+    replaySamples: job.replaySamples?.length || 0,
     lastLoss: job.lastLoss,
     lastCheckpoint: job.lastCheckpoint,
     storage: {
@@ -96,8 +98,26 @@ function sampleTrainingRows(samples, limit) {
   return rows
 }
 
+function buildTrainingRows(job) {
+  const limit = job.config.trainSampleLimit
+  const replaySamples = job.replaySamples || []
+
+  if (!replaySamples.length) {
+    return sampleTrainingRows(job.pendingSamples, limit)
+  }
+
+  const pendingLimit = Math.min(job.pendingSamples.length, Math.ceil(limit / 2))
+  const replayLimit = limit - pendingLimit
+  const rows = [
+    ...sampleTrainingRows(job.pendingSamples, pendingLimit),
+    ...sampleTrainingRows(replaySamples, replayLimit),
+  ]
+
+  return sampleTrainingRows(rows, limit)
+}
+
 async function trainOnSamples(job) {
-  const rows = sampleTrainingRows(job.pendingSamples, job.config.trainSampleLimit)
+  const rows = buildTrainingRows(job)
 
   if (!rows.length) {
     return
@@ -242,7 +262,7 @@ async function runTrainingStep(job) {
       job.message = `Training iteration ${job.iteration + 1}`
       await trainOnSamples(job)
       job.iteration += 1
-      job.gamesInIteration = 0
+      job.gamesInIteration -= job.config.gamesPerIteration
       await maybeCheckpoint(job)
     }
 
@@ -276,6 +296,7 @@ async function startTrainingJob(config, user) {
   }
 
   const trainingConfig = sanitizeTrainingConfig(config)
+  const replaySamples = await loadReplaySamples(trainingConfig.replaySampleLimit)
 
   activeJob = {
     id: `rl-${Date.now()}`,
@@ -295,6 +316,7 @@ async function startTrainingJob(config, user) {
     lastLoss: null,
     lastCheckpoint: null,
     pendingSamples: [],
+    replaySamples,
     selfPlayGame: null,
     activeGames: [],
     completedGames: [],
