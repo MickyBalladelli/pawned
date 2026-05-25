@@ -16,6 +16,7 @@ Done now:
 12. Send compact active-game summaries to UI and full moves only for selected game.
 13. Run chess simulation in trainer worker threads.
 14. Store generated records as length-prefixed binary.
+15. Load the latest checkpoint when a new training job starts.
 
 Runtime persistence:
 
@@ -82,9 +83,8 @@ Max plies: 80
 Still needed for strong play:
 
 1. Replace random exploration with MCTS.
-2. Load best checkpoint on server start.
-3. Evaluate new checkpoints against old checkpoints before promotion.
-4. Add checkpoint browser and delete/export controls.
-5. Add worker thread/process pool inside trainer for CPU-heavy scaling.
-6. Persist and restore active job state after trainer restart.
-7. Add tools to inspect binary training files.
+2. Evaluate new checkpoints against old checkpoints before promotion.
+3. Add checkpoint browser and delete/export controls.
+4. Add worker thread/process pool inside trainer for CPU-heavy scaling.
+5. Persist and restore active job state after trainer restart.
+6. Add tools to inspect binary training files.

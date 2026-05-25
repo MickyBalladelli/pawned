@@ -1,4 +1,4 @@
-const { createModel, saveModel, tf } = require('./modelStore')
+const { createOrLoadModel, saveModel, tf } = require('./modelStore')
 const { loadReplaySamples, saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
 const { TrainingWorkerPool } = require('./workerPool')
 
@@ -52,6 +52,7 @@ function publicJob(job, options = {}) {
     totalSamples: job.totalSamples,
     replaySamples: job.replaySamples?.length || 0,
     lastLoss: job.lastLoss,
+    startingCheckpoint: job.startingCheckpoint,
     lastCheckpoint: job.lastCheckpoint,
     storage: {
       gamesPath,
@@ -324,6 +325,7 @@ async function startTrainingJob(config, user) {
 
   const trainingConfig = sanitizeTrainingConfig(config)
   const replaySamples = await loadReplaySamples(trainingConfig.replaySampleLimit)
+  const { model, checkpointPath } = await createOrLoadModel()
 
   activeJob = {
     id: `rl-${Date.now()}`,
@@ -335,19 +337,20 @@ async function startTrainingJob(config, user) {
     },
     startedAt: new Date().toISOString(),
     stoppedAt: null,
-    message: 'Training job started',
+    message: checkpointPath ? 'Training job started from latest checkpoint' : 'Training job started',
     iteration: 0,
     gamesInIteration: 0,
     totalGames: 0,
     totalSamples: 0,
     lastLoss: null,
+    startingCheckpoint: checkpointPath,
     lastCheckpoint: null,
     pendingSamples: [],
     replaySamples,
     selfPlayGame: null,
     activeGames: [],
     completedGames: [],
-    model: createModel(),
+    model,
     workerPool: new TrainingWorkerPool({
       parallelGames: trainingConfig.parallelGames,
       workerCount: trainingConfig.workerCount,

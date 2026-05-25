@@ -105,6 +105,11 @@ function RLTrainingCurrentJob({ job, totalGamesRemaining }) {
                 Data: {job.storage.gamesPath} / {job.storage.samplesPath}
               </Typography>
             )}
+            {job?.startingCheckpoint && (
+              <Typography variant="caption" color="text.secondary">
+                Loaded: {job.startingCheckpoint}
+              </Typography>
+            )}
             {job?.lastCheckpoint && (
               <Typography variant="caption" color="text.secondary">
                 Checkpoint: {job.lastCheckpoint}
