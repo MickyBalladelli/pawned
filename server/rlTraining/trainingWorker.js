@@ -11,6 +11,44 @@ function randomItem(items) {
   return items[Math.floor(Math.random() * items.length)]
 }
 
+function fenKey(fen) {
+  return fen.split(' ').slice(0, 4).join(' ')
+}
+
+function scoreLegalMoves(game, chess, legalMoves) {
+  const recentPositions = new Set(
+    game.moves.slice(-16).map((move) => fenKey(move.fen)),
+  )
+  const recentOwnMoves = game.moves
+    .slice(-8)
+    .filter((move) => move.color === (chess.turn() === 'w' ? 'white' : 'black'))
+
+  return legalMoves.map((move) => {
+    const nextChess = new Chess(chess.fen())
+    nextChess.move(move)
+
+    const repeatsPosition = recentPositions.has(fenKey(nextChess.fen()))
+    const reversesPiece = recentOwnMoves.some((recentMove) => (
+      recentMove.piece === move.piece
+        && recentMove.from === move.to
+        && recentMove.to === move.from
+    ))
+
+    return {
+      action: moveToActionIndex(move),
+      repeatPenalty: (repeatsPosition ? 0.35 : 0) + (reversesPiece ? 0.2 : 0),
+    }
+  })
+}
+
+function chooseExplorationMove(game, chess, legalMoves) {
+  const scoredMoves = scoreLegalMoves(game, chess, legalMoves)
+  const lowestPenalty = Math.min(...scoredMoves.map((move) => move.repeatPenalty))
+  const bestMoves = legalMoves.filter((move, index) => scoredMoves[index].repeatPenalty === lowestPenalty)
+
+  return randomItem(bestMoves)
+}
+
 function createGame() {
   const chess = new Chess()
 
@@ -58,6 +96,9 @@ function appendMove(game, chess, state, color, move) {
     color: move.color === 'w' ? 'white' : 'black',
     san: move.san,
     uci: moveToUci(move),
+    from: move.from,
+    to: move.to,
+    piece: move.piece,
     fen: chess.fen(),
   }
 
@@ -125,7 +166,7 @@ function prepare(options) {
     }
 
     if (Math.random() < options.explorationRate) {
-      appendMove(game, chess, state, color, randomItem(legalMoves))
+      appendMove(game, chess, state, color, chooseExplorationMove(game, chess, legalMoves))
       maybeFinish(index, completed, options.maxPlies)
       continue
     }
@@ -141,7 +182,7 @@ function prepare(options) {
     requests.push({
       gameId: game.id,
       state,
-      legalIndexes: legalMoves.map(moveToActionIndex),
+      legalMoves: scoreLegalMoves(game, chess, legalMoves),
     })
   }
 

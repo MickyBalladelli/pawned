@@ -156,20 +156,47 @@ async function maybeCheckpoint(job) {
   job.lastCheckpoint = await saveModel(job.model, job.id, job.iteration)
 }
 
-function selectBestAction(legalIndexes, scores) {
-  let bestAction = legalIndexes[0]
+function normalizeLegalMoves(request) {
+  if (request.legalMoves) {
+    return request.legalMoves
+  }
+
+  return request.legalIndexes.map((action) => ({
+    action,
+    repeatPenalty: 0,
+  }))
+}
+
+function selectPolicyAction(legalMoves, scores) {
+  const temperature = 0.08
   let bestScore = -Infinity
 
-  for (const action of legalIndexes) {
-    const score = scores[action]
+  const weightedMoves = legalMoves.map((move) => {
+    const score = (scores[move.action] || 0) - (move.repeatPenalty || 0)
 
     if (score > bestScore) {
       bestScore = score
-      bestAction = action
+    }
+
+    return {
+      action: move.action,
+      score,
+    }
+  })
+
+  const weights = weightedMoves.map((move) => Math.exp((move.score - bestScore) / temperature))
+  const totalWeight = weights.reduce((total, weight) => total + weight, 0)
+  let cursor = Math.random() * totalWeight
+
+  for (let index = 0; index < weightedMoves.length; index += 1) {
+    cursor -= weights[index]
+
+    if (cursor <= 0) {
+      return weightedMoves[index].action
     }
   }
 
-  return bestAction
+  return weightedMoves[0].action
 }
 
 function buildChoicesFromPolicy(requestBatches, policyRows) {
@@ -180,7 +207,7 @@ function buildChoicesFromPolicy(requestBatches, policyRows) {
     for (const request of requestBatches[workerIndex]) {
       choicesByWorker[workerIndex].push({
         gameId: request.gameId,
-        action: selectBestAction(request.legalIndexes, policyRows[rowIndex]),
+        action: selectPolicyAction(normalizeLegalMoves(request), policyRows[rowIndex]),
       })
       rowIndex += 1
     }
