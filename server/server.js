@@ -12,6 +12,7 @@ const createChessRouter = require('./chess/chessRoutes')
 const registerChessSockets = require('./chess/chessSockets')
 const { createChessTables } = require('./chess/chessStore')
 const createRlTrainingRouter = require('./rlTraining/rlTrainingRoutes')
+const { stopAllTrainingJobs } = require('./rlTraining/rlTrainingJobs')
 
 // Initialize Express app
 const app = express();
@@ -146,6 +147,10 @@ async function authenticate(req, res, next) {
   const session = token ? sessions.get(token) : null;
 
   if (!session) {
+    if (req.originalUrl?.startsWith('/api/rl-training')) {
+      stopAllTrainingJobs('Stopped because authentication was required')
+    }
+
     return res.status(401).json({ error: 'Authentication required' });
   }
 
@@ -157,6 +162,10 @@ async function authenticate(req, res, next) {
 
     if (result.rows.length === 0) {
       sessions.delete(token);
+      if (req.originalUrl?.startsWith('/api/rl-training')) {
+        stopAllTrainingJobs('Stopped because authentication was required')
+      }
+
       return res.status(401).json({ error: 'Authentication required' });
     }
 

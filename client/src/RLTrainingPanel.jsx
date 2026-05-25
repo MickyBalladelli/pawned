@@ -19,7 +19,8 @@ const defaultConfig = {
   iterations: 100,
   gamesPerIteration: 32,
   checkpointEvery: 10,
-  maxPlies: 240,
+  maxPlies: 400,
+  plyDelayMs: 25,
 }
 
 function formatDate(value) {
@@ -59,6 +60,14 @@ function RLTrainingPanel({ authToken, themeMode }) {
       })
       setJob(data.job)
     } catch (err) {
+      if (err.status === 401) {
+        setJob((current) => current ? {
+          ...current,
+          status: 'stopped',
+          message: 'Stopped because authentication was required',
+        } : current)
+      }
+
       setError(err.message)
     } finally {
       setLoading(false)
@@ -78,6 +87,14 @@ function RLTrainingPanel({ authToken, themeMode }) {
       })
       .catch((err) => {
         if (active) {
+          if (err.status === 401) {
+            setJob((current) => current ? {
+              ...current,
+              status: 'stopped',
+              message: 'Stopped because authentication was required',
+            } : current)
+          }
+
           setError(err.message)
         }
       })
@@ -91,6 +108,21 @@ function RLTrainingPanel({ authToken, themeMode }) {
       active = false
     }
   }, [authHeaders])
+
+  useEffect(() => {
+    if (!isRunning) {
+      return undefined
+    }
+
+    const pollDelay = Math.max(50, Math.min(500, config.plyDelayMs || 100))
+    const interval = window.setInterval(() => {
+      loadJob()
+    }, pollDelay)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [config.plyDelayMs, isRunning])
 
   function updateConfig(field, value) {
     setConfig((current) => ({
@@ -220,6 +252,16 @@ function RLTrainingPanel({ authToken, themeMode }) {
               fullWidth
               disabled={isRunning || saving}
             />
+            <TextField
+              label="Ply delay (ms)"
+              type="number"
+              size="small"
+              value={config.plyDelayMs}
+              onChange={(event) => updateConfig('plyDelayMs', event.target.value)}
+              inputProps={{ min: 10 }}
+              fullWidth
+              disabled={isRunning || saving}
+            />
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -269,6 +311,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
               <Chip label={`${job.config.gamesPerIteration} games`} variant="outlined" />
               <Chip label={`${job.config.checkpointEvery} checkpoint`} variant="outlined" />
               <Chip label={`${job.config.maxPlies} plies`} variant="outlined" />
+              <Chip label={`${job.config.plyDelayMs}ms / ply`} variant="outlined" />
             </Stack>
           )}
           <Typography variant="body2" color="text.secondary">

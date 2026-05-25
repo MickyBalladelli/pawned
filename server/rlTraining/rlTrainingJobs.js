@@ -6,32 +6,67 @@ function randomItem(items) {
   return items[Math.floor(Math.random() * items.length)]
 }
 
-function generateSelfPlayPreview(maxPlies) {
+function createSelfPlayPreview() {
   const chess = new Chess()
-  const moves = []
-  const plies = Math.min(maxPlies, 48)
-
-  while (!chess.isGameOver() && moves.length < plies) {
-    const legalMoves = chess.moves({ verbose: true })
-    const move = randomItem(legalMoves)
-
-    chess.move(move)
-    moves.push({
-      ply: moves.length + 1,
-      moveNumber: Math.ceil((moves.length + 1) / 2),
-      color: move.color === 'w' ? 'white' : 'black',
-      san: move.san,
-      uci: `${move.from}${move.to}${move.promotion || ''}`,
-      fen: chess.fen(),
-    })
+  return {
+    initialFen: chess.fen(),
+    currentFen: chess.fen(),
+    result: 'in progress',
+    moves: [],
   }
+}
+
+function appendPreviewMove(game, maxPlies) {
+  const chess = new Chess(game.currentFen || game.initialFen)
+  const legalMoves = chess.moves({ verbose: true })
+
+  if (chess.isGameOver() || !legalMoves.length || game.moves.length >= maxPlies) {
+    return createSelfPlayPreview()
+  }
+
+  const move = randomItem(legalMoves)
+
+  chess.move(move)
 
   return {
-    initialFen: new Chess().fen(),
+    ...game,
     currentFen: chess.fen(),
     result: chess.isDraw() ? 'draw' : chess.isCheckmate() ? 'checkmate' : 'in progress',
-    moves,
+    moves: [
+      ...game.moves,
+      {
+        ply: game.moves.length + 1,
+        moveNumber: Math.ceil((game.moves.length + 1) / 2),
+        color: move.color === 'w' ? 'white' : 'black',
+        san: move.san,
+        uci: `${move.from}${move.to}${move.promotion || ''}`,
+        fen: chess.fen(),
+      },
+    ],
   }
+}
+
+function advanceSelfPlayPreview(job) {
+  if (!job.selfPlayGame) {
+    job.selfPlayGame = createSelfPlayPreview()
+  }
+
+  const now = Date.now()
+  const lastMoveAt = job.lastPreviewMoveAt || 0
+  const plyDelayMs = job.config?.plyDelayMs || 25
+  const elapsed = now - lastMoveAt
+
+  if (elapsed < plyDelayMs) {
+    return
+  }
+
+  const movesToAdd = Math.min(20, Math.floor(elapsed / plyDelayMs))
+
+  for (let index = 0; index < movesToAdd; index += 1) {
+    job.selfPlayGame = appendPreviewMove(job.selfPlayGame, job.config?.maxPlies || 400)
+  }
+
+  job.lastPreviewMoveAt = lastMoveAt + movesToAdd * plyDelayMs
 }
 
 function sanitizePositiveInteger(value, fallback, min, max) {
@@ -49,13 +84,18 @@ function sanitizeTrainingConfig(config = {}) {
     iterations: sanitizePositiveInteger(config.iterations, 100, 1, 100000),
     gamesPerIteration: sanitizePositiveInteger(config.gamesPerIteration, 32, 1, 10000),
     checkpointEvery: sanitizePositiveInteger(config.checkpointEvery, 10, 1, 10000),
-    maxPlies: sanitizePositiveInteger(config.maxPlies, 240, 20, 1000),
+    maxPlies: sanitizePositiveInteger(config.maxPlies, 400, 20, 1000),
+    plyDelayMs: sanitizePositiveInteger(config.plyDelayMs, 25, 10, 5000),
   }
 }
 
 function publicJob(job) {
   if (!job) {
     return null
+  }
+
+  if (job.status === 'running') {
+    advanceSelfPlayPreview(job)
   }
 
   return {
@@ -76,6 +116,7 @@ function getTrainingJob() {
 
 function startTrainingJob(config, user) {
   if (activeJob?.status === 'running') {
+    advanceSelfPlayPreview(activeJob)
     return publicJob(activeJob)
   }
 
@@ -92,7 +133,8 @@ function startTrainingJob(config, user) {
     startedAt: new Date().toISOString(),
     stoppedAt: null,
     message: 'Training job started',
-    selfPlayGame: generateSelfPlayPreview(trainingConfig.maxPlies),
+    selfPlayGame: createSelfPlayPreview(),
+    lastPreviewMoveAt: Date.now(),
   }
 
   return publicJob(activeJob)
@@ -113,8 +155,24 @@ function stopTrainingJob(user) {
   return publicJob(activeJob)
 }
 
+function stopAllTrainingJobs(message = 'Stopped') {
+  if (!activeJob || activeJob.status !== 'running') {
+    return publicJob(activeJob)
+  }
+
+  activeJob = {
+    ...activeJob,
+    status: 'stopped',
+    stoppedAt: new Date().toISOString(),
+    message,
+  }
+
+  return publicJob(activeJob)
+}
+
 module.exports = {
   getTrainingJob,
   startTrainingJob,
+  stopAllTrainingJobs,
   stopTrainingJob,
 }

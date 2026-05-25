@@ -12,6 +12,7 @@ export async function requestJson(url, options) {
   if (!response.ok) {
     const error = new Error(payload?.error || 'Request failed')
     error.payload = payload
+    error.status = response.status
     throw error
   }
 
