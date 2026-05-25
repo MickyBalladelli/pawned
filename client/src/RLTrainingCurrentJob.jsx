@@ -41,7 +41,7 @@ function formatDuration(milliseconds = 0) {
 }
 
 function RLTrainingCurrentJob({ job, totalGamesRemaining }) {
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>

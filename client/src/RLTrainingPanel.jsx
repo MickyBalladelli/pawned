@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   Alert,
-  Box,
   Button,
   Chip,
   Collapse,
@@ -70,7 +69,7 @@ function RLTrainingPanel({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [parametersExpanded, setParametersExpanded] = useState(true)
+  const [parametersExpanded, setParametersExpanded] = useState(false)
   const authHeaders = useMemo(() => (
     authToken ? { Authorization: `Bearer ${authToken}` } : {}
   ), [authToken])
@@ -218,33 +217,6 @@ function RLTrainingPanel({
 
   return (
     <Stack spacing={2}>
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={1}
-        sx={{ alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between' }}
-      >
-        <Box>
-          <Typography
-            variant="h5"
-            component="h2"
-            sx={{
-              color: themeMode === 'dark' ? 'text.primary' : '#05070a',
-              fontWeight: 900,
-            }}
-          >
-            RL Agent Training
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Self-play chess worker
-          </Typography>
-        </Box>
-        <Chip
-          label={job?.status || 'idle'}
-          color={isRunning ? 'success' : 'default'}
-          variant={isRunning ? 'filled' : 'outlined'}
-        />
-      </Stack>
-
       {error && <Alert severity="error">{error}</Alert>}
       {runningJobUsesDifferentConfig && (
         <Alert severity="info">
@@ -385,32 +357,44 @@ function RLTrainingPanel({
             </Stack>
           </Collapse>
 
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-            <Button
-              variant="contained"
-              startIcon={saving && !isRunning ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
-              onClick={startTraining}
-              disabled={isRunning || saving}
-            >
-              Start training
-            </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={saving && isRunning ? <CircularProgress size={16} color="inherit" /> : <Stop />}
-              onClick={stopTraining}
-              disabled={!isRunning || saving}
-            >
-              Stop
-            </Button>
-            <Button
-              variant="text"
-              startIcon={<Sync />}
-              onClick={loadJob}
-              disabled={saving}
-            >
-              Refresh
-            </Button>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{ alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', gap: 1 }}
+          >
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
+              <Button
+                variant="contained"
+                startIcon={saving && !isRunning ? <CircularProgress size={16} color="inherit" /> : <PlayArrow />}
+                onClick={startTraining}
+                disabled={isRunning || saving}
+              >
+                Start training
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={saving && isRunning ? <CircularProgress size={16} color="inherit" /> : <Stop />}
+                onClick={stopTraining}
+                disabled={!isRunning || saving}
+              >
+                Stop
+              </Button>
+              <Button
+                variant="text"
+                startIcon={<Sync />}
+                onClick={loadJob}
+                disabled={saving}
+              >
+                Refresh
+              </Button>
+            </Stack>
+            <Chip
+              label={job?.status || 'idle'}
+              color={isRunning ? 'success' : 'default'}
+              variant={isRunning ? 'filled' : 'outlined'}
+              sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
+            />
           </Stack>
         </Stack>
       </Paper>
