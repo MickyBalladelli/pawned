@@ -11,6 +11,7 @@ const nodemailer = require('nodemailer')
 const createChessRouter = require('./chess/chessRoutes')
 const registerChessSockets = require('./chess/chessSockets')
 const { createChessTables } = require('./chess/chessStore')
+const createRlTrainingRouter = require('./rlTraining/rlTrainingRoutes')
 
 // Initialize Express app
 const app = express();
@@ -286,6 +287,7 @@ app.get('/verify-email', (req, res) => {
 });
 
 app.use('/api/chess', createChessRouter({ pool, authenticate, io }))
+app.use('/api/rl-training', createRlTrainingRouter({ authenticate, requireAdmin }))
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;

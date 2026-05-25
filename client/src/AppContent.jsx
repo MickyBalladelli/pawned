@@ -828,7 +828,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         ) : (
           <>
           {activeView === 'training' ? (
-            <TrainingPage authUser={authUser} themeMode={themeMode} />
+            <TrainingPage authToken={authToken} authUser={authUser} themeMode={themeMode} />
           ) : activeView === 'chess' ? (
             <ChessPage
               authToken={authToken}

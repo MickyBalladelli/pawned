@@ -22,6 +22,7 @@ import {
 import { ChevronLeft, ChevronRight, MenuBook, Search } from '@mui/icons-material'
 import { Chess } from 'chess.js'
 import ChessBoard from './ChessBoard'
+import RLTrainingPanel from './RLTrainingPanel'
 import openingsBook from './data/chessOpenings.json'
 
 const startingFen = new Chess().fen()
@@ -159,7 +160,7 @@ function cleanTheme(theme) {
   return String(theme || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
-function TrainingPage({ authUser, themeMode }) {
+function TrainingPage({ authToken, authUser, themeMode }) {
   const [trainingTab, setTrainingTab] = useState('openings')
   const [filter, setFilter] = useState('')
   const [selectedOpening, setSelectedOpening] = useState(openingsBook.openings[0])
@@ -276,6 +277,7 @@ function TrainingPage({ authUser, themeMode }) {
     : selectedPuzzlePositions[puzzleViewIndex] || puzzleFen
   const puzzleBoardOrientation = puzzleSolverColor(selectedPuzzle)
   const selectedPuzzleWasSolved = Boolean(selectedPuzzle && solvedPuzzleIds.has(selectedPuzzle.id))
+  const isAdmin = Boolean(authUser?.is_admin)
 
   function selectOpening(opening) {
     setSelectedOpening(opening)
@@ -457,6 +459,7 @@ function TrainingPage({ authUser, themeMode }) {
             >
               <Tab label="Openings" value="openings" sx={{ minHeight: 32 }} />
               <Tab label="Puzzles" value="puzzles" sx={{ minHeight: 32 }} />
+              {isAdmin && <Tab label="Agent" value="agent" sx={{ minHeight: 32 }} />}
             </Tabs>
             <TextField
               label={trainingTab === 'puzzles' ? 'Filter puzzles' : 'Filter openings'}
@@ -495,6 +498,14 @@ function TrainingPage({ authUser, themeMode }) {
           <Divider sx={{ mb: 1 }} />
 
           <Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
+            {trainingTab === 'agent' && (
+              <Stack spacing={1.25}>
+                <Chip label="Admin only" color="primary" variant="outlined" />
+                <Typography variant="body2" color="text.secondary">
+                  Start self-play training jobs here.
+                </Typography>
+              </Stack>
+            )}
             {trainingTab === 'openings' && (
               <List disablePadding>
                 {visibleOpenings.map((opening) => (
@@ -552,6 +563,10 @@ function TrainingPage({ authUser, themeMode }) {
 
       <Card sx={{ minHeight: { xs: 520, md: 'calc(100vh - 190px)' } }}>
         <CardContent>
+          {trainingTab === 'agent' && isAdmin ? (
+            <RLTrainingPanel authToken={authToken} themeMode={themeMode} />
+          ) : (
+            <>
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={1}
@@ -762,6 +777,8 @@ function TrainingPage({ authUser, themeMode }) {
               )}
             </Paper>
           </Box>
+            </>
+          )}
         </CardContent>
       </Card>
     </Box>
