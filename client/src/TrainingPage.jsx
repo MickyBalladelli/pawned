@@ -27,6 +27,7 @@ import openingsBook from './data/chessOpenings.json'
 
 const startingFen = new Chess().fen()
 const puzzlePreviewLimit = 200
+const trainingTabStorageKey = 'vela.training.tab'
 const puzzleDifficulties = [
   { value: 'easy', label: 'Easy', range: '800-1200' },
   { value: 'medium', label: 'Medium', range: '1201-1600' },
@@ -161,7 +162,11 @@ function cleanTheme(theme) {
 }
 
 function TrainingPage({ authToken, authUser, themeMode }) {
-  const [trainingTab, setTrainingTab] = useState('openings')
+  const [trainingTab, setTrainingTab] = useState(() => (
+    ['openings', 'puzzles', 'agent'].includes(localStorage.getItem(trainingTabStorageKey))
+      ? localStorage.getItem(trainingTabStorageKey)
+      : 'openings'
+  ))
   const [filter, setFilter] = useState('')
   const [selectedOpening, setSelectedOpening] = useState(openingsBook.openings[0])
   const [moveIndex, setMoveIndex] = useState(0)
@@ -182,6 +187,10 @@ function TrainingPage({ authToken, authUser, themeMode }) {
   useEffect(() => {
     setSolvedPuzzleIds(readSolvedPuzzles(authUser?.id))
   }, [authUser?.id])
+
+  useEffect(() => {
+    localStorage.setItem(trainingTabStorageKey, trainingTab)
+  }, [trainingTab])
 
   useEffect(() => {
     let cancelled = false

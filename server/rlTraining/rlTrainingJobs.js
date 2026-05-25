@@ -25,7 +25,7 @@ function sanitizeTrainingConfig(config = {}) {
     checkpointEvery: sanitizePositiveInteger(config.checkpointEvery, 10, 1, 10000),
     maxPlies: sanitizePositiveInteger(config.maxPlies, 400, 20, 1000),
     plyDelayMs: sanitizePositiveInteger(config.plyDelayMs, 25, 10, 5000),
-    parallelGames: sanitizePositiveInteger(config.parallelGames, 4, 1, 32),
+    parallelGames: sanitizePositiveInteger(config.parallelGames, 4, 1, 256),
     trainSampleLimit: sanitizePositiveInteger(config.trainSampleLimit, 512, 32, 4096),
   }
 }

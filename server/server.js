@@ -11,8 +11,6 @@ const nodemailer = require('nodemailer')
 const createChessRouter = require('./chess/chessRoutes')
 const registerChessSockets = require('./chess/chessSockets')
 const { createChessTables } = require('./chess/chessStore')
-const createRlTrainingRouter = require('./rlTraining/rlTrainingRoutes')
-const { stopAllTrainingJobs } = require('./rlTraining/rlTrainingJobs')
 
 // Initialize Express app
 const app = express();
@@ -44,6 +42,7 @@ const mailTransport = nodemailer.createTransport({
 })
 
 const channelNameConflictError = 'Channel name is already taken'
+const trainerBaseUrl = process.env.TRAINER_URL || 'http://127.0.0.1:6060'
 const userSelectColumns = `
   id,
   username,
@@ -228,7 +227,7 @@ async function authenticate(req, res, next) {
 
     if (!session) {
       if (req.originalUrl?.startsWith('/api/rl-training')) {
-        stopAllTrainingJobs('Stopped because authentication was required')
+        stopTrainerForAuthFailure()
       }
 
       return res.status(401).json({ error: 'Authentication required' });
@@ -242,7 +241,7 @@ async function authenticate(req, res, next) {
     if (result.rows.length === 0) {
       await deleteSession(token);
       if (req.originalUrl?.startsWith('/api/rl-training')) {
-        stopAllTrainingJobs('Stopped because authentication was required')
+        stopTrainerForAuthFailure()
       }
 
       return res.status(401).json({ error: 'Authentication required' });
@@ -263,6 +262,81 @@ function requireAdmin(req, res, next) {
   }
 
   next();
+}
+
+function requestTrainer(pathname, options = {}) {
+  const url = new URL(pathname, trainerBaseUrl)
+  const body = options.body ? JSON.stringify(options.body) : null
+
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      hostname: url.hostname,
+      port: url.port,
+      path: `${url.pathname}${url.search}`,
+      method: options.method || 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(body ? { 'Content-Length': Buffer.byteLength(body) } : {}),
+        ...options.headers,
+      },
+    }, (response) => {
+      let data = ''
+
+      response.setEncoding('utf8')
+      response.on('data', (chunk) => {
+        data += chunk
+      })
+      response.on('end', () => {
+        let payload = null
+
+        try {
+          payload = data ? JSON.parse(data) : null
+        } catch {
+          payload = { error: 'Invalid trainer response' }
+        }
+
+        resolve({ statusCode: response.statusCode, payload })
+      })
+    })
+
+    request.on('error', reject)
+
+    if (body) {
+      request.write(body)
+    }
+
+    request.end()
+  })
+}
+
+function stopTrainerForAuthFailure() {
+  requestTrainer('/job/stop-all', {
+    method: 'POST',
+    body: { message: 'Stopped because authentication was required' },
+  }).catch(() => {})
+}
+
+async function proxyRlTrainingRequest(req, res) {
+  const pathSuffix = req.originalUrl.replace(/^\/api\/rl-training/, '') || '/'
+  const userHeader = encodeURIComponent(JSON.stringify({
+    id: req.user.id,
+    username: req.user.username,
+  }))
+
+  try {
+    const response = await requestTrainer(pathSuffix, {
+      method: req.method,
+      body: ['GET', 'HEAD'].includes(req.method) ? null : req.body,
+      headers: {
+        'X-Vela-User': userHeader,
+      },
+    })
+
+    res.status(response.statusCode || 502).json(response.payload)
+  } catch (err) {
+    console.error('Trainer proxy failed:', err.message)
+    res.status(503).json({ error: 'Training server unavailable' })
+  }
 }
 
 function requireModerator(req, res, next) {
@@ -383,7 +457,7 @@ app.get('/verify-email', (req, res) => {
 });
 
 app.use('/api/chess', createChessRouter({ pool, authenticate, io }))
-app.use('/api/rl-training', createRlTrainingRouter({ authenticate, requireAdmin }))
+app.use('/api/rl-training', authenticate, requireAdmin, proxyRlTrainingRequest)
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;

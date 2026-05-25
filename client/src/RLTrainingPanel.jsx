@@ -24,6 +24,22 @@ const defaultConfig = {
   parallelGames: 4,
   trainSampleLimit: 512,
 }
+const trainingConfigStorageKey = 'vela.rlTraining.config'
+
+function readStoredConfig() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(trainingConfigStorageKey) || '{}')
+
+    return {
+      ...defaultConfig,
+      ...Object.fromEntries(
+        Object.keys(defaultConfig).map((key) => [key, numericFieldValue(stored[key] ?? defaultConfig[key])]),
+      ),
+    }
+  } catch {
+    return defaultConfig
+  }
+}
 
 function formatDate(value) {
   if (!value) {
@@ -66,7 +82,7 @@ function RLTrainingPanel({
   onJobChange,
   onSelectedGameIdChange,
 }) {
-  const [config, setConfig] = useState(defaultConfig)
+  const [config, setConfig] = useState(readStoredConfig)
   const [job, setJob] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -159,6 +175,10 @@ function RLTrainingPanel({
       [field]: numericFieldValue(value),
     }))
   }
+
+  useEffect(() => {
+    localStorage.setItem(trainingConfigStorageKey, JSON.stringify(config))
+  }, [config])
 
   async function startTraining() {
     setSaving(true)
