@@ -18,7 +18,17 @@ function moveLabel(move) {
   return `${move.moveNumber}${move.color === 'white' ? '.' : '...'} ${move.san}`
 }
 
-function RLTrainingGameViewer({ game, themeMode }) {
+function RLTrainingGameViewer({
+  games = [],
+  fallbackGame = null,
+  selectedGameId,
+  onSelectedGameIdChange,
+  themeMode,
+}) {
+  const visibleGames = games.length > 0 ? games : fallbackGame ? [fallbackGame] : []
+  const [localSelectedGameId, setLocalSelectedGameId] = useState(null)
+  const activeGameId = selectedGameId ?? localSelectedGameId
+  const game = visibleGames.find((item) => item.id === activeGameId) || visibleGames[0] || null
   const [selectedPly, setSelectedPly] = useState(null)
   const moves = game?.moves || []
   const selectedMove = selectedPly ? moves[selectedPly - 1] : null
@@ -48,6 +58,24 @@ function RLTrainingGameViewer({ game, themeMode }) {
     setSelectedPly(null)
   }, [game?.currentFen])
 
+  useEffect(() => {
+    if (!visibleGames.length) {
+      setLocalSelectedGameId(null)
+      onSelectedGameIdChange?.(null)
+      return
+    }
+
+    if (!visibleGames.some((item) => item.id === activeGameId)) {
+      setLocalSelectedGameId(visibleGames[0].id)
+      onSelectedGameIdChange?.(visibleGames[0].id)
+    }
+  }, [activeGameId, onSelectedGameIdChange, visibleGames])
+
+  function selectGame(id) {
+    setLocalSelectedGameId(id)
+    onSelectedGameIdChange?.(id)
+  }
+
   function previousMove() {
     setSelectedPly((current) => {
       const ply = current || moves.length
@@ -63,19 +91,6 @@ function RLTrainingGameViewer({ game, themeMode }) {
 
       return current + 1
     })
-  }
-
-  if (!game) {
-    return (
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 900 }}>
-          Self-play board
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Start training to see agent moves.
-        </Typography>
-      </Paper>
-    )
   }
 
   return (
@@ -97,12 +112,13 @@ function RLTrainingGameViewer({ game, themeMode }) {
               Self-play board
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {selectedLabel}
+              {game ? selectedLabel : 'No game'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1}>
+            <Chip label={`${visibleGames.length} games`} variant="outlined" />
             <Chip label={`${moves.length} plies`} variant="outlined" />
-            <Chip label={game.result || 'in progress'} variant="outlined" />
+            <Chip label={game?.result || 'idle'} variant="outlined" />
           </Stack>
         </Stack>
 
@@ -111,19 +127,79 @@ function RLTrainingGameViewer({ game, themeMode }) {
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', lg: 'minmax(280px, 520px) minmax(240px, 1fr)' },
+            gridTemplateColumns: { xs: '1fr', md: '240px minmax(280px, 520px) minmax(240px, 1fr)' },
             gap: 2,
             alignItems: 'start',
           }}
         >
+          <List
+            dense
+            disablePadding
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              maxHeight: { lg: 520 },
+              overflowY: 'auto',
+              p: 0.75,
+            }}
+          >
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1, py: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ flex: '1 1 auto', fontWeight: 900 }}>
+                Active games
+              </Typography>
+              <Chip size="small" label={visibleGames.length} variant="outlined" />
+            </Stack>
+            <Divider sx={{ mb: 0.75 }} />
+            {visibleGames.length === 0 && (
+              <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
+                No active games
+              </Typography>
+            )}
+            {visibleGames.map((item, index) => (
+              <ListItemButton
+                key={item.id}
+                selected={item.id === game?.id}
+                onClick={() => selectGame(item.id)}
+                sx={{ borderRadius: 1, mb: 0.5 }}
+              >
+                <ListItemText
+                  primary={`Game ${index + 1}`}
+                  secondary={`${item.moves?.length || 0} plies · ${item.result || 'in progress'}`}
+                  slotProps={{
+                    primary: { noWrap: true },
+                    secondary: { noWrap: true },
+                  }}
+                />
+              </ListItemButton>
+            ))}
+          </List>
+
           <Box>
-            <ChessBoard
-              position={boardFen}
-              playerColor="white"
-              selectedSquare={null}
-              themeMode={themeMode}
-              onSquareClick={() => {}}
-            />
+            {game ? (
+              <ChessBoard
+                position={boardFen}
+                playerColor="white"
+                selectedSquare={null}
+                themeMode={themeMode}
+                onSquareClick={() => {}}
+              />
+            ) : (
+              <Paper
+                variant="outlined"
+                sx={{
+                  aspectRatio: '1 / 1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  p: 2,
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Start training to see board
+                </Typography>
+              </Paper>
+            )}
             <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
               <Button
                 size="small"

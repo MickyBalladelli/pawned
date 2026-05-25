@@ -21,6 +21,7 @@ const defaultConfig = {
   checkpointEvery: 10,
   maxPlies: 400,
   plyDelayMs: 25,
+  parallelGames: 4,
   trainSampleLimit: 512,
 }
 
@@ -58,7 +59,13 @@ function numericFieldValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0
 }
 
-function RLTrainingPanel({ authToken, themeMode }) {
+function RLTrainingPanel({
+  authToken,
+  selectedGameId,
+  themeMode,
+  onJobChange,
+  onSelectedGameIdChange,
+}) {
   const [config, setConfig] = useState(defaultConfig)
   const [job, setJob] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -77,6 +84,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
         headers: authHeaders,
       })
       setJob(data.job)
+      onJobChange?.(data.job)
     } catch (err) {
       if (err.status === 401) {
         setJob((current) => current ? {
@@ -84,6 +92,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
           status: 'stopped',
           message: 'Stopped because authentication was required',
         } : current)
+        onJobChange?.(null)
       }
 
       setError(err.message)
@@ -101,6 +110,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
       .then((data) => {
         if (active) {
           setJob(data.job)
+          onJobChange?.(data.job)
         }
       })
       .catch((err) => {
@@ -111,6 +121,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
               status: 'stopped',
               message: 'Stopped because authentication was required',
             } : current)
+            onJobChange?.(null)
           }
 
           setError(err.message)
@@ -160,6 +171,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
         body: JSON.stringify(config),
       })
       setJob(data.job)
+      onJobChange?.(data.job)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -177,6 +189,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
         headers: authHeaders,
       })
       setJob(data.job)
+      onJobChange?.(data.job)
     } catch (err) {
       setError(err.message)
     } finally {
@@ -281,6 +294,16 @@ function RLTrainingPanel({ authToken, themeMode }) {
               disabled={isRunning || saving}
             />
             <TextField
+              label="Parallel games"
+              type="number"
+              size="small"
+              value={config.parallelGames}
+              onChange={(event) => updateConfig('parallelGames', event.target.value)}
+              inputProps={{ min: 1 }}
+              fullWidth
+              disabled={isRunning || saving}
+            />
+            <TextField
               label="Train samples"
               type="number"
               size="small"
@@ -341,6 +364,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
               <Chip label={`${job.config.checkpointEvery} checkpoint`} variant="outlined" />
               <Chip label={`${job.config.maxPlies} plies`} variant="outlined" />
               <Chip label={`${job.config.plyDelayMs}ms / ply`} variant="outlined" />
+              <Chip label={`${job.config.parallelGames} parallel games`} variant="outlined" />
               <Chip label={`${job.config.trainSampleLimit} train samples`} variant="outlined" />
             </Stack>
           )}
@@ -348,6 +372,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
               <Chip label={`Iteration: ${job.iteration || 0}`} variant="outlined" />
               <Chip label={`Games: ${job.totalGames || 0}`} variant="outlined" />
+              <Chip label={`Active: ${job.activeGames?.length || 0}`} variant="outlined" />
               <Chip label={`Samples: ${job.totalSamples || 0}`} variant="outlined" />
               <Chip label={`Loss: ${job.lastLoss || '-'}`} variant="outlined" />
             </Stack>
@@ -368,7 +393,13 @@ function RLTrainingPanel({ authToken, themeMode }) {
         </Stack>
       </Paper>
 
-      <RLTrainingGameViewer game={job?.selfPlayGame} themeMode={themeMode} />
+      <RLTrainingGameViewer
+        games={job?.activeGames || []}
+        fallbackGame={job?.selfPlayGame}
+        selectedGameId={selectedGameId}
+        themeMode={themeMode}
+        onSelectedGameIdChange={onSelectedGameIdChange}
+      />
     </Stack>
   )
 }

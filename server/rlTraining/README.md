@@ -10,6 +10,7 @@ Done now:
 6. Save checkpoints in `server/rlTraining/checkpoints/`.
 7. Show latest self-play game, moves, loss, samples, and checkpoint in admin UI.
 8. Stop training when auth fails.
+9. Generate multiple live self-play games in parallel with configurable `parallelGames`.
 
 Still needed for strong play:
 

@@ -176,6 +176,8 @@ function TrainingPage({ authToken, authUser, themeMode }) {
   const [puzzleStatus, setPuzzleStatus] = useState('Pick a puzzle')
   const [puzzleSolved, setPuzzleSolved] = useState(false)
   const [solvedPuzzleIds, setSolvedPuzzleIds] = useState(() => readSolvedPuzzles(authUser?.id))
+  const [agentJob, setAgentJob] = useState(null)
+  const [selectedAgentGameId, setSelectedAgentGameId] = useState(null)
 
   useEffect(() => {
     setSolvedPuzzleIds(readSolvedPuzzles(authUser?.id))
@@ -461,16 +463,18 @@ function TrainingPage({ authToken, authUser, themeMode }) {
               <Tab label="Puzzles" value="puzzles" sx={{ minHeight: 32 }} />
               {isAdmin && <Tab label="Agent" value="agent" sx={{ minHeight: 32 }} />}
             </Tabs>
-            <TextField
-              label={trainingTab === 'puzzles' ? 'Filter puzzles' : 'Filter openings'}
-              size="small"
-              value={filter}
-              onChange={(event) => setFilter(event.target.value)}
-              InputProps={{
-                startAdornment: <Search fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />,
-              }}
-              fullWidth
-            />
+            {trainingTab !== 'agent' && (
+              <TextField
+                label={trainingTab === 'puzzles' ? 'Filter puzzles' : 'Filter openings'}
+                size="small"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                InputProps={{
+                  startAdornment: <Search fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />,
+                }}
+                fullWidth
+              />
+            )}
             {trainingTab === 'puzzles' && (
               <ToggleButtonGroup
                 value={puzzleDifficulty}
@@ -501,9 +505,36 @@ function TrainingPage({ authToken, authUser, themeMode }) {
             {trainingTab === 'agent' && (
               <Stack spacing={1.25}>
                 <Chip label="Admin only" color="primary" variant="outlined" />
-                <Typography variant="body2" color="text.secondary">
-                  Start self-play training jobs here.
-                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Typography variant="subtitle2" sx={{ flex: '1 1 auto', fontWeight: 900 }}>
+                    Active games
+                  </Typography>
+                  <Chip size="small" label={agentJob?.activeGames?.length || 0} variant="outlined" />
+                </Stack>
+                <List dense disablePadding>
+                  {(agentJob?.activeGames || []).map((game, index) => (
+                    <ListItemButton
+                      key={game.id}
+                      selected={game.id === selectedAgentGameId}
+                      onClick={() => setSelectedAgentGameId(game.id)}
+                      sx={{ borderRadius: 1, mb: 0.5 }}
+                    >
+                      <ListItemText
+                        primary={`Game ${index + 1}`}
+                        secondary={`${game.moves?.length || 0} plies · ${game.result || 'in progress'}`}
+                        slotProps={{
+                          primary: { noWrap: true },
+                          secondary: { noWrap: true },
+                        }}
+                      />
+                    </ListItemButton>
+                  ))}
+                </List>
+                {(!agentJob?.activeGames || agentJob.activeGames.length === 0) && (
+                  <Typography variant="body2" color="text.secondary">
+                    Start job to see games.
+                  </Typography>
+                )}
               </Stack>
             )}
             {trainingTab === 'openings' && (
@@ -564,7 +595,13 @@ function TrainingPage({ authToken, authUser, themeMode }) {
       <Card sx={{ minHeight: { xs: 520, md: 'calc(100vh - 190px)' } }}>
         <CardContent>
           {trainingTab === 'agent' && isAdmin ? (
-            <RLTrainingPanel authToken={authToken} themeMode={themeMode} />
+            <RLTrainingPanel
+              authToken={authToken}
+              selectedGameId={selectedAgentGameId}
+              themeMode={themeMode}
+              onJobChange={setAgentJob}
+              onSelectedGameIdChange={setSelectedAgentGameId}
+            />
           ) : (
             <>
           <Stack
