@@ -75,6 +75,14 @@ function numericFieldValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0
 }
 
+function configDiffers(left, right) {
+  if (!left || !right) {
+    return false
+  }
+
+  return Object.keys(defaultConfig).some((key) => numericFieldValue(left[key]) !== numericFieldValue(right[key]))
+}
+
 function RLTrainingPanel({
   authToken,
   selectedGameId,
@@ -91,6 +99,7 @@ function RLTrainingPanel({
     authToken ? { Authorization: `Bearer ${authToken}` } : {}
   ), [authToken])
   const isRunning = job?.status === 'running'
+  const runningJobUsesDifferentConfig = Boolean(isRunning && configDiffers(config, job?.config))
 
   async function loadJob() {
     setError(null)
@@ -255,6 +264,11 @@ function RLTrainingPanel({
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {runningJobUsesDifferentConfig && (
+        <Alert severity="info">
+          Running job uses settings from when it started. Stop and start to apply current settings.
+        </Alert>
+      )}
 
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={2}>
