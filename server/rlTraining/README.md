@@ -5,8 +5,8 @@ Done now:
 1. Generate self-play games with `chess.js`.
 2. Encode board states as tensors.
 3. Train a TensorFlow.js policy/value model.
-4. Store games in `server/rlTraining/data/games.jsonl`.
-5. Store samples in `server/rlTraining/data/samples.jsonl`.
+4. Store games in `server/rlTraining/data/games.binl`.
+5. Store samples in `server/rlTraining/data/samples.binl`.
 6. Save checkpoints in `server/rlTraining/checkpoints/`.
 7. Show latest self-play game, moves, loss, samples, and checkpoint in admin UI.
 8. Stop training when auth fails.
@@ -14,6 +14,8 @@ Done now:
 10. Run training in a separate local trainer server behind app-server admin proxy.
 11. Batch policy inference across active games.
 12. Send compact active-game summaries to UI and full moves only for selected game.
+13. Run chess simulation in trainer worker threads.
+14. Store generated records as length-prefixed binary.
 
 Runtime persistence:
 
@@ -32,6 +34,7 @@ Training terms:
 - Max plies: hard game length cap. One ply is one half-move.
 - Ply delay (ms): delay between live generation ticks. Lower means faster.
 - Parallel games: number of self-play games generated at the same time. Current cap is `256`.
+- Workers: number of trainer worker threads used for chess simulation.
 - Train samples: maximum move samples used in one train step.
 - Train batch: TensorFlow batch size used inside one train step.
 - Game: one self-play chess game.
@@ -50,4 +53,4 @@ Still needed for strong play:
 4. Add checkpoint browser and delete/export controls.
 5. Add worker thread/process pool inside trainer for CPU-heavy scaling.
 6. Persist and restore active job state after trainer restart.
-7. Move storage to compact binary format if JSONL becomes bottleneck.
+7. Add tools to inspect binary training files.

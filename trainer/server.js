@@ -73,14 +73,14 @@ async function handleRequest(req, res) {
 
     if (req.method === 'POST' && url.pathname === '/job') {
       const body = await readJsonBody(req)
-      const job = startTrainingJob(body, getProxyUser(req))
+      const job = await startTrainingJob(body, getProxyUser(req))
 
       sendJson(res, 201, { job })
       return
     }
 
     if (req.method === 'POST' && url.pathname === '/job/stop') {
-      const job = stopTrainingJob(getProxyUser(req))
+      const job = await stopTrainingJob(getProxyUser(req))
 
       sendJson(res, 200, { job })
       return
@@ -88,7 +88,7 @@ async function handleRequest(req, res) {
 
     if (req.method === 'POST' && url.pathname === '/job/stop-all') {
       const body = await readJsonBody(req)
-      const job = stopAllTrainingJobs(body.message || 'Stopped')
+      const job = await stopAllTrainingJobs(body.message || 'Stopped')
 
       sendJson(res, 200, { job })
       return

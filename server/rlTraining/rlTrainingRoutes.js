@@ -14,13 +14,13 @@ function createRlTrainingRouter({ authenticate, requireAdmin }) {
     res.json({ job: getTrainingJob() })
   })
 
-  router.post('/job', (req, res) => {
-    const job = startTrainingJob(req.body, req.user)
+  router.post('/job', async (req, res) => {
+    const job = await startTrainingJob(req.body, req.user)
     res.status(201).json({ job })
   })
 
-  router.post('/job/stop', (req, res) => {
-    const job = stopTrainingJob(req.user)
+  router.post('/job/stop', async (req, res) => {
+    const job = await stopTrainingJob(req.user)
     res.json({ job })
   })
 

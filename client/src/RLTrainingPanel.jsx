@@ -22,6 +22,7 @@ const defaultConfig = {
   maxPlies: 400,
   plyDelayMs: 25,
   parallelGames: 4,
+  workerCount: 4,
   trainSampleLimit: 512,
   trainBatchSize: 256,
 }
@@ -342,6 +343,16 @@ function RLTrainingPanel({
               disabled={isRunning || saving}
             />
             <TextField
+              label="Workers"
+              type="number"
+              size="small"
+              value={config.workerCount}
+              onChange={(event) => updateConfig('workerCount', event.target.value)}
+              inputProps={{ min: 1 }}
+              fullWidth
+              disabled={isRunning || saving}
+            />
+            <TextField
               label="Train samples"
               type="number"
               size="small"
@@ -422,6 +433,7 @@ function RLTrainingPanel({
               <Chip label={`${job.config.maxPlies} plies`} variant="outlined" />
               <Chip label={`${job.config.plyDelayMs}ms / ply`} variant="outlined" />
               <Chip label={`${job.config.parallelGames} parallel games`} variant="outlined" />
+              <Chip label={`${job.config.workerCount} workers`} variant="outlined" />
               <Chip label={`${job.config.trainSampleLimit} train samples`} variant="outlined" />
               <Chip label={`${job.config.trainBatchSize} train batch`} variant="outlined" />
             </Stack>

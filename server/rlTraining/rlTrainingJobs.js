@@ -1,11 +1,6 @@
 const { createModel, saveModel, tf } = require('./modelStore')
-const {
-  advanceLiveSelfPlayGames,
-  createLiveSelfPlayGame,
-  publicLiveGame,
-  summarizeLiveGame,
-} = require('./selfPlayEngine')
 const { saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
+const { TrainingWorkerPool } = require('./workerPool')
 
 let activeJob = null
 
@@ -27,6 +22,7 @@ function sanitizeTrainingConfig(config = {}) {
     maxPlies: sanitizePositiveInteger(config.maxPlies, 400, 20, 1000),
     plyDelayMs: sanitizePositiveInteger(config.plyDelayMs, 25, 10, 5000),
     parallelGames: sanitizePositiveInteger(config.parallelGames, 4, 1, 256),
+    workerCount: sanitizePositiveInteger(config.workerCount, 4, 1, 32),
     trainSampleLimit: sanitizePositiveInteger(config.trainSampleLimit, 512, 32, 4096),
     trainBatchSize: sanitizePositiveInteger(config.trainBatchSize, 256, 16, 2048),
   }
@@ -35,13 +31,6 @@ function sanitizeTrainingConfig(config = {}) {
 function publicJob(job, options = {}) {
   if (!job) {
     return null
-  }
-
-  if (job.status === 'running' && (!job.activeGames || job.activeGames.length === 0)) {
-    job.activeGames = Array.from(
-      { length: job.config?.parallelGames || 4 },
-      () => createLiveSelfPlayGame(),
-    )
   }
 
   const startedAtMs = Date.parse(job.startedAt)
@@ -67,7 +56,7 @@ function publicJob(job, options = {}) {
       samplesPath,
     },
     selfPlayGame: selectPublicGame(job, options.selectedGameId),
-    activeGames: (job.activeGames || []).map(summarizeLiveGame),
+    activeGames: (job.activeGames || []).map(summarizeGame),
   }
 }
 
@@ -75,7 +64,22 @@ function selectPublicGame(job, selectedGameId) {
   const activeGames = job.activeGames || []
   const selectedGame = activeGames.find((game) => game.id === selectedGameId)
 
-  return publicLiveGame(selectedGame || job.selfPlayGame || activeGames[0])
+  return selectedGame || job.selfPlayGame || activeGames[0] || null
+}
+
+function summarizeGame(game) {
+  if (!game) {
+    return null
+  }
+
+  return {
+    id: game.id,
+    createdAt: game.createdAt,
+    currentFen: game.currentFen,
+    result: game.result,
+    hitMaxPlies: game.hitMaxPlies,
+    plyCount: game.moves?.length || game.plyCount || 0,
+  }
 }
 
 function sampleTrainingRows(samples, limit) {
@@ -132,6 +136,85 @@ async function maybeCheckpoint(job) {
   job.lastCheckpoint = await saveModel(job.model, job.id, job.iteration)
 }
 
+function selectBestAction(legalIndexes, scores) {
+  let bestAction = legalIndexes[0]
+  let bestScore = -Infinity
+
+  for (const action of legalIndexes) {
+    const score = scores[action]
+
+    if (score > bestScore) {
+      bestScore = score
+      bestAction = action
+    }
+  }
+
+  return bestAction
+}
+
+function buildChoicesFromPolicy(requestBatches, policyRows) {
+  const choicesByWorker = requestBatches.map(() => [])
+  let rowIndex = 0
+
+  for (let workerIndex = 0; workerIndex < requestBatches.length; workerIndex += 1) {
+    for (const request of requestBatches[workerIndex]) {
+      choicesByWorker[workerIndex].push({
+        gameId: request.gameId,
+        action: selectBestAction(request.legalIndexes, policyRows[rowIndex]),
+      })
+      rowIndex += 1
+    }
+  }
+
+  return choicesByWorker
+}
+
+function chooseActions(model, requestBatches) {
+  const requests = requestBatches.flat()
+
+  if (requests.length === 0) {
+    return requestBatches.map(() => [])
+  }
+
+  const policyRows = tf.tidy(() => {
+    const input = tf.tensor2d(requests.map((request) => request.state))
+    const [policy] = model.predict(input)
+
+    return policy.arraySync()
+  })
+
+  return buildChoicesFromPolicy(requestBatches, policyRows)
+}
+
+function absorbWorkerResults(job, workerResults) {
+  const activeGames = []
+
+  for (const result of workerResults) {
+    activeGames.push(...result.games)
+
+    for (const completed of result.completed) {
+      job.completedGames = [completed.game, ...job.completedGames].slice(0, 12)
+      job.pendingSamples.push(...completed.samples)
+      job.gamesInIteration += 1
+      job.totalGames += 1
+      job.totalSamples += completed.samples.length
+      job.selfPlayGame = completed.game
+      job.message = `Generated game ${job.totalGames}`
+    }
+  }
+
+  job.activeGames = activeGames
+}
+
+async function saveCompletedResults(results) {
+  for (const result of results) {
+    for (const completed of result.completed) {
+      await saveGame(completed.game)
+      await saveSamples(completed.samples)
+    }
+  }
+}
+
 async function runTrainingStep(job) {
   if (job.status !== 'running') {
     return
@@ -139,34 +222,21 @@ async function runTrainingStep(job) {
 
   try {
     const explorationRate = Math.max(0.05, 0.35 - job.iteration / Math.max(job.config.iterations, 1))
-    const nextGames = []
-    const results = advanceLiveSelfPlayGames(job.activeGames, job.model, {
+    const options = {
       maxPlies: job.config.maxPlies,
       explorationRate,
-    })
-
-    for (const result of results) {
-      job.selfPlayGame = publicLiveGame(result.game)
-
-      if (result.completed) {
-        const savedGame = publicLiveGame(result.game)
-
-        await saveGame(savedGame)
-        await saveSamples(result.samples)
-
-        job.completedGames = [savedGame, ...job.completedGames].slice(0, 12)
-        job.pendingSamples.push(...result.samples)
-        job.gamesInIteration += 1
-        job.totalGames += 1
-        job.totalSamples += result.samples.length
-        job.message = `Generated game ${job.totalGames}`
-        nextGames.push(createLiveSelfPlayGame())
-      } else {
-        nextGames.push(result.game)
-      }
     }
+    const prepared = await job.workerPool.prepare(options)
+    const requestBatches = prepared.map((result) => result.requests)
 
-    job.activeGames = nextGames
+    absorbWorkerResults(job, prepared)
+    await saveCompletedResults(prepared)
+
+    const choicesByWorker = chooseActions(job.model, requestBatches)
+    const applied = await job.workerPool.apply(choicesByWorker, options)
+
+    absorbWorkerResults(job, applied)
+    await saveCompletedResults(applied)
 
     if (job.gamesInIteration >= job.config.gamesPerIteration) {
       job.message = `Training iteration ${job.iteration + 1}`
@@ -181,12 +251,14 @@ async function runTrainingStep(job) {
       job.stoppedAt = new Date().toISOString()
       job.message = 'Training completed'
       await maybeCheckpoint(job)
+      await job.workerPool?.stop()
       return
     }
   } catch (err) {
     job.status = 'failed'
     job.stoppedAt = new Date().toISOString()
     job.message = err.message
+    await job.workerPool?.stop()
     console.error('RL training failed:', err)
     return
   }
@@ -198,7 +270,7 @@ function getTrainingJob(options = {}) {
   return publicJob(activeJob, options)
 }
 
-function startTrainingJob(config, user) {
+async function startTrainingJob(config, user) {
   if (activeJob?.status === 'running') {
     return publicJob(activeJob)
   }
@@ -224,18 +296,24 @@ function startTrainingJob(config, user) {
     lastCheckpoint: null,
     pendingSamples: [],
     selfPlayGame: null,
-    activeGames: Array.from({ length: trainingConfig.parallelGames }, () => createLiveSelfPlayGame()),
+    activeGames: [],
     completedGames: [],
     model: createModel(),
+    workerPool: new TrainingWorkerPool({
+      parallelGames: trainingConfig.parallelGames,
+      workerCount: trainingConfig.workerCount,
+    }),
     timer: null,
   }
 
+  await activeJob.workerPool.start()
+  activeJob.activeGames = activeJob.workerPool.latestGames
   activeJob.timer = setTimeout(() => runTrainingStep(activeJob), 0)
 
   return publicJob(activeJob)
 }
 
-function stopTrainingJob(user) {
+async function stopTrainingJob(user) {
   if (!activeJob || activeJob.status !== 'running') {
     return publicJob(activeJob)
   }
@@ -243,6 +321,8 @@ function stopTrainingJob(user) {
   if (activeJob.timer) {
     clearTimeout(activeJob.timer)
   }
+
+  await activeJob.workerPool?.stop()
 
   activeJob = {
     ...activeJob,
@@ -254,7 +334,7 @@ function stopTrainingJob(user) {
   return publicJob(activeJob)
 }
 
-function stopAllTrainingJobs(message = 'Stopped') {
+async function stopAllTrainingJobs(message = 'Stopped') {
   if (!activeJob || activeJob.status !== 'running') {
     return publicJob(activeJob)
   }
@@ -262,6 +342,8 @@ function stopAllTrainingJobs(message = 'Stopped') {
   if (activeJob.timer) {
     clearTimeout(activeJob.timer)
   }
+
+  await activeJob.workerPool?.stop()
 
   activeJob = {
     ...activeJob,
