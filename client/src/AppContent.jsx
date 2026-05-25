@@ -411,6 +411,10 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           onUserUpdated(user)
         })
 
+        liveSocket.on('userDeleted', () => {
+          onLogout()
+        })
+
         liveSocket.on('channelMembershipRemoved', () => {
           setNotice('You were removed from a private channel')
           setMessages([])

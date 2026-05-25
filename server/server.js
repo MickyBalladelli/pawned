@@ -724,7 +724,7 @@ app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
                created_at
         FROM users
         ORDER BY is_blocked ASC,
-                 CASE role WHEN 'admin' THEN 0 WHEN 'developer' THEN 1 WHEN 'moderator' THEN 2 ELSE 3 END,
+                 CASE role WHEN 'admin' THEN 0 WHEN 'developer' THEN 1 WHEN 'moderator' THEN 2 WHEN 'vip' THEN 3 ELSE 4 END,
                  LOWER(username) ASC
       `
     )
@@ -739,8 +739,8 @@ app.get('/api/users', authenticate, requireAdmin, async (req, res) => {
 app.put('/api/users/:id/role', authenticate, requireAdmin, async (req, res) => {
   const role = typeof req.body.role === 'string' ? req.body.role.trim().toLowerCase() : ''
 
-  if (!['user', 'developer', 'moderator', 'admin'].includes(role)) {
-    return res.status(400).json({ error: 'Role must be user, developer, moderator, or admin' })
+  if (!['user', 'vip', 'developer', 'moderator', 'admin'].includes(role)) {
+    return res.status(400).json({ error: 'Role must be user, vip, developer, moderator, or admin' })
   }
 
   if (Number(req.params.id) === Number(req.user.id) && role !== 'admin') {
@@ -812,6 +812,31 @@ app.put('/api/users/:id/block', authenticate, requireModerator, async (req, res)
   } catch (err) {
     console.error('Error updating user block:', err)
     res.status(500).json({ error: 'Failed to update user block' })
+  }
+})
+
+app.delete('/api/users/:id', authenticate, requireAdmin, async (req, res) => {
+  if (Number(req.params.id) === Number(req.user.id)) {
+    return res.status(400).json({ error: 'You cannot delete your own account here' })
+  }
+
+  try {
+    await deleteUserSessions(req.params.id)
+
+    const result = await pool.query(
+      'DELETE FROM users WHERE id = $1 RETURNING id, username',
+      [req.params.id]
+    )
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    io.to(`user:${req.params.id}`).emit('userDeleted')
+    res.json({ message: 'User deleted', user: result.rows[0] })
+  } catch (err) {
+    console.error('Error deleting user:', err)
+    res.status(500).json({ error: 'Failed to delete user' })
   }
 })
 
@@ -1506,7 +1531,7 @@ async function createTables() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_chess_opening BOOLEAN DEFAULT TRUE');
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL');
     await pool.query("UPDATE users SET role = 'admin' WHERE is_admin = true AND role <> 'admin'");
-    await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'developer', 'moderator', 'admin')");
+    await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'vip', 'developer', 'moderator', 'admin')");
     await pool.query("UPDATE users SET is_admin = true WHERE role IN ('admin', 'developer')");
     await pool.query('UPDATE users SET is_blocked = false WHERE is_blocked IS NULL');
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL');

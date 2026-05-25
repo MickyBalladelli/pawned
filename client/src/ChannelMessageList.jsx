@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Avatar, Box, Chip, Menu, MenuItem, Stack, Tooltip, Typography } from '@mui/material'
-import { AdminPanelSettings, Code, Shield } from '@mui/icons-material'
+import { AdminPanelSettings, Code, Diamond, Shield } from '@mui/icons-material'
 
 const groupWindowMs = 5 * 60 * 1000
 
@@ -162,6 +162,7 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
         const isAdminMessage = role === 'admin'
         const isModeratorMessage = role === 'moderator'
         const isDeveloperMessage = role === 'developer'
+        const isVipMessage = role === 'vip'
 
         return (
           <Box
@@ -182,6 +183,8 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                     ? 'rgba(237, 108, 2, 0.14)'
                     : isDeveloperMessage
                       ? 'rgba(46, 125, 50, 0.14)'
+                      : isVipMessage
+                        ? 'rgba(2, 136, 209, 0.14)'
                       : 'action.hover',
               },
               '&:hover .message-time': {
@@ -199,8 +202,14 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                   fontSize: 14,
                   fontWeight: 800,
                   bgcolor: 'primary.main',
-                  border: isAdminMessage ? '2px solid' : isModeratorMessage || isDeveloperMessage ? '1px solid' : 0,
-                  borderColor: isAdminMessage ? 'error.main' : isModeratorMessage ? 'warning.main' : 'success.main',
+                  border: isAdminMessage ? '2px solid' : isModeratorMessage || isDeveloperMessage || isVipMessage ? '1px solid' : 0,
+                  borderColor: isAdminMessage
+                    ? 'error.main'
+                    : isModeratorMessage
+                      ? 'warning.main'
+                      : isDeveloperMessage
+                        ? 'success.main'
+                        : 'info.main',
                 }}
               >
                 {getInitial(message.username)}
@@ -241,6 +250,8 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                           ? 'warning.main'
                           : isDeveloperMessage
                             ? 'success.main'
+                            : isVipMessage
+                              ? 'info.main'
                             : 'text.primary',
                     }}
                   >
@@ -270,6 +281,15 @@ function ChannelMessageList({ authUser, messages, endRef, onDeleteMessage, onBlo
                       icon={<Code />}
                       label="dev"
                       color="success"
+                      sx={{ height: 20, fontWeight: 900 }}
+                    />
+                  )}
+                  {isVipMessage && (
+                    <Chip
+                      size="small"
+                      icon={<Diamond />}
+                      label="vip"
+                      color="info"
                       sx={{ height: 20, fontWeight: 900 }}
                     />
                   )}

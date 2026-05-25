@@ -14,7 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { AdminPanelSettings, Block, Code, Person, Refresh, Shield } from '@mui/icons-material'
+import { AdminPanelSettings, Block, Code, Delete, Diamond, Person, Refresh, Shield } from '@mui/icons-material'
 import { requestJson } from './requestJson'
 
 function getInitial(username) {
@@ -42,6 +42,10 @@ function roleIcon(role) {
     return <Code fontSize="small" />
   }
 
+  if (role === 'vip') {
+    return <Diamond fontSize="small" />
+  }
+
   return <Person fontSize="small" />
 }
 
@@ -56,6 +60,10 @@ function roleColor(role) {
 
   if (role === 'developer') {
     return 'success'
+  }
+
+  if (role === 'vip') {
+    return 'info'
   }
 
   return 'default'
@@ -144,6 +152,31 @@ function UsersPage({ authToken, authUser, onError, onNotice }) {
         body: JSON.stringify({ blocked }),
       })
       setUsers((current) => current.map((item) => (item.id === user.id ? data.user : item)))
+      onNotice(data.message)
+    } catch (err) {
+      setLocalError(err.message)
+      onError(err.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  async function deleteUser(user) {
+    const confirmed = window.confirm(`Delete ${user.username}?`)
+
+    if (!confirmed) {
+      return
+    }
+
+    setBusyId(user.id)
+    setLocalError(null)
+
+    try {
+      const data = await requestJson(`/api/users/${user.id}`, {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+      setUsers((current) => current.filter((item) => item.id !== user.id))
       onNotice(data.message)
     } catch (err) {
       setLocalError(err.message)
@@ -245,6 +278,7 @@ function UsersPage({ authToken, authUser, onError, onNotice }) {
                         sx={{ minWidth: 170 }}
                       >
                         <MenuItem value="user">User</MenuItem>
+                        <MenuItem value="vip">VIP</MenuItem>
                         <MenuItem value="developer">Developer</MenuItem>
                         <MenuItem value="moderator">Moderator</MenuItem>
                         <MenuItem value="admin">Admin</MenuItem>
@@ -259,6 +293,17 @@ function UsersPage({ authToken, authUser, onError, onNotice }) {
                         sx={{ minWidth: 130 }}
                       >
                         {user.is_blocked ? 'Unblock' : 'Block'}
+                      </Button>
+
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        startIcon={<Delete />}
+                        disabled={busyId === user.id || isSelf}
+                        onClick={() => deleteUser(user)}
+                        sx={{ minWidth: 120 }}
+                      >
+                        Delete
                       </Button>
                     </Stack>
                   </Paper>
