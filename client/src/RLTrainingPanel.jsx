@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import { PlayArrow, Stop, Sync } from '@mui/icons-material'
+import RLTrainingGameViewer from './RLTrainingGameViewer'
 import { requestJson } from './requestJson'
 
 const defaultConfig = {
@@ -275,6 +276,8 @@ function RLTrainingPanel({ authToken, themeMode }) {
           </Typography>
         </Stack>
       </Paper>
+
+      <RLTrainingGameViewer game={job?.selfPlayGame} themeMode={themeMode} />
     </Stack>
   )
 }

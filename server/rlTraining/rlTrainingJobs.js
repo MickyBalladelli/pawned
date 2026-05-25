@@ -1,4 +1,38 @@
+const { Chess } = require('chess.js')
+
 let activeJob = null
+
+function randomItem(items) {
+  return items[Math.floor(Math.random() * items.length)]
+}
+
+function generateSelfPlayPreview(maxPlies) {
+  const chess = new Chess()
+  const moves = []
+  const plies = Math.min(maxPlies, 48)
+
+  while (!chess.isGameOver() && moves.length < plies) {
+    const legalMoves = chess.moves({ verbose: true })
+    const move = randomItem(legalMoves)
+
+    chess.move(move)
+    moves.push({
+      ply: moves.length + 1,
+      moveNumber: Math.ceil((moves.length + 1) / 2),
+      color: move.color === 'w' ? 'white' : 'black',
+      san: move.san,
+      uci: `${move.from}${move.to}${move.promotion || ''}`,
+      fen: chess.fen(),
+    })
+  }
+
+  return {
+    initialFen: new Chess().fen(),
+    currentFen: chess.fen(),
+    result: chess.isDraw() ? 'draw' : chess.isCheckmate() ? 'checkmate' : 'in progress',
+    moves,
+  }
+}
 
 function sanitizePositiveInteger(value, fallback, min, max) {
   const number = Number(value)
@@ -32,6 +66,7 @@ function publicJob(job) {
     startedAt: job.startedAt,
     stoppedAt: job.stoppedAt,
     message: job.message,
+    selfPlayGame: job.selfPlayGame,
   }
 }
 
@@ -44,10 +79,12 @@ function startTrainingJob(config, user) {
     return publicJob(activeJob)
   }
 
+  const trainingConfig = sanitizeTrainingConfig(config)
+
   activeJob = {
     id: `rl-${Date.now()}`,
     status: 'running',
-    config: sanitizeTrainingConfig(config),
+    config: trainingConfig,
     startedBy: {
       id: user.id,
       username: user.username,
@@ -55,6 +92,7 @@ function startTrainingJob(config, user) {
     startedAt: new Date().toISOString(),
     stoppedAt: null,
     message: 'Training job started',
+    selfPlayGame: generateSelfPlayPreview(trainingConfig.maxPlies),
   }
 
   return publicJob(activeJob)
