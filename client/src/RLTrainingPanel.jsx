@@ -37,6 +37,23 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+function formatDuration(milliseconds = 0) {
+  const totalSeconds = Math.floor(milliseconds / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  }
+
+  return `${seconds}s`
+}
+
 function numericFieldValue(value) {
   return Number.isFinite(Number(value)) ? Number(value) : 0
 }
@@ -314,6 +331,7 @@ function RLTrainingPanel({ authToken, themeMode }) {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
             <Chip label={`ID: ${job?.id || '-'}`} variant="outlined" />
             <Chip label={`Started: ${formatDate(job?.startedAt)}`} variant="outlined" />
+            <Chip label={`Time: ${formatDuration(job?.elapsedMs)}`} variant="outlined" />
             <Chip label={`By: ${job?.startedBy?.username || '-'}`} variant="outlined" />
           </Stack>
           {job?.config && (

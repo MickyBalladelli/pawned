@@ -30,6 +30,9 @@ function publicJob(job) {
     return null
   }
 
+  const startedAtMs = Date.parse(job.startedAt)
+  const endedAtMs = job.stoppedAt ? Date.parse(job.stoppedAt) : Date.now()
+
   return {
     id: job.id,
     status: job.status,
@@ -37,6 +40,7 @@ function publicJob(job) {
     startedBy: job.startedBy,
     startedAt: job.startedAt,
     stoppedAt: job.stoppedAt,
+    elapsedMs: Number.isFinite(startedAtMs) ? Math.max(0, endedAtMs - startedAtMs) : 0,
     message: job.message,
     iteration: job.iteration,
     gamesInIteration: job.gamesInIteration,
