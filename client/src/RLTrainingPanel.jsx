@@ -345,6 +345,15 @@ function RLTrainingPanel({
         </Stack>
       </Paper>
 
+      <RLTrainingGameViewer
+        games={job?.activeGames || []}
+        fallbackGame={job?.selfPlayGame}
+        elapsedMs={job?.elapsedMs || 0}
+        selectedGameId={selectedGameId}
+        themeMode={themeMode}
+        onSelectedGameIdChange={onSelectedGameIdChange}
+      />
+
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1.25}>
           <Typography variant="h6" sx={{ fontWeight: 900 }}>
@@ -392,14 +401,6 @@ function RLTrainingPanel({
           )}
         </Stack>
       </Paper>
-
-      <RLTrainingGameViewer
-        games={job?.activeGames || []}
-        fallbackGame={job?.selfPlayGame}
-        selectedGameId={selectedGameId}
-        themeMode={themeMode}
-        onSelectedGameIdChange={onSelectedGameIdChange}
-      />
     </Stack>
   )
 }

@@ -21,6 +21,7 @@ function moveLabel(move) {
 function RLTrainingGameViewer({
   games = [],
   fallbackGame = null,
+  elapsedMs = 0,
   selectedGameId,
   onSelectedGameIdChange,
   themeMode,
@@ -71,11 +72,6 @@ function RLTrainingGameViewer({
     }
   }, [activeGameId, onSelectedGameIdChange, visibleGames])
 
-  function selectGame(id) {
-    setLocalSelectedGameId(id)
-    onSelectedGameIdChange?.(id)
-  }
-
   function previousMove() {
     setSelectedPly((current) => {
       const ply = current || moves.length
@@ -117,6 +113,7 @@ function RLTrainingGameViewer({
           </Box>
           <Stack direction="row" spacing={1}>
             <Chip label={`${visibleGames.length} games`} variant="outlined" />
+            <Chip label={`${Math.floor(elapsedMs / 1000)}s`} variant="outlined" />
             <Chip label={`${moves.length} plies`} variant="outlined" />
             <Chip label={game?.result || 'idle'} variant="outlined" />
           </Stack>
@@ -127,54 +124,11 @@ function RLTrainingGameViewer({
         <Box
           sx={{
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', md: '240px minmax(280px, 520px) minmax(240px, 1fr)' },
+            gridTemplateColumns: { xs: '1fr', lg: 'minmax(280px, 520px) minmax(240px, 1fr)' },
             gap: 2,
             alignItems: 'start',
           }}
         >
-          <List
-            dense
-            disablePadding
-            sx={{
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              maxHeight: { lg: 520 },
-              overflowY: 'auto',
-              p: 0.75,
-            }}
-          >
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', px: 1, py: 0.5 }}>
-              <Typography variant="subtitle2" sx={{ flex: '1 1 auto', fontWeight: 900 }}>
-                Active games
-              </Typography>
-              <Chip size="small" label={visibleGames.length} variant="outlined" />
-            </Stack>
-            <Divider sx={{ mb: 0.75 }} />
-            {visibleGames.length === 0 && (
-              <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
-                No active games
-              </Typography>
-            )}
-            {visibleGames.map((item, index) => (
-              <ListItemButton
-                key={item.id}
-                selected={item.id === game?.id}
-                onClick={() => selectGame(item.id)}
-                sx={{ borderRadius: 1, mb: 0.5 }}
-              >
-                <ListItemText
-                  primary={`Game ${index + 1}`}
-                  secondary={`${item.moves?.length || 0} plies · ${item.result || 'in progress'}`}
-                  slotProps={{
-                    primary: { noWrap: true },
-                    secondary: { noWrap: true },
-                  }}
-                />
-              </ListItemButton>
-            ))}
-          </List>
-
           <Box>
             {game ? (
               <ChessBoard
