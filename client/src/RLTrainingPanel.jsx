@@ -23,6 +23,7 @@ const defaultConfig = {
   plyDelayMs: 25,
   parallelGames: 4,
   trainSampleLimit: 512,
+  trainBatchSize: 256,
 }
 const trainingConfigStorageKey = 'vela.rlTraining.config'
 
@@ -103,9 +104,10 @@ function RLTrainingPanel({
 
   async function loadJob() {
     setError(null)
+    const params = selectedGameId ? `?selectedGameId=${encodeURIComponent(selectedGameId)}` : ''
 
     try {
-      const data = await requestJson('/api/rl-training/job', {
+      const data = await requestJson(`/api/rl-training/job${params}`, {
         headers: authHeaders,
       })
       setJob(data.job)
@@ -129,7 +131,9 @@ function RLTrainingPanel({
   useEffect(() => {
     let active = true
 
-    requestJson('/api/rl-training/job', {
+    const params = selectedGameId ? `?selectedGameId=${encodeURIComponent(selectedGameId)}` : ''
+
+    requestJson(`/api/rl-training/job${params}`, {
       headers: authHeaders,
     })
       .then((data) => {
@@ -161,7 +165,7 @@ function RLTrainingPanel({
     return () => {
       active = false
     }
-  }, [authHeaders])
+  }, [authHeaders, selectedGameId])
 
   useEffect(() => {
     if (!isRunning) {
@@ -176,7 +180,7 @@ function RLTrainingPanel({
     return () => {
       window.clearInterval(interval)
     }
-  }, [config.plyDelayMs, isRunning])
+  }, [config.plyDelayMs, isRunning, selectedGameId])
 
   function updateConfig(field, value) {
     setConfig((current) => ({
@@ -347,6 +351,16 @@ function RLTrainingPanel({
               fullWidth
               disabled={isRunning || saving}
             />
+            <TextField
+              label="Train batch"
+              type="number"
+              size="small"
+              value={config.trainBatchSize}
+              onChange={(event) => updateConfig('trainBatchSize', event.target.value)}
+              inputProps={{ min: 16 }}
+              fullWidth
+              disabled={isRunning || saving}
+            />
           </Stack>
 
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -409,6 +423,7 @@ function RLTrainingPanel({
               <Chip label={`${job.config.plyDelayMs}ms / ply`} variant="outlined" />
               <Chip label={`${job.config.parallelGames} parallel games`} variant="outlined" />
               <Chip label={`${job.config.trainSampleLimit} train samples`} variant="outlined" />
+              <Chip label={`${job.config.trainBatchSize} train batch`} variant="outlined" />
             </Stack>
           )}
           {job && (

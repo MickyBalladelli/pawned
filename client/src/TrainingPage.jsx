@@ -530,7 +530,7 @@ function TrainingPage({ authToken, authUser, themeMode }) {
                     >
                       <ListItemText
                         primary={`Game ${index + 1}`}
-                        secondary={`${game.moves?.length || 0} plies · ${game.result || 'in progress'}`}
+                        secondary={`${game.plyCount || 0} plies · ${game.result || 'in progress'}`}
                         slotProps={{
                           primary: { noWrap: true },
                           secondary: { noWrap: true },

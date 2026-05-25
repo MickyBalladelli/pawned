@@ -29,7 +29,9 @@ function RLTrainingGameViewer({
   const visibleGames = games.length > 0 ? games : fallbackGame ? [fallbackGame] : []
   const [localSelectedGameId, setLocalSelectedGameId] = useState(null)
   const activeGameId = selectedGameId ?? localSelectedGameId
-  const game = visibleGames.find((item) => item.id === activeGameId) || visibleGames[0] || null
+  const game = fallbackGame?.id === activeGameId || !activeGameId
+    ? fallbackGame
+    : fallbackGame || null
   const [selectedPly, setSelectedPly] = useState(null)
   const moves = game?.moves || []
   const selectedMove = selectedPly ? moves[selectedPly - 1] : null

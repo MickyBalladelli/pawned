@@ -12,6 +12,8 @@ Done now:
 8. Stop training when auth fails.
 9. Generate multiple live self-play games in parallel with configurable `parallelGames`.
 10. Run training in a separate local trainer server behind app-server admin proxy.
+11. Batch policy inference across active games.
+12. Send compact active-game summaries to UI and full moves only for selected game.
 
 Runtime persistence:
 
@@ -31,6 +33,7 @@ Training terms:
 - Ply delay (ms): delay between live generation ticks. Lower means faster.
 - Parallel games: number of self-play games generated at the same time. Current cap is `256`.
 - Train samples: maximum move samples used in one train step.
+- Train batch: TensorFlow batch size used inside one train step.
 - Game: one self-play chess game.
 - Sample: one training row from one position. It stores board state, chosen move, and final reward.
 - Loss: current model training error. Lower usually better, but not perfect proof.
@@ -45,5 +48,6 @@ Still needed for strong play:
 2. Load best checkpoint on server start.
 3. Evaluate new checkpoints against old checkpoints before promotion.
 4. Add checkpoint browser and delete/export controls.
-5. Run training in worker thread or separate process for heavy jobs.
+5. Add worker thread/process pool inside trainer for CPU-heavy scaling.
 6. Persist and restore active job state after trainer restart.
+7. Move storage to compact binary format if JSONL becomes bottleneck.

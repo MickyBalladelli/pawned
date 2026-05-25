@@ -1,8 +1,9 @@
 const { createModel, saveModel, tf } = require('./modelStore')
 const {
-  advanceLiveSelfPlayGame,
+  advanceLiveSelfPlayGames,
   createLiveSelfPlayGame,
   publicLiveGame,
+  summarizeLiveGame,
 } = require('./selfPlayEngine')
 const { saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
 
@@ -27,10 +28,11 @@ function sanitizeTrainingConfig(config = {}) {
     plyDelayMs: sanitizePositiveInteger(config.plyDelayMs, 25, 10, 5000),
     parallelGames: sanitizePositiveInteger(config.parallelGames, 4, 1, 256),
     trainSampleLimit: sanitizePositiveInteger(config.trainSampleLimit, 512, 32, 4096),
+    trainBatchSize: sanitizePositiveInteger(config.trainBatchSize, 256, 16, 2048),
   }
 }
 
-function publicJob(job) {
+function publicJob(job, options = {}) {
   if (!job) {
     return null
   }
@@ -64,9 +66,16 @@ function publicJob(job) {
       gamesPath,
       samplesPath,
     },
-    selfPlayGame: job.selfPlayGame,
-    activeGames: (job.activeGames || []).map(publicLiveGame),
+    selfPlayGame: selectPublicGame(job, options.selectedGameId),
+    activeGames: (job.activeGames || []).map(summarizeLiveGame),
   }
+}
+
+function selectPublicGame(job, selectedGameId) {
+  const activeGames = job.activeGames || []
+  const selectedGame = activeGames.find((game) => game.id === selectedGameId)
+
+  return publicLiveGame(selectedGame || job.selfPlayGame || activeGames[0])
 }
 
 function sampleTrainingRows(samples, limit) {
@@ -97,7 +106,7 @@ async function trainOnSamples(job) {
   try {
     const loss = await job.model.fit(xs, [policyY, valueY], {
       epochs: 1,
-      batchSize: Math.min(64, rows.length),
+      batchSize: Math.min(job.config.trainBatchSize, rows.length),
       shuffle: true,
       verbose: 0,
     })
@@ -131,13 +140,12 @@ async function runTrainingStep(job) {
   try {
     const explorationRate = Math.max(0.05, 0.35 - job.iteration / Math.max(job.config.iterations, 1))
     const nextGames = []
+    const results = advanceLiveSelfPlayGames(job.activeGames, job.model, {
+      maxPlies: job.config.maxPlies,
+      explorationRate,
+    })
 
-    for (const activeGame of job.activeGames) {
-      const result = advanceLiveSelfPlayGame(activeGame, job.model, {
-        maxPlies: job.config.maxPlies,
-        explorationRate,
-      })
-
+    for (const result of results) {
       job.selfPlayGame = publicLiveGame(result.game)
 
       if (result.completed) {
@@ -186,8 +194,8 @@ async function runTrainingStep(job) {
   job.timer = setTimeout(() => runTrainingStep(job), job.config.plyDelayMs)
 }
 
-function getTrainingJob() {
-  return publicJob(activeJob)
+function getTrainingJob(options = {}) {
+  return publicJob(activeJob, options)
 }
 
 function startTrainingJob(config, user) {

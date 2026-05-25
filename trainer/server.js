@@ -67,7 +67,7 @@ async function handleRequest(req, res) {
     }
 
     if (req.method === 'GET' && url.pathname === '/job') {
-      sendJson(res, 200, { job: getTrainingJob() })
+      sendJson(res, 200, { job: getTrainingJob({ selectedGameId: url.searchParams.get('selectedGameId') }) })
       return
     }
 
