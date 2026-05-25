@@ -46,6 +46,39 @@ Training terms:
 - Total games: completed games saved to disk during current job.
 - Total samples: move samples saved to disk during current job.
 
+M1 32 GB speed settings:
+
+Good default:
+
+```txt
+Iterations: 100
+Games / iteration: 200
+Checkpoint every: 10
+Max plies: 100
+Ply delay: 10
+Parallel games: 16
+Workers: 4
+Train samples: 512
+Train batch: 256
+Replay samples: 50000
+```
+
+Faster if the Mac still feels responsive:
+
+```txt
+Parallel games: 24
+Workers: 6
+Max plies: 80
+```
+
+Cooler if the Mac lags or gets hot:
+
+```txt
+Parallel games: 10
+Workers: 4
+Max plies: 80
+```
+
 Still needed for strong play:
 
 1. Replace random exploration with MCTS.

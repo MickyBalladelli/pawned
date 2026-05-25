@@ -103,6 +103,9 @@ function RLTrainingPanel({
   ), [authToken])
   const isRunning = job?.status === 'running'
   const runningJobUsesDifferentConfig = Boolean(isRunning && configDiffers(config, job?.config))
+  const totalGamesRemaining = job?.config
+    ? Math.max(0, ((job.config.iterations || 0) * (job.config.gamesPerIteration || 0)) - (job.totalGames || 0))
+    : 0
 
   async function loadJob() {
     setError(null)
@@ -290,7 +293,7 @@ function RLTrainingPanel({
               value={config.iterations}
               onChange={(event) => updateConfig('iterations', event.target.value)}
               inputProps={{ min: 1 }}
-              fullWidth
+              sx={{ flex: 1 }}
               disabled={isRunning || saving}
             />
             <TextField
@@ -300,7 +303,7 @@ function RLTrainingPanel({
               value={config.gamesPerIteration}
               onChange={(event) => updateConfig('gamesPerIteration', event.target.value)}
               inputProps={{ min: 1 }}
-              fullWidth
+              sx={{ flex: 1 }}
               disabled={isRunning || saving}
             />
             <TextField
@@ -310,7 +313,7 @@ function RLTrainingPanel({
               value={config.checkpointEvery}
               onChange={(event) => updateConfig('checkpointEvery', event.target.value)}
               inputProps={{ min: 1 }}
-              fullWidth
+              sx={{ flex: 1 }}
               disabled={isRunning || saving}
             />
             <TextField
@@ -320,57 +323,7 @@ function RLTrainingPanel({
               value={config.maxPlies}
               onChange={(event) => updateConfig('maxPlies', event.target.value)}
               inputProps={{ min: 20 }}
-              fullWidth
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Ply delay (ms)"
-              type="number"
-              size="small"
-              value={config.plyDelayMs}
-              onChange={(event) => updateConfig('plyDelayMs', event.target.value)}
-              inputProps={{ min: 10 }}
-              fullWidth
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Parallel games"
-              type="number"
-              size="small"
-              value={config.parallelGames}
-              onChange={(event) => updateConfig('parallelGames', event.target.value)}
-              inputProps={{ min: 1 }}
-              fullWidth
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Workers"
-              type="number"
-              size="small"
-              value={config.workerCount}
-              onChange={(event) => updateConfig('workerCount', event.target.value)}
-              inputProps={{ min: 1 }}
-              fullWidth
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Train samples"
-              type="number"
-              size="small"
-              value={config.trainSampleLimit}
-              onChange={(event) => updateConfig('trainSampleLimit', event.target.value)}
-              inputProps={{ min: 32 }}
-              fullWidth
-              disabled={isRunning || saving}
-            />
-            <TextField
-              label="Train batch"
-              type="number"
-              size="small"
-              value={config.trainBatchSize}
-              onChange={(event) => updateConfig('trainBatchSize', event.target.value)}
-              inputProps={{ min: 16 }}
-              fullWidth
+              sx={{ flex: 1 }}
               disabled={isRunning || saving}
             />
           </Stack>
@@ -381,13 +334,63 @@ function RLTrainingPanel({
             sx={{ alignItems: 'stretch' }}
           >
             <TextField
+              label="Ply delay (ms)"
+              type="number"
+              size="small"
+              value={config.plyDelayMs}
+              onChange={(event) => updateConfig('plyDelayMs', event.target.value)}
+              inputProps={{ min: 10 }}
+              sx={{ flex: 1 }}
+              disabled={isRunning || saving}
+            />
+            <TextField
+              label="Parallel games"
+              type="number"
+              size="small"
+              value={config.parallelGames}
+              onChange={(event) => updateConfig('parallelGames', event.target.value)}
+              inputProps={{ min: 1 }}
+              sx={{ flex: 1 }}
+              disabled={isRunning || saving}
+            />
+            <TextField
+              label="Workers"
+              type="number"
+              size="small"
+              value={config.workerCount}
+              onChange={(event) => updateConfig('workerCount', event.target.value)}
+              inputProps={{ min: 1 }}
+              sx={{ flex: 1 }}
+              disabled={isRunning || saving}
+            />
+            <TextField
+              label="Train samples"
+              type="number"
+              size="small"
+              value={config.trainSampleLimit}
+              onChange={(event) => updateConfig('trainSampleLimit', event.target.value)}
+              inputProps={{ min: 32 }}
+              sx={{ flex: 1 }}
+              disabled={isRunning || saving}
+            />
+            <TextField
+              label="Train batch"
+              type="number"
+              size="small"
+              value={config.trainBatchSize}
+              onChange={(event) => updateConfig('trainBatchSize', event.target.value)}
+              inputProps={{ min: 16 }}
+              sx={{ flex: 1 }}
+              disabled={isRunning || saving}
+            />
+            <TextField
               label="Replay samples"
               type="number"
               size="small"
               value={config.replaySampleLimit}
               onChange={(event) => updateConfig('replaySampleLimit', event.target.value)}
               inputProps={{ min: 0 }}
-              fullWidth
+              sx={{ flex: 1 }}
               disabled={isRunning || saving}
             />
           </Stack>
@@ -461,6 +464,7 @@ function RLTrainingPanel({
             <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 1 }}>
               <Chip label={`Iteration: ${job.iteration || 0}`} variant="outlined" />
               <Chip label={`Games: ${job.totalGames || 0}`} variant="outlined" />
+              <Chip label={`Total left: ${totalGamesRemaining}`} variant="outlined" />
               <Chip label={`Active: ${job.activeGames?.length || 0}`} variant="outlined" />
               <Chip label={`Samples: ${job.totalSamples || 0}`} variant="outlined" />
               <Chip label={`Replay: ${job.replaySamples || 0}`} variant="outlined" />
