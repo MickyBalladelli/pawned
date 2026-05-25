@@ -78,6 +78,65 @@ function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
 
+function hashToken(token) {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+async function getSession(token) {
+  if (!token) {
+    return null
+  }
+
+  const memorySession = sessions.get(token)
+
+  if (memorySession) {
+    return memorySession
+  }
+
+  const result = await pool.query(
+    'SELECT user_id FROM auth_sessions WHERE token_hash = $1',
+    [hashToken(token)]
+  )
+  const row = result.rows[0]
+
+  if (!row) {
+    return null
+  }
+
+  const session = { userId: row.user_id }
+  sessions.set(token, session)
+  return session
+}
+
+async function saveSession(token, userId) {
+  sessions.set(token, { userId })
+  await pool.query(
+    `
+      INSERT INTO auth_sessions (token_hash, user_id)
+      VALUES ($1, $2)
+      ON CONFLICT (token_hash) DO UPDATE
+      SET user_id = EXCLUDED.user_id,
+          created_at = CURRENT_TIMESTAMP
+    `,
+    [hashToken(token), userId]
+  )
+}
+
+async function deleteSession(token) {
+  sessions.delete(token)
+  await pool.query('DELETE FROM auth_sessions WHERE token_hash = $1', [hashToken(token)])
+}
+
+async function deleteUserSessions(userId) {
+  for (const [token, session] of sessions.entries()) {
+    if (Number(session.userId) === Number(userId)) {
+      sessions.delete(token)
+    }
+  }
+
+  await pool.query('DELETE FROM auth_sessions WHERE user_id = $1', [userId])
+}
+
 function getPublicBaseUrl(req) {
   return process.env.PUBLIC_APP_URL || `${req.protocol}://${req.get('host')}`
 }
@@ -163,24 +222,25 @@ function passwordMatches(password, passwordHash) {
 
 async function authenticate(req, res, next) {
   const token = getAuthToken(req);
-  const session = token ? sessions.get(token) : null;
-
-  if (!session) {
-    if (req.originalUrl?.startsWith('/api/rl-training')) {
-      stopAllTrainingJobs('Stopped because authentication was required')
-    }
-
-    return res.status(401).json({ error: 'Authentication required' });
-  }
 
   try {
+    const session = await getSession(token)
+
+    if (!session) {
+      if (req.originalUrl?.startsWith('/api/rl-training')) {
+        stopAllTrainingJobs('Stopped because authentication was required')
+      }
+
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
     const result = await pool.query(
       `SELECT ${userSelectColumns} FROM users WHERE id = $1 AND is_verified = true AND is_blocked = false`,
       [session.userId]
     );
 
     if (result.rows.length === 0) {
-      sessions.delete(token);
+      await deleteSession(token);
       if (req.originalUrl?.startsWith('/api/rl-training')) {
         stopAllTrainingJobs('Stopped because authentication was required')
       }
@@ -392,7 +452,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const token = crypto.randomBytes(32).toString('hex');
-    sessions.set(token, { userId: user.id });
+    await saveSession(token, user.id);
 
     res.json({
       token,
@@ -582,8 +642,8 @@ app.get('/api/auth/me', authenticate, (req, res) => {
   res.json({ user: req.user });
 });
 
-app.post('/api/auth/logout', authenticate, (req, res) => {
-  sessions.delete(req.authToken);
+app.post('/api/auth/logout', authenticate, async (req, res) => {
+  await deleteSession(req.authToken);
   res.json({ message: 'Logged out' });
 });
 
@@ -744,11 +804,7 @@ app.put('/api/users/:id/block', authenticate, requireModerator, async (req, res)
     )
 
     if (blocked) {
-      for (const [token, session] of sessions.entries()) {
-        if (Number(session.userId) === Number(req.params.id)) {
-          sessions.delete(token)
-        }
-      }
+      await deleteUserSessions(req.params.id)
     }
 
     io.to(`user:${req.params.id}`).emit('userUpdated', result.rows[0])
@@ -1198,7 +1254,7 @@ app.delete('/api/messages/:id', authenticate, async (req, res) => {
 })
 
 async function getUserFromToken(token) {
-  const session = token ? sessions.get(token) : null
+  const session = await getSession(token)
 
   if (!session) {
     return null
@@ -1458,6 +1514,14 @@ async function createTables() {
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL');
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_read_only BOOLEAN DEFAULT FALSE')
     await pool.query('UPDATE channels SET is_read_only = false WHERE is_read_only IS NULL')
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auth_sessions (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
 
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
 
