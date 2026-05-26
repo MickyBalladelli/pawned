@@ -50,7 +50,8 @@ import ChessIcon from './ChessIcon'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const botLevels = [600, 800, 1000, 1200, 1400, 1600]
+const trainedBotLevel = 5
+const botLevels = [600, 800, 1000, 1200, 1400, 1600, trainedBotLevel]
 const timeControls = [
   { label: 'Bullet (1 min)', value: 60 },
   { label: 'Blitz (5 mins)', value: 300 },
@@ -62,6 +63,10 @@ const selectedGameStorageKey = 'vela.chess.selectedGameId'
 
 function getAuthHeaders(authToken) {
   return { Authorization: `Bearer ${authToken}` }
+}
+
+function botLevelLabel(level) {
+  return Number(level) === trainedBotLevel ? 'RL best' : String(level)
 }
 
 function parseFenBoard(fen) {
@@ -124,7 +129,7 @@ function playerName(game, color) {
     const username = color === 'white' ? game?.white_username : game?.black_username
 
     if (username === 'VelaBot') {
-      return `Bot ${game.bot_level || ''}`.trim()
+      return `Bot ${botLevelLabel(game.bot_level)}`
     }
   }
 
@@ -350,6 +355,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [newGameColor, setNewGameColor] = useState('white')
   const [newGameTimeControl, setNewGameTimeControl] = useState(300)
   const [botLevel, setBotLevel] = useState(800)
+  const [trainedBotStatus, setTrainedBotStatus] = useState(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [gameListTab, setGameListTab] = useState('active')
   const [expandedGameIds, setExpandedGameIds] = useState(new Set())
@@ -575,6 +581,30 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     movesEndRef.current?.scrollIntoView({ block: 'nearest' })
   }, [moves.length])
 
+  useEffect(() => {
+    if (!createDialogOpen) {
+      return undefined
+    }
+
+    let active = true
+
+    requestJson('/api/chess/trained-bot-status', {
+      headers: authHeaders,
+    }).then((data) => {
+      if (active) {
+        setTrainedBotStatus(data)
+      }
+    }).catch(() => {
+      if (active) {
+        setTrainedBotStatus({ available: false, error: 'Status unavailable' })
+      }
+    })
+
+    return () => {
+      active = false
+    }
+  }, [authHeaders, createDialogOpen])
+
   async function createGame() {
     setBusy(true)
 
@@ -619,7 +649,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setSelectedGame(data.game)
       setMoves(data.moves || [])
       setViewMoveIndex(null)
-      onNotice(`Bot game created at ${data.game.bot_level || botLevel}`)
+      onNotice(`Bot game created at ${botLevelLabel(data.game.bot_level || botLevel)}`)
       setCreateDialogOpen(false)
       loadGames()
     } catch (err) {
@@ -918,7 +948,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 />
                 <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                   {game.is_bot_game && !options.hideBotChip && (
-                    <Chip size="small" label={`Bot ${game.bot_level}`} variant="outlined" />
+                    <Chip size="small" label={`Bot ${botLevelLabel(game.bot_level)}`} variant="outlined" />
                   )}
                   {statusIcon ? (
                     <Tooltip title={statusIcon.tooltip}>
@@ -988,7 +1018,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     )}
                     {game.is_bot_game && (
                       <Typography variant="body2" color="text.secondary">
-                        Bot level: {game.bot_level}
+                        Bot level: {botLevelLabel(game.bot_level)}
                       </Typography>
                     )}
                     <Stack direction="row" spacing={1}>
@@ -1423,10 +1453,17 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             >
               {botLevels.map((level) => (
                 <MenuItem key={level} value={level}>
-                  {level}
+                  {botLevelLabel(level)}
                 </MenuItem>
               ))}
             </TextField>
+            {botLevel === trainedBotLevel && (
+              <Alert severity={trainedBotStatus?.available ? 'success' : 'warning'}>
+                {trainedBotStatus?.available
+                  ? `RL best ready${trainedBotStatus.loaded ? ' and loaded' : ''}`
+                  : 'RL best missing, bot will fallback'}
+              </Alert>
+            )}
             <Button
               variant="outlined"
               startIcon={<ChessIcon />}

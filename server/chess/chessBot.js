@@ -1,6 +1,7 @@
 const openingBook = require('../../client/src/data/chessOpenings.json')
 
-const botLevels = [600, 800, 1000, 1200, 1400, 1600]
+const trainedBotLevel = 5
+const botLevels = [600, 800, 1000, 1200, 1400, 1600, trainedBotLevel]
 const pieceValues = {
   p: 100,
   n: 320,
@@ -17,6 +18,7 @@ const levelProfiles = {
   1200: { depth: 2, openingChance: 0.8, blunderChance: 0.1, randomTop: 4 },
   1400: { depth: 2, openingChance: 0.86, blunderChance: 0.06, randomTop: 3 },
   1600: { depth: 3, openingChance: 0.9, blunderChance: 0.03, randomTop: 2 },
+  [trainedBotLevel]: { depth: 3, openingChance: 0.9, blunderChance: 0.03, randomTop: 2 },
 }
 
 function normalizeBotLevel(level) {
@@ -185,6 +187,7 @@ function chooseBotMove(chess, moveHistory, level) {
 
 module.exports = {
   botLevels,
+  trainedBotLevel,
   normalizeBotLevel,
   openingBook,
   getOpeningMatches,

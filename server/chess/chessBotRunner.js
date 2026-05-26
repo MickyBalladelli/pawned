@@ -1,5 +1,6 @@
 const { Chess } = require('chess.js')
-const { chooseBotMove } = require('./chessBot')
+const { chooseBotMove, trainedBotLevel } = require('./chessBot')
+const { chooseTrainedBotMove } = require('./trainedChessBot')
 const {
   getChessBotUser,
   getChessGame,
@@ -35,11 +36,13 @@ async function playBotTurn(pool, gameId) {
 
   const moves = await listChessMoves(pool, game.id)
   const chess = new Chess(game.fen)
-  const move = chooseBotMove(
-    chess,
-    moves.map((item) => item.san),
-    game.bot_level
-  )
+  const move = Number(game.bot_level) === trainedBotLevel
+    ? await chooseTrainedBotMove(chess) || chooseBotMove(chess, moves.map((item) => item.san), 1600)
+    : chooseBotMove(
+      chess,
+      moves.map((item) => item.san),
+      game.bot_level
+    )
 
   if (!move) {
     return null
