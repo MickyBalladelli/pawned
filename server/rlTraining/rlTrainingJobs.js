@@ -1,3 +1,4 @@
+const { evaluateCheckpoint } = require('./checkpointEvaluator')
 const { createOrLoadModel, saveModel, tf } = require('./modelStore')
 const { loadReplaySamples, saveGame, saveSamples, gamesPath, samplesPath } = require('./trainingStorage')
 const { TrainingWorkerPool } = require('./workerPool')
@@ -54,6 +55,8 @@ function publicJob(job, options = {}) {
     lastLoss: job.lastLoss,
     startingCheckpoint: job.startingCheckpoint,
     lastCheckpoint: job.lastCheckpoint,
+    bestCheckpoint: job.bestCheckpoint,
+    lastEvaluation: job.lastEvaluation,
     storage: {
       gamesPath,
       samplesPath,
@@ -154,7 +157,28 @@ async function maybeCheckpoint(job) {
     return
   }
 
+  if (job.lastCheckpointIteration === job.iteration) {
+    return
+  }
+
   job.lastCheckpoint = await saveModel(job.model, job.id, job.iteration)
+  job.lastCheckpointIteration = job.iteration
+  job.message = `Evaluating checkpoint ${job.iteration}`
+
+  const evaluation = await evaluateCheckpoint(job.model, job.lastCheckpoint, {
+    games: 20,
+    maxPlies: Math.min(job.config.maxPlies, 120),
+  })
+
+  job.lastEvaluation = evaluation
+
+  if (evaluation.promoted) {
+    job.bestCheckpoint = job.lastCheckpoint
+    job.message = `Promoted checkpoint ${job.iteration}`
+    return
+  }
+
+  job.message = `Kept current best after checkpoint ${job.iteration}`
 }
 
 function normalizeLegalMoves(request) {
@@ -345,6 +369,9 @@ async function startTrainingJob(config, user) {
     lastLoss: null,
     startingCheckpoint: checkpointPath,
     lastCheckpoint: null,
+    bestCheckpoint: checkpointPath,
+    lastEvaluation: null,
+    lastCheckpointIteration: null,
     pendingSamples: [],
     replaySamples,
     selfPlayGame: null,

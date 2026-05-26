@@ -11,6 +11,7 @@ const { actionCount } = require('./actionSpace')
 const { inputSize } = require('./boardEncoding')
 
 const checkpointDir = path.join(__dirname, 'checkpoints')
+const bestCheckpointPath = path.join(checkpointDir, 'best.json')
 
 function compileModel(model) {
   model.compile({
@@ -65,6 +66,7 @@ async function getLatestCheckpointPath() {
     const checkpoints = await Promise.all(
       entries
         .filter((entry) => entry.endsWith('.json'))
+        .filter((entry) => entry !== 'best.json')
         .map(async (entry) => {
           const filePath = path.join(checkpointDir, entry)
           const stat = await fs.stat(filePath)
@@ -82,6 +84,30 @@ async function getLatestCheckpointPath() {
   } catch {
     return null
   }
+}
+
+async function readBestCheckpoint() {
+  try {
+    const metadata = JSON.parse(await fs.readFile(bestCheckpointPath, 'utf8'))
+
+    if (!metadata.path) {
+      return null
+    }
+
+    await fs.access(metadata.path)
+
+    return metadata
+  } catch {
+    return null
+  }
+}
+
+async function writeBestCheckpoint(metadata) {
+  await ensureCheckpointDir()
+  await fs.writeFile(bestCheckpointPath, JSON.stringify({
+    ...metadata,
+    promotedAt: new Date().toISOString(),
+  }, null, 2))
 }
 
 function bufferToArrayBuffer(buffer) {
@@ -105,7 +131,8 @@ async function loadModelFromCheckpoint(checkpointPath) {
 }
 
 async function createOrLoadModel() {
-  const checkpointPath = await getLatestCheckpointPath()
+  const bestCheckpoint = await readBestCheckpoint()
+  const checkpointPath = bestCheckpoint?.path || await getLatestCheckpointPath()
 
   if (!checkpointPath) {
     return {
@@ -115,6 +142,17 @@ async function createOrLoadModel() {
   }
 
   try {
+    if (!bestCheckpoint) {
+      await writeBestCheckpoint({
+        path: checkpointPath,
+        reason: 'initialized from latest checkpoint',
+        evaluation: {
+          games: 0,
+          score: null,
+        },
+      })
+    }
+
     return {
       model: await loadModelFromCheckpoint(checkpointPath),
       checkpointPath,
@@ -130,10 +168,13 @@ async function createOrLoadModel() {
 }
 
 module.exports = {
+  bestCheckpointPath,
   createOrLoadModel,
   createModel,
   getLatestCheckpointPath,
   loadModelFromCheckpoint,
+  readBestCheckpoint,
   saveModel,
   tf,
+  writeBestCheckpoint,
 }

@@ -110,9 +110,19 @@ function RLTrainingCurrentJob({ job, totalGamesRemaining }) {
                 Loaded: {job.startingCheckpoint}
               </Typography>
             )}
+            {job?.bestCheckpoint && (
+              <Typography variant="caption" color="text.secondary">
+                Best: {job.bestCheckpoint}
+              </Typography>
+            )}
             {job?.lastCheckpoint && (
               <Typography variant="caption" color="text.secondary">
                 Checkpoint: {job.lastCheckpoint}
+              </Typography>
+            )}
+            {job?.lastEvaluation && (
+              <Typography variant="caption" color="text.secondary">
+                Eval: {job.lastEvaluation.score ?? '-'} / {job.lastEvaluation.games} ({job.lastEvaluation.reason})
               </Typography>
             )}
           </Stack>

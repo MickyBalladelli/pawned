@@ -17,6 +17,8 @@ Done now:
 13. Run chess simulation in trainer worker threads.
 14. Store generated records as length-prefixed binary.
 15. Load the latest checkpoint when a new training job starts.
+16. Evaluate each new checkpoint against the current best checkpoint.
+17. Promote a checkpoint to `server/rlTraining/checkpoints/best.json` only when it wins evaluation.
 
 Runtime persistence:
 
@@ -43,6 +45,7 @@ Training terms:
 - Sample: one training row from one position. It stores board state, chosen move, and final reward.
 - Loss: current model training error. Lower usually better, but not perfect proof.
 - Checkpoint: saved model weights for later use or rollback.
+- Best checkpoint: checkpoint used to start new jobs. New checkpoints must beat it before promotion.
 - Active games: live self-play games currently generating.
 - Total games: completed games saved to disk during current job.
 - Total samples: move samples saved to disk during current job.
@@ -83,8 +86,7 @@ Max plies: 80
 Still needed for strong play:
 
 1. Replace random exploration with MCTS.
-2. Evaluate new checkpoints against old checkpoints before promotion.
-3. Add checkpoint browser and delete/export controls.
-4. Add worker thread/process pool inside trainer for CPU-heavy scaling.
-5. Persist and restore active job state after trainer restart.
-6. Add tools to inspect binary training files.
+2. Add checkpoint browser and delete/export controls.
+3. Add worker thread/process pool inside trainer for CPU-heavy scaling.
+4. Persist and restore active job state after trainer restart.
+5. Add tools to inspect binary training files.
