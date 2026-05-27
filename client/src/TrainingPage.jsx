@@ -22,7 +22,6 @@ import {
 import { ChevronLeft, ChevronRight, MenuBook, Search } from '@mui/icons-material'
 import { Chess } from 'chess.js'
 import ChessBoard from './ChessBoard'
-import RLTrainingPanel from './RLTrainingPanel'
 import openingsBook from './data/chessOpenings.json'
 
 const startingFen = new Chess().fen()
@@ -161,9 +160,9 @@ function cleanTheme(theme) {
   return String(theme || '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
 }
 
-function TrainingPage({ authToken, authUser, themeMode }) {
+function TrainingPage({ authUser, themeMode }) {
   const [trainingTab, setTrainingTab] = useState(() => (
-    ['openings', 'puzzles', 'agent'].includes(localStorage.getItem(trainingTabStorageKey))
+    ['openings', 'puzzles'].includes(localStorage.getItem(trainingTabStorageKey))
       ? localStorage.getItem(trainingTabStorageKey)
       : 'openings'
   ))
@@ -181,8 +180,6 @@ function TrainingPage({ authToken, authUser, themeMode }) {
   const [puzzleStatus, setPuzzleStatus] = useState('Pick a puzzle')
   const [puzzleSolved, setPuzzleSolved] = useState(false)
   const [solvedPuzzleIds, setSolvedPuzzleIds] = useState(() => readSolvedPuzzles(authUser?.id))
-  const [agentJob, setAgentJob] = useState(null)
-  const [selectedAgentGameId, setSelectedAgentGameId] = useState(null)
 
   useEffect(() => {
     setSolvedPuzzleIds(readSolvedPuzzles(authUser?.id))
@@ -288,7 +285,6 @@ function TrainingPage({ authToken, authUser, themeMode }) {
     : selectedPuzzlePositions[puzzleViewIndex] || puzzleFen
   const puzzleBoardOrientation = puzzleSolverColor(selectedPuzzle)
   const selectedPuzzleWasSolved = Boolean(selectedPuzzle && solvedPuzzleIds.has(selectedPuzzle.id))
-  const isAdmin = Boolean(authUser?.is_admin || authUser?.role === 'admin' || authUser?.role === 'developer')
 
   function selectOpening(opening) {
     setSelectedOpening(opening)
@@ -470,20 +466,17 @@ function TrainingPage({ authToken, authUser, themeMode }) {
             >
               <Tab label="Openings" value="openings" sx={{ minHeight: 32 }} />
               <Tab label="Puzzles" value="puzzles" sx={{ minHeight: 32 }} />
-              {isAdmin && <Tab label="Agent" value="agent" sx={{ minHeight: 32 }} />}
             </Tabs>
-            {trainingTab !== 'agent' && (
-              <TextField
-                label={trainingTab === 'puzzles' ? 'Filter puzzles' : 'Filter openings'}
-                size="small"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                InputProps={{
-                  startAdornment: <Search fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />,
-                }}
-                fullWidth
-              />
-            )}
+            <TextField
+              label={trainingTab === 'puzzles' ? 'Filter puzzles' : 'Filter openings'}
+              size="small"
+              value={filter}
+              onChange={(event) => setFilter(event.target.value)}
+              InputProps={{
+                startAdornment: <Search fontSize="small" sx={{ mr: 0.75, color: 'text.secondary' }} />,
+              }}
+              fullWidth
+            />
             {trainingTab === 'puzzles' && (
               <ToggleButtonGroup
                 value={puzzleDifficulty}
@@ -511,41 +504,6 @@ function TrainingPage({ authToken, authUser, themeMode }) {
           <Divider sx={{ mb: 1 }} />
 
           <Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
-            {trainingTab === 'agent' && (
-              <Stack spacing={1.25}>
-                <Chip label="Admin only" color="primary" variant="outlined" />
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Typography variant="subtitle2" sx={{ flex: '1 1 auto', fontWeight: 900 }}>
-                    Active games
-                  </Typography>
-                  <Chip size="small" label={agentJob?.activeGames?.length || 0} variant="outlined" />
-                </Stack>
-                <List dense disablePadding>
-                  {(agentJob?.activeGames || []).map((game, index) => (
-                    <ListItemButton
-                      key={game.id}
-                      selected={game.id === selectedAgentGameId}
-                      onClick={() => setSelectedAgentGameId(game.id)}
-                      sx={{ borderRadius: 1, mb: 0.5 }}
-                    >
-                      <ListItemText
-                        primary={`Game ${index + 1}`}
-                        secondary={`${game.plyCount || 0} plies · ${game.result || 'in progress'}`}
-                        slotProps={{
-                          primary: { noWrap: true },
-                          secondary: { noWrap: true },
-                        }}
-                      />
-                    </ListItemButton>
-                  ))}
-                </List>
-                {(!agentJob?.activeGames || agentJob.activeGames.length === 0) && (
-                  <Typography variant="body2" color="text.secondary">
-                    Start job to see games.
-                  </Typography>
-                )}
-              </Stack>
-            )}
             {trainingTab === 'openings' && (
               <List disablePadding>
                 {visibleOpenings.map((opening) => (
@@ -603,16 +561,6 @@ function TrainingPage({ authToken, authUser, themeMode }) {
 
       <Card sx={{ minHeight: { xs: 520, md: 'calc(100vh - 190px)' } }}>
         <CardContent>
-          {trainingTab === 'agent' && isAdmin ? (
-            <RLTrainingPanel
-              authToken={authToken}
-              selectedGameId={selectedAgentGameId}
-              themeMode={themeMode}
-              onJobChange={setAgentJob}
-              onSelectedGameIdChange={setSelectedAgentGameId}
-            />
-          ) : (
-            <>
           <Stack
             direction={{ xs: 'column', md: 'row' }}
             spacing={1}
@@ -823,8 +771,6 @@ function TrainingPage({ authToken, authUser, themeMode }) {
               )}
             </Paper>
           </Box>
-            </>
-          )}
         </CardContent>
       </Card>
     </Box>

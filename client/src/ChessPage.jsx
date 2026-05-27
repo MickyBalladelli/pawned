@@ -50,8 +50,7 @@ import ChessIcon from './ChessIcon'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const trainedBotLevel = 5
-const botLevels = [600, 800, 1000, 1200, 1400, 1600, trainedBotLevel]
+const botLevels = [600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
 const timeControls = [
   { label: 'Bullet (1 min)', value: 60 },
   { label: 'Blitz (5 mins)', value: 300 },
@@ -66,7 +65,7 @@ function getAuthHeaders(authToken) {
 }
 
 function botLevelLabel(level) {
-  return Number(level) === trainedBotLevel ? 'RL best' : String(level)
+  return String(level)
 }
 
 function parseFenBoard(fen) {
@@ -355,7 +354,6 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [newGameColor, setNewGameColor] = useState('white')
   const [newGameTimeControl, setNewGameTimeControl] = useState(300)
   const [botLevel, setBotLevel] = useState(800)
-  const [trainedBotStatus, setTrainedBotStatus] = useState(null)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [gameListTab, setGameListTab] = useState('active')
   const [expandedGameIds, setExpandedGameIds] = useState(new Set())
@@ -580,30 +578,6 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   useEffect(() => {
     movesEndRef.current?.scrollIntoView({ block: 'nearest' })
   }, [moves.length])
-
-  useEffect(() => {
-    if (!createDialogOpen) {
-      return undefined
-    }
-
-    let active = true
-
-    requestJson('/api/chess/trained-bot-status', {
-      headers: authHeaders,
-    }).then((data) => {
-      if (active) {
-        setTrainedBotStatus(data)
-      }
-    }).catch(() => {
-      if (active) {
-        setTrainedBotStatus({ available: false, error: 'Status unavailable' })
-      }
-    })
-
-    return () => {
-      active = false
-    }
-  }, [authHeaders, createDialogOpen])
 
   async function createGame() {
     setBusy(true)
@@ -1457,13 +1431,6 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 </MenuItem>
               ))}
             </TextField>
-            {botLevel === trainedBotLevel && (
-              <Alert severity={trainedBotStatus?.available ? 'success' : 'warning'}>
-                {trainedBotStatus?.available
-                  ? `RL best ready${trainedBotStatus.loaded ? ' and loaded' : ''}`
-                  : 'RL best missing, bot will fallback'}
-              </Alert>
-            )}
             <Button
               variant="outlined"
               startIcon={<ChessIcon />}

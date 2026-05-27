@@ -16,7 +16,6 @@ const {
 } = require('./chessStore')
 const { botLevels, openingBook } = require('./chessBot')
 const { playBotTurn } = require('./chessBotRunner')
-const { getTrainedBotStatus } = require('./trainedChessBot')
 const { postChessOpeningMessage } = require('./chessOpeningMessages')
 
 function emitGameUpdate(io, game) {
@@ -52,14 +51,6 @@ function createChessRouter({ pool, authenticate, io }) {
 
   router.get('/bot-levels', (req, res) => {
     res.json({ levels: botLevels })
-  })
-
-  router.get('/trained-bot-status', async (req, res) => {
-    try {
-      res.json(await getTrainedBotStatus())
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to get trained bot status' })
-    }
   })
 
   router.get('/openings', (req, res) => {
