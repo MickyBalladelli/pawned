@@ -2,7 +2,7 @@ const path = require('path')
 const os = require('os')
 const { Worker } = require('worker_threads')
 const { Chess } = require('chess.js')
-const { getLevelProfile } = require('./chessBot')
+const { chooseOpeningBookMove, getLevelProfile } = require('./chessBot')
 const {
   getChessBotUser,
   getChessGame,
@@ -75,7 +75,15 @@ function runBotSearchWorker(game, moveHistory, rootMoveKeys, options = {}) {
 }
 
 async function runBotSearch(game, moveHistory, options = {}) {
-  const legalMoves = new Chess(game.fen).moves({ verbose: true })
+  const chess = new Chess(game.fen)
+  const bookMove = chooseOpeningBookMove(chess, moveHistory)
+
+  if (bookMove) {
+    options.onBestMove?.(bookMove)
+    return bookMove
+  }
+
+  const legalMoves = chess.moves({ verbose: true })
 
   if (legalMoves.length === 0) {
     return null

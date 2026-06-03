@@ -3,6 +3,7 @@ const { chooseEngineMoveAsync } = require('./chessBotEngine')
 
 const bossBotLevel = 9999
 const botLevels = [600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, bossBotLevel]
+const maxBookPlies = 16
 
 const levelProfiles = {
   600: { maxDepth: 2, timeLimitMs: 350, nodeLimit: 35000 },
@@ -44,8 +45,76 @@ function getOpeningMatches(history) {
   })
 }
 
+function normalizeSan(san) {
+  return String(san || '')
+    .replace(/[+#]+$/u, '')
+    .replace(/[!?]+$/u, '')
+}
+
+function bookKey(history) {
+  return history.map(normalizeSan).join('\x1f')
+}
+
+function createOpeningMoveIndex() {
+  const index = new Map()
+
+  for (const opening of openingBook.openings) {
+    for (let ply = 0; ply < Math.min(opening.moves.length, maxBookPlies); ply += 1) {
+      const history = opening.moves.slice(0, ply)
+      const key = bookKey(history)
+      const san = opening.moves[ply]
+      const moves = index.get(key) || new Map()
+
+      moves.set(san, (moves.get(san) || 0) + 1)
+      index.set(key, moves)
+    }
+  }
+
+  return index
+}
+
+const openingMoveIndex = createOpeningMoveIndex()
+
+function chooseOpeningBookMove(chess, moveHistory) {
+  if (!Array.isArray(moveHistory) || moveHistory.length >= maxBookPlies) {
+    return null
+  }
+
+  const candidates = openingMoveIndex.get(bookKey(moveHistory))
+
+  if (!candidates) {
+    return null
+  }
+
+  const legalMovesBySan = new Map(chess.moves({ verbose: true }).map((move) => [normalizeSan(move.san), move]))
+  const bookMove = [...candidates.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([san]) => legalMovesBySan.get(normalizeSan(san)))
+    .find(Boolean)
+
+  if (!bookMove) {
+    return null
+  }
+
+  return {
+    from: bookMove.from,
+    to: bookMove.to,
+    promotion: bookMove.promotion || undefined,
+    source: 'opening-book',
+    depth: 0,
+    nodes: 0,
+    score: null,
+  }
+}
+
 async function chooseBotMove(chess, moveHistory, level, options = {}) {
   const selectedLevel = level === undefined ? moveHistory : level
+  const bookMove = chooseOpeningBookMove(chess, Array.isArray(moveHistory) ? moveHistory : [])
+
+  if (bookMove && (!options.rootMoveKeys || options.rootMoveKeys.includes(`${bookMove.from}${bookMove.to}${bookMove.promotion || ''}`))) {
+    return bookMove
+  }
+
   const profile = {
     ...getLevelProfile(selectedLevel),
     onBestMove: options.onBestMove,
@@ -76,5 +145,6 @@ module.exports = {
   normalizeBotLevel,
   openingBook,
   getOpeningMatches,
+  chooseOpeningBookMove,
   chooseBotMove,
 }
