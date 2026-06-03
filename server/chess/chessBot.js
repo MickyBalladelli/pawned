@@ -49,6 +49,7 @@ async function chooseBotMove(chess, moveHistory, level, options = {}) {
   const profile = {
     ...getLevelProfile(selectedLevel),
     onBestMove: options.onBestMove,
+    onStats: options.onStats,
     rootMoveKeys: options.rootMoveKeys,
   }
   const searchMove = await chooseEngineMoveAsync(chess, profile)

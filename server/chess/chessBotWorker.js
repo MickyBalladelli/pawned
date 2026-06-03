@@ -25,6 +25,12 @@ async function run() {
 
   const move = await chooseBotMove(chess, workerData.moveHistory, workerData.level, {
     rootMoveKeys: workerData.rootMoveKeys,
+    onStats: (stats) => {
+      parentPort.postMessage({
+        type: 'stats',
+        stats,
+      })
+    },
     onBestMove: (bestMove) => {
       parentPort.postMessage({
         type: 'bestMove',

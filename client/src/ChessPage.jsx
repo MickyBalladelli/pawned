@@ -55,6 +55,21 @@ import { requestJson } from './requestJson'
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const bossBotLevel = 9999
 const botLevels = [600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, bossBotLevel]
+const botLevelProfiles = {
+  600: { workerCount: 1, nodeLimit: 35000, timeLimitMs: 350 },
+  800: { workerCount: 1, nodeLimit: 55000, timeLimitMs: 450 },
+  1000: { workerCount: 1, nodeLimit: 80000, timeLimitMs: 600 },
+  1200: { workerCount: 1, nodeLimit: 120000, timeLimitMs: 750 },
+  1400: { workerCount: 1, nodeLimit: 170000, timeLimitMs: 950 },
+  1600: { workerCount: 1, nodeLimit: 240000, timeLimitMs: 1200 },
+  1800: { workerCount: 1, nodeLimit: 360000, timeLimitMs: 1600 },
+  2000: { workerCount: 1, nodeLimit: 550000, timeLimitMs: 2200 },
+  2200: { workerCount: 1, nodeLimit: 850000, timeLimitMs: 3000 },
+  2400: { workerCount: 1, nodeLimit: 1300000, timeLimitMs: 4200 },
+  2600: { workerCount: 1, nodeLimit: 1900000, timeLimitMs: 5600 },
+  2800: { workerCount: 2, nodeLimit: 2800000, timeLimitMs: 7500 },
+  [bossBotLevel]: { workerCount: 4, nodeLimit: 12000000, timeLimitMs: 22000 },
+}
 const timeControls = [
   { label: 'Bullet (1 min)', value: 60 },
   { label: 'Blitz (5 mins)', value: 300 },
@@ -161,6 +176,42 @@ function getFirstLegalMoveSquares(fen) {
     return move ? [move.from, move.to] : []
   } catch {
     return []
+  }
+}
+
+function formatBotNodes(value) {
+  const number = Number(value || 0)
+
+  if (number >= 1000000) {
+    return `${(number / 1000000).toFixed(1)}M`
+  }
+
+  if (number >= 1000) {
+    return `${Math.round(number / 1000)}K`
+  }
+
+  return String(number)
+}
+
+function formatThinkingTimeLeft(deadlineAt, now) {
+  const remainingMs = Math.max(0, Number(deadlineAt || 0) - now)
+
+  return `${Math.ceil(remainingMs / 1000)}s`
+}
+
+function fallbackBotThinkingStats(game, startedAt) {
+  if (!isBotTurn(game)) {
+    return null
+  }
+
+  const profile = botLevelProfiles[Number(game.bot_level)] || botLevelProfiles[800]
+
+  return {
+    workerCount: profile.workerCount,
+    nodes: 0,
+    nodeLimit: profile.nodeLimit * profile.workerCount,
+    deadlineAt: startedAt + profile.timeLimitMs,
+    fallback: true,
   }
 }
 
@@ -422,6 +473,8 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [boardFlipped, setBoardFlipped] = useState(false)
   const [leftPaneCollapsed, setLeftPaneCollapsed] = useState(false)
   const [botThinkingMove, setBotThinkingMove] = useState(null)
+  const [thinkingStatsNow, setThinkingStatsNow] = useState(Date.now())
+  const [localThinkingStartedAt, setLocalThinkingStartedAt] = useState(Date.now())
   const movesEndRef = useRef(null)
 
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
@@ -443,6 +496,11 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const thinkingMoveSquares = !isViewingHistory
     ? serverThinkingMoveSquares.length > 0 ? serverThinkingMoveSquares : fallbackThinkingMoveSquares
     : []
+  const localBotThinking = isBotTurn(selectedGame)
+  const fallbackThinkingStats = useMemo(() => (
+    fallbackBotThinkingStats(selectedGame, localThinkingStartedAt)
+  ), [localThinkingStartedAt, selectedGame])
+  const botThinkingStats = botThinkingMove?.bestMove?.stats || fallbackThinkingStats
   const defaultBoardOrientation = playerColor === 'black' ? 'black' : 'white'
   const boardOrientation = boardFlipped
     ? defaultBoardOrientation === 'white' ? 'black' : 'white'
@@ -554,6 +612,47 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       kind: newGameKind,
     })
   }, [botLevel, newGameColor, newGameKind, newGameTimeControl])
+
+  useEffect(() => {
+    if (!botThinkingStats) {
+      return undefined
+    }
+
+    setThinkingStatsNow(Date.now())
+    const interval = window.setInterval(() => {
+      setThinkingStatsNow(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(interval)
+  }, [botThinkingStats])
+
+  useEffect(() => {
+    if (localBotThinking) {
+      setLocalThinkingStartedAt(Date.now())
+    }
+  }, [localBotThinking, selectedGame?.id, moves.length])
+
+  useEffect(() => {
+    if (!localBotThinking || !selectedGameId) {
+      return undefined
+    }
+
+    const interval = window.setInterval(async () => {
+      try {
+        const data = await requestJson(`/api/chess/games/${selectedGameId}`, {
+          headers: authHeaders,
+        })
+
+        if (data.botThinking) {
+          setBotThinkingMove(data.botThinking)
+        }
+      } catch {
+        // Socket path still handles updates; polling is only a fallback.
+      }
+    }, 1000)
+
+    return () => window.clearInterval(interval)
+  }, [authHeaders, localBotThinking, selectedGameId])
 
   useEffect(() => {
     if (!socket || !selectedGameId) {
@@ -1512,6 +1611,21 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 <ChessGameChat
                   authHeaders={authHeaders}
                   authUser={authUser}
+                  footer={botThinkingStats && !isViewingHistory ? (
+                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                      <Chip size="small" label={`${botThinkingStats.workerCount} threads`} variant="outlined" />
+                      <Chip
+                        size="small"
+                        label={`${formatBotNodes(botThinkingStats.nodes)} / ${formatBotNodes(botThinkingStats.nodeLimit)} nodes`}
+                        variant="outlined"
+                      />
+                      <Chip
+                        size="small"
+                        label={`${formatThinkingTimeLeft(botThinkingStats.deadlineAt, thinkingStatsNow)} left`}
+                        variant="outlined"
+                      />
+                    </Stack>
+                  ) : null}
                   game={selectedGame}
                   socket={socket}
                   socketConnected={socketConnected}

@@ -37,8 +37,13 @@ function runBotSearchWorker(game, moveHistory, rootMoveKeys, options = {}) {
     }, 60000)
 
     worker.on('message', (message) => {
+      if (message.type === 'stats') {
+        options.onStats?.(message.stats, options.workerIndex)
+        return
+      }
+
       if (message.type === 'bestMove') {
-        options.onBestMove?.(message.bestMove)
+        options.onBestMove?.(message.bestMove, options.workerIndex)
         return
       }
 
@@ -79,8 +84,45 @@ async function runBotSearch(game, moveHistory, options = {}) {
   const profile = getLevelProfile(game.bot_level)
   const maxWorkers = Math.max(1, Math.min(os.cpus().length - 1, profile.workerCount || 1, legalMoves.length))
   const moveGroups = splitMoves(legalMoves, maxWorkers).filter((group) => group.length > 0)
-  const results = await Promise.all(moveGroups.map((rootMoveKeys) => (
-    runBotSearchWorker(game, moveHistory, rootMoveKeys, options)
+  const startedAt = Date.now()
+  const deadlineAt = startedAt + profile.timeLimitMs
+  const workerNodes = Array.from({ length: moveGroups.length }, () => 0)
+  let currentBestMove = null
+
+  function stats() {
+    return {
+      workerCount: moveGroups.length,
+      nodes: workerNodes.reduce((total, nodes) => total + nodes, 0),
+      nodeLimit: profile.nodeLimit * moveGroups.length,
+      startedAt,
+      deadlineAt,
+      timeLimitMs: profile.timeLimitMs,
+    }
+  }
+
+  const results = await Promise.all(moveGroups.map((rootMoveKeys, workerIndex) => (
+    runBotSearchWorker(game, moveHistory, rootMoveKeys, {
+      workerIndex,
+      onStats: (workerStats, index) => {
+        workerNodes[index] = Number(workerStats.nodes || 0)
+        options.onBestMove?.({
+          ...(currentBestMove || {}),
+          stats: stats(),
+        })
+      },
+      onBestMove: (bestMove, index) => {
+        workerNodes[index] = Number(bestMove.nodes || 0)
+
+        if (!currentBestMove || Number(bestMove.score ?? -Infinity) > Number(currentBestMove.score ?? -Infinity)) {
+          currentBestMove = bestMove
+        }
+
+        options.onBestMove?.({
+          ...currentBestMove,
+          stats: stats(),
+        })
+      },
+    })
   )))
 
   return results

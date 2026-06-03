@@ -383,6 +383,12 @@ function rememberHistory(state, depth, move) {
 function checkLimits(state) {
   state.nodes += 1
 
+  if (state.onStats && state.nodes % state.statsInterval === 0) {
+    state.onStats({
+      nodes: state.nodes,
+    })
+  }
+
   if (state.nodes >= state.nodeLimit || Date.now() >= state.deadline) {
     throw timeout
   }
@@ -584,6 +590,8 @@ function chooseEngineMove(chess, options = {}) {
     history: new Map(),
     bestMoveKey: null,
     rootMoveKeys,
+    onStats: options.onStats,
+    statsInterval: options.statsInterval || 25000,
   }
   const maxDepth = options.maxDepth || 5
   let best = { move: availableMoves[0], score: -infinity, depth: 0 }
@@ -640,6 +648,8 @@ async function chooseEngineMoveAsync(chess, options = {}) {
     history: new Map(),
     bestMoveKey: null,
     rootMoveKeys,
+    onStats: options.onStats,
+    statsInterval: options.statsInterval || 25000,
   }
   const maxDepth = options.maxDepth || 5
   let best = { move: availableMoves[0], score: -infinity, depth: 0 }
