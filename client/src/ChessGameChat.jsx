@@ -4,7 +4,7 @@ import { Send } from '@mui/icons-material'
 import ChannelMessageList from './ChannelMessageList'
 import { requestJson } from './requestJson'
 
-function ChessGameChat({ authHeaders, authUser, footer, game, socket, socketConnected, onError, onGameUpdated }) {
+function ChessGameChat({ authHeaders, authUser, game, socket, socketConnected, onError, onGameUpdated }) {
   const [messages, setMessages] = useState([])
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -191,11 +191,6 @@ function ChessGameChat({ authHeaders, authUser, footer, game, socket, socketConn
           </Button>
         </Stack>
       </Box>
-      {footer && (
-        <Box sx={{ mt: 1 }}>
-          {footer}
-        </Box>
-      )}
     </Paper>
   )
 }

@@ -1611,27 +1611,27 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                 <ChessGameChat
                   authHeaders={authHeaders}
                   authUser={authUser}
-                  footer={botThinkingStats && !isViewingHistory ? (
-                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                      <Chip size="small" label={`${botThinkingStats.workerCount} threads`} variant="outlined" />
-                      <Chip
-                        size="small"
-                        label={`${formatBotNodes(botThinkingStats.nodes)} / ${formatBotNodes(botThinkingStats.nodeLimit)} nodes`}
-                        variant="outlined"
-                      />
-                      <Chip
-                        size="small"
-                        label={`${formatThinkingTimeLeft(botThinkingStats.deadlineAt, thinkingStatsNow)} left`}
-                        variant="outlined"
-                      />
-                    </Stack>
-                  ) : null}
                   game={selectedGame}
                   socket={socket}
                   socketConnected={socketConnected}
                   onError={onError}
                   onGameUpdated={handleSelectedGameUpdated}
                 />
+                {botThinkingStats && !isViewingHistory && (
+                  <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Chip size="small" label={`${botThinkingStats.workerCount} threads`} variant="outlined" />
+                    <Chip
+                      size="small"
+                      label={`${formatBotNodes(botThinkingStats.nodes)} / ${formatBotNodes(botThinkingStats.nodeLimit)} nodes`}
+                      variant="outlined"
+                    />
+                    <Chip
+                      size="small"
+                      label={`${formatThinkingTimeLeft(botThinkingStats.deadlineAt, thinkingStatsNow)} left`}
+                      variant="outlined"
+                    />
+                  </Stack>
+                )}
               </Stack>
             </Box>
           )}
