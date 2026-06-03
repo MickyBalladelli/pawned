@@ -2,12 +2,22 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Box, Chip, Paper, Stack, Typography } from '@mui/material'
 import { Timer } from '@mui/icons-material'
 
+const bossBotLevel = 9999
+
+function botLevelLabel(level) {
+  if (Number(level) === bossBotLevel) {
+    return 'boss-level'
+  }
+
+  return String(level || '')
+}
+
 function playerName(game, color) {
   if (game?.is_bot_game) {
     const username = color === 'white' ? game?.white_username : game?.black_username
 
     if (username === 'VelaBot') {
-      return `Bot ${game.bot_level || ''}`.trim()
+      return `Bot ${botLevelLabel(game.bot_level)}`.trim()
     }
   }
 

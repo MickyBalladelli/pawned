@@ -50,7 +50,8 @@ import ChessIcon from './ChessIcon'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
-const botLevels = [600, 800, 1000, 1200, 1400, 1600, 1800, 2000]
+const bossBotLevel = 9999
+const botLevels = [600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, bossBotLevel]
 const timeControls = [
   { label: 'Bullet (1 min)', value: 60 },
   { label: 'Blitz (5 mins)', value: 300 },
@@ -65,6 +66,10 @@ function getAuthHeaders(authToken) {
 }
 
 function botLevelLabel(level) {
+  if (Number(level) === bossBotLevel) {
+    return 'boss-level'
+  }
+
   return String(level)
 }
 

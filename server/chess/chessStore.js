@@ -540,11 +540,19 @@ async function makeChessMove(pool, gameId, user, moveInput = {}) {
     }
 
     const chess = new Chess(game.fen)
-    const move = chess.move({
+    const movingPiece = moveInput.from ? chess.get(moveInput.from) : null
+    const promotionRank = movingPiece?.color === 'w' ? '8' : '1'
+    const isPromotion = movingPiece?.type === 'p' && moveInput.to?.[1] === promotionRank
+    const movePayload = {
       from: moveInput.from,
       to: moveInput.to,
-      promotion: moveInput.promotion || 'q',
-    })
+    }
+
+    if (isPromotion || moveInput.promotion) {
+      movePayload.promotion = moveInput.promotion || 'q'
+    }
+
+    const move = chess.move(movePayload)
 
     if (!move) {
       throw new Error('Illegal move')
@@ -553,6 +561,7 @@ async function makeChessMove(pool, gameId, user, moveInput = {}) {
     const fenAfter = chess.fen()
     const status = statusFromChess(chess)
     const winnerUserId = winnerFromChess(chess, game)
+
     const nextTurnColor = currentTurnColor(fenAfter)
     const endedAt = status === 'active' ? null : now
     const moveCountResult = await client.query('SELECT COUNT(*)::integer AS count FROM chess_moves WHERE game_id = $1', [game.id])
