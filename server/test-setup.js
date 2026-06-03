@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-console.log('Vela MMO Server Setup Verification');
+console.log('Pawned MMO Server Setup Verification');
 
 // Check if required files exist
 const requiredFiles = [
@@ -51,7 +51,7 @@ if (allFilesExist) {
   console.log('\n🎉 Server setup is complete and all required files are present!');
   console.log('\nTo start the server:');
   console.log('1. Make sure PostgreSQL is running');
-  console.log('2. Create a database named "vela"');
+  console.log('2. Create a database named "pawned"');
   console.log('3. Run: npm run dev');
 } else {
   console.log('\n❌ Some files are missing. Please check the setup.');

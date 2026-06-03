@@ -1,12 +1,12 @@
-# Vela MMO Server Structure
+# Pawned MMO Server Structure
 
 ## Overview
-This is a real-time chat server for the Vela MMO game, built with Node.js, Express, Socket.IO, and PostgreSQL.
+This is a real-time chat server for the Pawned MMO game, built with Node.js, Express, Socket.IO, and PostgreSQL.
 
 ## Directory Structure
 
 ```
-vela/
+pawned/
 ├── server/
 │   ├── server.js          # Main server implementation
 │   ├── package.json       # Node.js dependencies
@@ -75,7 +75,7 @@ The server automatically creates three tables:
    npm install
    ```
 
-2. Ensure PostgreSQL is running and create a database named "vela"
+2. Ensure PostgreSQL is running and create a database named "pawned"
 
 3. Start the server:
    ```bash
@@ -104,7 +104,7 @@ The server automatically creates three tables:
 - `GET /api/chess/games?scope=active` - Get live chess games for viewing
 - `GET /api/chess/games?scope=completed` - Get completed chess games
 - `POST /api/chess/games` - Create a chess game
-- `POST /api/chess/bot-games` - Create a chess game against VelaBot
+- `POST /api/chess/bot-games` - Create a chess game against PawnedBot
 - `GET /api/chess/bot-levels` - Get supported bot levels
 - `GET /api/chess/openings` - Get the opening book
 - `GET /api/chess/games/:id` - Get a chess game and moves

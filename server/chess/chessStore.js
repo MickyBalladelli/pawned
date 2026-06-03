@@ -3,7 +3,7 @@ const crypto = require('crypto')
 const { normalizeBotLevel } = require('./chessBot')
 
 const startingFen = new Chess().fen()
-const chessBotUsername = 'VelaBot'
+const chessBotUsername = 'PawnedBot'
 const timeControls = new Set([60, 300, 600, 5400])
 
 function isAdminUser(user) {

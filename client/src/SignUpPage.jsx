@@ -101,7 +101,7 @@ function SignUpPage({
         <Box
           component="img"
           src="/images/pawned.png"
-          alt="Vela"
+          alt="Pawned"
           sx={{
             width: '100%',
             maxHeight: 260,
@@ -122,7 +122,7 @@ function SignUpPage({
                   </Typography>
                 </Stack>
                 <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-                  Create Vela Account
+                  Create Pawned Account
                 </Typography>
               </Box>
 

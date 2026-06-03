@@ -16,7 +16,7 @@ function playerName(game, color) {
   if (game?.is_bot_game) {
     const username = color === 'white' ? game?.white_username : game?.black_username
 
-    if (username === 'VelaBot') {
+    if (username === 'PawnedBot') {
       return `Bot ${botLevelLabel(game.bot_level)}`.trim()
     }
   }

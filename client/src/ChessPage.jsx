@@ -78,8 +78,8 @@ const timeControls = [
   { label: 'Classical (90 mins)', value: 5400 },
   { label: 'Unlimited', value: 'unlimited' },
 ]
-const selectedGameStorageKey = 'vela.chess.selectedGameId'
-const newGameSettingsStorageKey = 'vela.chess.newGameSettings'
+const selectedGameStorageKey = 'pawned.chess.selectedGameId'
+const newGameSettingsStorageKey = 'pawned.chess.newGameSettings'
 
 function getStoredNewGameSettings() {
   const defaults = {
@@ -166,7 +166,7 @@ function isBotTurn(game) {
 
   const username = game.turn_color === 'white' ? game.white_username : game.black_username
 
-  return username === 'VelaBot'
+  return username === 'PawnedBot'
 }
 
 function getFirstLegalMoveSquares(fen) {
@@ -236,7 +236,7 @@ function playerName(game, color) {
   if (game?.is_bot_game) {
     const username = color === 'white' ? game?.white_username : game?.black_username
 
-    if (username === 'VelaBot') {
+    if (username === 'PawnedBot') {
       return `Bot ${botLevelLabel(game.bot_level)}`
     }
   }

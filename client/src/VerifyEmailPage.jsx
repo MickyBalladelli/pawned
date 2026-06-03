@@ -49,7 +49,7 @@ function VerifyEmailPage({ onBackToLogin }) {
         <Box
           component="img"
           src="/images/pawned.png"
-          alt="Vela"
+          alt="Pawned"
           sx={{
             width: '100%',
             maxHeight: 260,

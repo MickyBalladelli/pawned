@@ -26,7 +26,7 @@ import openingsBook from './data/chessOpenings.json'
 
 const startingFen = new Chess().fen()
 const puzzlePreviewLimit = 200
-const trainingTabStorageKey = 'vela.training.tab'
+const trainingTabStorageKey = 'pawned.training.tab'
 const puzzleDifficulties = [
   { value: 'easy', label: 'Easy', range: '800-1200' },
   { value: 'medium', label: 'Medium', range: '1201-1600' },
@@ -35,7 +35,7 @@ const puzzleDifficulties = [
 ]
 
 function solvedPuzzleStorageKey(userId) {
-  return `vela.training.solvedPuzzles.${userId || 'guest'}`
+  return `pawned.training.solvedPuzzles.${userId || 'guest'}`
 }
 
 function readSolvedPuzzles(userId) {

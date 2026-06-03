@@ -17,5 +17,5 @@ app.get(/.*/, (req, res) => {
 
 const PORT = 5050;
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`Vela Client running on http://127.0.0.1:${PORT}/`);
+  console.log(`Pawned Client running on http://127.0.0.1:${PORT}/`);
 });

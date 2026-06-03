@@ -1,7 +1,7 @@
 {
-  "name": "vela-server",
+  "name": "pawned-server",
   "version": "1.0.0",
-  "description": "Server for the Vela MMO game with real-time chat",
+  "description": "Server for the Pawned MMO game with real-time chat",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -19,11 +19,11 @@
     "nodemon": "^3.0.1"
   },
   "keywords": [
-    "vela",
+    "pawned",
     "mmo",
     "game",
     "chat",
     "server"
   ],
-  "author": "Vela Team"
+  "author": "Pawned Team"
 }

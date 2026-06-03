@@ -83,7 +83,7 @@ function ChessBoard({
     >
       <Chessboard
         options={{
-          id: 'vela-chessboard',
+          id: 'pawned-chessboard',
           position,
           pieces: readablePieces,
           boardOrientation: boardOrientation || (playerColor === 'black' ? 'black' : 'white'),

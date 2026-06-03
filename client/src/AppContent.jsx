@@ -65,7 +65,7 @@ const emptyForm = {
   is_private: false,
   is_read_only: false,
 }
-const activeViewStorageKey = 'vela.activeView'
+const activeViewStorageKey = 'pawned.activeView'
 const channelNameCollator = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: 'base',
@@ -758,7 +758,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
           <Box
             component="img"
             src="/images/pawned.png"
-            alt="Vela"
+            alt="Pawned"
             sx={{
               width: { xs: '100%', sm: 120, md: 96 },
               height: { xs: 120, sm: 92, md: 72 },

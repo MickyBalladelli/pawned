@@ -1,11 +1,11 @@
-// Database initialization script for Vela MMO game
+// Database initialization script for Pawned MMO game
 const { Pool } = require('pg');
 
 // PostgreSQL connection pool
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
-  database: 'vela',
+  database: 'pawned',
   password: 'postgres',
   port: 5432,
 });
@@ -163,7 +163,7 @@ async function initializeDatabase() {
     // Create sample messages
     await pool.query(`
       INSERT INTO messages (channel_id, user_id, content) VALUES 
-      (1, 1, 'Welcome to the Vela MMO chat!'),
+      (1, 1, 'Welcome to the Pawned MMO chat!'),
       (1, 2, 'Hello everyone!'),
       (1, 3, 'This is a test message'),
       (2, 1, 'Guild announcements will go here'),

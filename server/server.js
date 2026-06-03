@@ -1,4 +1,4 @@
-// Vela MMO Game Server
+// Pawned MMO Game Server
 // Real-time chat server with PostgreSQL database integration
 
 const express = require('express');
@@ -28,7 +28,7 @@ const io = socketIo(server, {
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
-  database: 'vela',
+  database: 'pawned',
   password: 'postgres',
   port: 5432,
 });
@@ -186,12 +186,12 @@ function getVerificationLink(req, token) {
 
 function sendVerificationEmail(email, verificationLink) {
   return mailTransport.sendMail({
-    from: process.env.MAIL_FROM || 'Vela <no-reply@vela.io>',
+    from: process.env.MAIL_FROM || 'Pawned <no-reply@pawned.io>',
     to: email,
-    subject: 'Verify your Vela account',
-    text: `Welcome to Vela.\n\nVerify your email here:\n${verificationLink}\n\nThis link expires in 24 hours.`,
+    subject: 'Verify your Pawned account',
+    text: `Welcome to Pawned.\n\nVerify your email here:\n${verificationLink}\n\nThis link expires in 24 hours.`,
     html: `
-      <p>Welcome to Vela.</p>
+      <p>Welcome to Pawned.</p>
       <p><a href="${verificationLink}">Verify your email</a></p>
       <p>This link expires in 24 hours.</p>
     `,
@@ -351,7 +351,7 @@ async function requireChannelManager(req, res, next) {
 pool.query('SELECT NOW()', (err, res) => {
   if (err) {
     console.error('Database connection error:', err.stack);
-    console.error('Please ensure PostgreSQL is running and the database "vela" exists.');
+    console.error('Please ensure PostgreSQL is running and the database "pawned" exists.');
     console.error('You may need to run: ./scripts/init-db.sh');
   } else {
     console.log('Database connected successfully');
@@ -1469,7 +1469,7 @@ io.on('connection', async (socket) => {
 // Start the server
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
-  console.log(`Vela server running on port ${PORT}`);
+  console.log(`Pawned server running on port ${PORT}`);
 });
 
 // Create database tables if they don't exist

@@ -45,7 +45,7 @@ function LoginPage({
         <Box
           component="img"
           src="/images/pawned.png"
-          alt="Vela"
+          alt="Pawned"
           sx={{
             width: '100%',
             maxHeight: 260,
@@ -66,7 +66,7 @@ function LoginPage({
                   </Typography>
                 </Stack>
                 <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-                  Vela Login
+                  Pawned Login
                 </Typography>
               </Box>
 

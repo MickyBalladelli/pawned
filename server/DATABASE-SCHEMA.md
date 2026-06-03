@@ -1,7 +1,7 @@
-# Vela MMO Database Schema
+# Pawned MMO Database Schema
 
 ## Overview
-The Vela MMO game server uses PostgreSQL for persistent storage of chat and chess data.
+The Pawned MMO game server uses PostgreSQL for persistent storage of chat and chess data.
 
 ## Tables
 
@@ -53,8 +53,8 @@ Stores chess game state.
 | status | VARCHAR(20) | DEFAULT waiting | Game status |
 | turn_color | VARCHAR(10) | DEFAULT white | Player color to move |
 | winner_user_id | INTEGER | REFERENCES users(id) ON DELETE SET NULL | Winner, when game has one |
-| is_bot_game | BOOLEAN | DEFAULT FALSE | Whether this game uses VelaBot |
-| bot_level | INTEGER | | VelaBot level for bot games |
+| is_bot_game | BOOLEAN | DEFAULT FALSE | Whether this game uses PawnedBot |
+| bot_level | INTEGER | | PawnedBot level for bot games |
 | deleted_at | TIMESTAMP | | Soft-delete time for completed games |
 | created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When the game was created |
 | updated_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | When the game last changed |

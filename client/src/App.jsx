@@ -9,8 +9,8 @@ import VerifyEmailPage from './VerifyEmailPage'
 import { requestJson } from './requestJson'
 import './App.css'
 
-const authTokenKey = 'velaAuthToken'
-const themeModeKey = 'velaThemeMode'
+const authTokenKey = 'pawnedAuthToken'
+const themeModeKey = 'pawnedThemeMode'
 
 function App() {
   const [authToken, setAuthToken] = useState(() => localStorage.getItem(authTokenKey))

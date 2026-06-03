@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Initialize database for Vela MMO game
-echo "Initializing Vela database..."
+# Initialize database for Pawned MMO game
+echo "Initializing Pawned database..."
 
 # Run the initialization script
 node scripts/init-db.js
