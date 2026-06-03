@@ -536,7 +536,9 @@ function searchRoot(chess, depth, botColor, state) {
   let bestMove = null
   let bestScore = -infinity
   let alpha = -infinity
-  const moves = orderedMoves(chess, state, 0)
+  const moves = orderedMoves(chess, state, 0).filter((move) => (
+    !state.rootMoveKeys || state.rootMoveKeys.has(moveKey(move))
+  ))
 
   for (const move of moves) {
     chess.move(move)
@@ -563,8 +565,12 @@ function searchRoot(chess, depth, botColor, state) {
 
 function chooseEngineMove(chess, options = {}) {
   const moves = chess.moves({ verbose: true })
+  const rootMoveKeys = options.rootMoveKeys ? new Set(options.rootMoveKeys) : null
+  const availableMoves = rootMoveKeys
+    ? moves.filter((move) => rootMoveKeys.has(moveKey(move)))
+    : moves
 
-  if (moves.length === 0) {
+  if (availableMoves.length === 0) {
     return null
   }
 
@@ -577,9 +583,10 @@ function chooseEngineMove(chess, options = {}) {
     killers: [],
     history: new Map(),
     bestMoveKey: null,
+    rootMoveKeys,
   }
   const maxDepth = options.maxDepth || 5
-  let best = { move: moves[0], score: -infinity, depth: 0 }
+  let best = { move: availableMoves[0], score: -infinity, depth: 0 }
 
   for (let depth = 1; depth <= maxDepth; depth += 1) {
     try {
@@ -614,8 +621,12 @@ function chooseEngineMove(chess, options = {}) {
 
 async function chooseEngineMoveAsync(chess, options = {}) {
   const moves = chess.moves({ verbose: true })
+  const rootMoveKeys = options.rootMoveKeys ? new Set(options.rootMoveKeys) : null
+  const availableMoves = rootMoveKeys
+    ? moves.filter((move) => rootMoveKeys.has(moveKey(move)))
+    : moves
 
-  if (moves.length === 0) {
+  if (availableMoves.length === 0) {
     return null
   }
 
@@ -628,9 +639,10 @@ async function chooseEngineMoveAsync(chess, options = {}) {
     killers: [],
     history: new Map(),
     bestMoveKey: null,
+    rootMoveKeys,
   }
   const maxDepth = options.maxDepth || 5
-  let best = { move: moves[0], score: -infinity, depth: 0 }
+  let best = { move: availableMoves[0], score: -infinity, depth: 0 }
 
   for (let depth = 1; depth <= maxDepth; depth += 1) {
     try {

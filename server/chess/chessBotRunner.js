@@ -1,5 +1,8 @@
 const path = require('path')
+const os = require('os')
 const { Worker } = require('worker_threads')
+const { Chess } = require('chess.js')
+const { getLevelProfile } = require('./chessBot')
 const {
   getChessBotUser,
   getChessGame,
@@ -7,13 +10,25 @@ const {
   makeChessMove,
 } = require('./chessStore')
 
-function runBotSearch(game, moveHistory, options = {}) {
+function moveKey(move) {
+  return `${move.from}${move.to}${move.promotion || ''}`
+}
+
+function splitMoves(moves, workerCount) {
+  return moves.reduce((groups, move, index) => {
+    groups[index % workerCount].push(moveKey(move))
+    return groups
+  }, Array.from({ length: workerCount }, () => []))
+}
+
+function runBotSearchWorker(game, moveHistory, rootMoveKeys, options = {}) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(path.join(__dirname, 'chessBotWorker.js'), {
       workerData: {
         fen: game.fen,
         level: game.bot_level,
         moveHistory,
+        rootMoveKeys,
       },
     })
     const hardTimeout = setTimeout(() => {
@@ -52,6 +67,25 @@ function runBotSearch(game, moveHistory, options = {}) {
       }
     })
   })
+}
+
+async function runBotSearch(game, moveHistory, options = {}) {
+  const legalMoves = new Chess(game.fen).moves({ verbose: true })
+
+  if (legalMoves.length === 0) {
+    return null
+  }
+
+  const profile = getLevelProfile(game.bot_level)
+  const maxWorkers = Math.max(1, Math.min(os.cpus().length - 1, profile.workerCount || 1, legalMoves.length))
+  const moveGroups = splitMoves(legalMoves, maxWorkers).filter((group) => group.length > 0)
+  const results = await Promise.all(moveGroups.map((rootMoveKeys) => (
+    runBotSearchWorker(game, moveHistory, rootMoveKeys, options)
+  )))
+
+  return results
+    .filter(Boolean)
+    .sort((a, b) => Number(b.score ?? -Infinity) - Number(a.score ?? -Infinity))[0] || null
 }
 
 function getBotColor(game, botUserId) {

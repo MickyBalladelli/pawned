@@ -4,7 +4,10 @@ const { chooseBotMove } = require('./chessBot')
 
 async function run() {
   const chess = new Chess(workerData.fen)
-  const firstMove = chess.moves({ verbose: true })[0]
+  const rootMoveKeys = new Set(workerData.rootMoveKeys || [])
+  const firstMove = chess.moves({ verbose: true }).find((move) => (
+    rootMoveKeys.size === 0 || rootMoveKeys.has(`${move.from}${move.to}${move.promotion || ''}`)
+  ))
 
   if (firstMove) {
     parentPort.postMessage({
@@ -21,6 +24,7 @@ async function run() {
   }
 
   const move = await chooseBotMove(chess, workerData.moveHistory, workerData.level, {
+    rootMoveKeys: workerData.rootMoveKeys,
     onBestMove: (bestMove) => {
       parentPort.postMessage({
         type: 'bestMove',

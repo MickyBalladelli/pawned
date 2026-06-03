@@ -16,8 +16,8 @@ const levelProfiles = {
   2200: { maxDepth: 6, timeLimitMs: 3000, nodeLimit: 850000 },
   2400: { maxDepth: 7, timeLimitMs: 4200, nodeLimit: 1300000 },
   2600: { maxDepth: 7, timeLimitMs: 5600, nodeLimit: 1900000 },
-  2800: { maxDepth: 8, timeLimitMs: 7500, nodeLimit: 2800000 },
-  [bossBotLevel]: { maxDepth: 13, timeLimitMs: 45000, nodeLimit: 30000000 },
+  2800: { maxDepth: 8, timeLimitMs: 7500, nodeLimit: 2800000, workerCount: 2 },
+  [bossBotLevel]: { maxDepth: 13, timeLimitMs: 22000, nodeLimit: 12000000, workerCount: 4 },
 }
 
 function normalizeBotLevel(level) {
@@ -49,6 +49,7 @@ async function chooseBotMove(chess, moveHistory, level, options = {}) {
   const profile = {
     ...getLevelProfile(selectedLevel),
     onBestMove: options.onBestMove,
+    rootMoveKeys: options.rootMoveKeys,
   }
   const searchMove = await chooseEngineMoveAsync(chess, profile)
 
@@ -70,6 +71,7 @@ async function chooseBotMove(chess, moveHistory, level, options = {}) {
 module.exports = {
   bossBotLevel,
   botLevels,
+  getLevelProfile,
   normalizeBotLevel,
   openingBook,
   getOpeningMatches,
