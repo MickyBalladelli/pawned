@@ -16,6 +16,7 @@ const {
 } = require('./chessStore')
 const { botLevels, openingBook } = require('./chessBot')
 const { playBotTurn } = require('./chessBotRunner')
+const { getBotThinking, setBotThinking } = require('./chessBotThinking')
 const { postChessOpeningMessage } = require('./chessOpeningMessages')
 
 function emitGameUpdate(io, game) {
@@ -30,7 +31,7 @@ function emitMoveMade(io, result) {
 }
 
 function emitBotThinking(io, update) {
-  io.to(`chess:game:${update.gameId}`).emit('chess:botThinking', update)
+  io.emit('chess:botThinking', setBotThinking(update) || update)
 }
 
 async function playAndEmitBotTurn(pool, io, gameId) {
@@ -118,7 +119,11 @@ function createChessRouter({ pool, authenticate, io }) {
       }
 
       const moves = await listChessMoves(pool, game.id)
-      res.json({ game, moves })
+      res.json({
+        game,
+        moves,
+        botThinking: getBotThinking(game.id),
+      })
     } catch (err) {
       console.error('Error fetching chess game:', err)
       res.status(500).json({ error: 'Failed to fetch chess game' })

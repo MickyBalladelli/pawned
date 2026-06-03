@@ -45,6 +45,7 @@ import {
   SwapVert,
   Timer,
 } from '@mui/icons-material'
+import { Chess } from 'chess.js'
 import ChessBoard from './ChessBoard'
 import ChessClock, { timeControlName } from './ChessClock'
 import ChessGameChat from './ChessGameChat'
@@ -140,6 +141,27 @@ function getPlayerColor(game, userId) {
   }
 
   return null
+}
+
+function isBotTurn(game) {
+  if (!game?.is_bot_game || game.status !== 'active') {
+    return false
+  }
+
+  const username = game.turn_color === 'white' ? game.white_username : game.black_username
+
+  return username === 'VelaBot'
+}
+
+function getFirstLegalMoveSquares(fen) {
+  try {
+    const chess = new Chess(fen)
+    const move = chess.moves({ verbose: true })[0]
+
+    return move ? [move.from, move.to] : []
+  } catch {
+    return []
+  }
 }
 
 function isOwnPiece(piece, playerColor) {
@@ -414,8 +436,12 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const lastMoveSquares = highlightedMove
     ? [highlightedMove.from_square, highlightedMove.to_square].filter(Boolean)
     : []
-  const thinkingMoveSquares = !isViewingHistory && Number(botThinkingMove?.gameId) === Number(selectedGameId)
+  const serverThinkingMoveSquares = Number(botThinkingMove?.gameId) === Number(selectedGameId)
     ? [botThinkingMove.bestMove?.from, botThinkingMove.bestMove?.to].filter(Boolean)
+    : []
+  const fallbackThinkingMoveSquares = isBotTurn(selectedGame) ? getFirstLegalMoveSquares(viewedFen) : []
+  const thinkingMoveSquares = !isViewingHistory
+    ? serverThinkingMoveSquares.length > 0 ? serverThinkingMoveSquares : fallbackThinkingMoveSquares
     : []
   const defaultBoardOrientation = playerColor === 'black' ? 'black' : 'white'
   const boardOrientation = boardFlipped
@@ -478,6 +504,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGame(data.game)
       setMoves(data.moves || [])
+      setBotThinkingMove(data.botThinking || null)
       setViewMoveIndex(null)
       setSelectedSquare(null)
     } catch (err) {
@@ -541,6 +568,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGame(response.game)
       setMoves(response.moves || [])
+      setBotThinkingMove(response.botThinking || null)
       setViewMoveIndex(null)
     })
 

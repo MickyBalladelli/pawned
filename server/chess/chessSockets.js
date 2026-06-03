@@ -7,6 +7,7 @@ const {
   cancelChessGame,
 } = require('./chessStore')
 const { playBotTurn } = require('./chessBotRunner')
+const { getBotThinking, setBotThinking } = require('./chessBotThinking')
 const { postChessOpeningMessage } = require('./chessOpeningMessages')
 
 function chessRoom(gameId) {
@@ -25,7 +26,7 @@ function emitMoveMade(io, result) {
 }
 
 function emitBotThinking(io, update) {
-  io.to(chessRoom(update.gameId)).emit('chess:botThinking', update)
+  io.emit('chess:botThinking', setBotThinking(update) || update)
 }
 
 function emitChessNotice(io, game, user, type) {
@@ -86,7 +87,13 @@ function registerChessSockets(io, socket, { pool }) {
       }
 
       const moves = await listChessMoves(pool, game.id)
-      callback?.({ game, moves })
+      const botThinking = getBotThinking(game.id)
+
+      if (botThinking) {
+        socket.emit('chess:botThinking', botThinking)
+      }
+
+      callback?.({ game, moves, botThinking })
     } catch (err) {
       console.error('Error joining chess game:', err)
       callback?.({ error: 'Failed to join chess game' })

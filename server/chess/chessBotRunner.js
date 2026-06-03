@@ -1,5 +1,5 @@
-const { Chess } = require('chess.js')
-const { chooseBotMove } = require('./chessBot')
+const path = require('path')
+const { Worker } = require('worker_threads')
 const {
   getChessBotUser,
   getChessGame,
@@ -7,9 +7,50 @@ const {
   makeChessMove,
 } = require('./chessStore')
 
-function nextTick() {
-  return new Promise((resolve) => {
-    setTimeout(resolve, 0)
+function runBotSearch(game, moveHistory, options = {}) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(path.join(__dirname, 'chessBotWorker.js'), {
+      workerData: {
+        fen: game.fen,
+        level: game.bot_level,
+        moveHistory,
+      },
+    })
+    const hardTimeout = setTimeout(() => {
+      worker.terminate()
+      reject(new Error('Bot search timed out'))
+    }, 60000)
+
+    worker.on('message', (message) => {
+      if (message.type === 'bestMove') {
+        options.onBestMove?.(message.bestMove)
+        return
+      }
+
+      if (message.type === 'done') {
+        clearTimeout(hardTimeout)
+        resolve(message.move)
+        return
+      }
+
+      if (message.type === 'error') {
+        clearTimeout(hardTimeout)
+        reject(new Error(message.error))
+      }
+    })
+
+    worker.on('error', (err) => {
+      clearTimeout(hardTimeout)
+      reject(err)
+    })
+
+    worker.on('exit', (code) => {
+      clearTimeout(hardTimeout)
+
+      if (code !== 0) {
+        reject(new Error(`Bot worker exited with code ${code}`))
+      }
+    })
   })
 }
 
@@ -40,36 +81,22 @@ async function playBotTurn(pool, gameId, options = {}) {
   }
 
   const moves = await listChessMoves(pool, game.id)
-  const chess = new Chess(game.fen)
   options.onThinking?.({
     gameId: game.id,
     thinking: true,
     bestMove: null,
   })
-  await nextTick()
 
   try {
-    const move = await chooseBotMove(
-      chess,
-      moves.map((item) => item.san),
-      game.bot_level,
-      {
-        onBestMove: (bestMove) => {
-          options.onThinking?.({
-            gameId: game.id,
-            thinking: true,
-            bestMove: {
-              from: bestMove.from,
-              to: bestMove.to,
-              promotion: bestMove.promotion || null,
-              depth: bestMove.depth,
-              nodes: bestMove.nodes,
-              score: bestMove.score,
-            },
-          })
-        },
-      }
-    )
+    const move = await runBotSearch(game, moves.map((item) => item.san), {
+      onBestMove: (bestMove) => {
+        options.onThinking?.({
+          gameId: game.id,
+          thinking: true,
+          bestMove,
+        })
+      },
+    })
 
     if (!move) {
       return null
