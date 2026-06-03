@@ -34,6 +34,14 @@ function emitBotThinking(io, update) {
   io.emit('chess:botThinking', setBotThinking(update) || update)
 }
 
+function queueBotTurn(pool, io, gameId) {
+  setImmediate(() => {
+    playAndEmitBotTurn(pool, io, gameId).catch((err) => {
+      console.error('Error playing queued bot chess turn:', err)
+    })
+  })
+}
+
 async function playAndEmitBotTurn(pool, io, gameId) {
   const botResult = await playBotTurn(pool, gameId, {
     onThinking: (update) => emitBotThinking(io, update),
@@ -98,12 +106,11 @@ function createChessRouter({ pool, authenticate, io }) {
         level: req.body?.level,
         timeControlSeconds: req.body?.timeControlSeconds,
       })
-      const botResult = await playAndEmitBotTurn(pool, io, game.id)
-      const activeGame = botResult?.game || game
-      const moves = await listChessMoves(pool, activeGame.id)
+      const moves = await listChessMoves(pool, game.id)
 
-      emitGameUpdate(io, activeGame)
-      res.status(201).json({ game: activeGame, moves })
+      emitGameUpdate(io, game)
+      res.status(201).json({ game, moves })
+      queueBotTurn(pool, io, game.id)
     } catch (err) {
       console.error('Error creating bot chess game:', err)
       res.status(500).json({ error: err.message || 'Failed to create bot chess game' })
