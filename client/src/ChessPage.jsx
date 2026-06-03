@@ -378,6 +378,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     : moves[viewMoveIndex]?.fen_after
   const boardSquares = useMemo(() => parseFenBoard(viewedFen), [viewedFen])
   const isViewingHistory = viewMoveIndex !== null
+  const highlightedMove = isViewingHistory ? moves[viewMoveIndex] : moves[moves.length - 1]
+  const lastMoveSquares = highlightedMove
+    ? [highlightedMove.from_square, highlightedMove.to_square].filter(Boolean)
+    : []
   const defaultBoardOrientation = playerColor === 'black' ? 'black' : 'white'
   const boardOrientation = boardFlipped
     ? defaultBoardOrientation === 'white' ? 'black' : 'white'
@@ -1282,6 +1286,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   boardOrientation={boardOrientation}
                   boardSquares={boardSquares}
                   canMove={canMove}
+                  lastMoveSquares={lastMoveSquares}
                   position={viewedFen}
                   playerColor={playerColor}
                   selectedSquare={selectedSquare}

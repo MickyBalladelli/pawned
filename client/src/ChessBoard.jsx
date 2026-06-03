@@ -21,12 +21,31 @@ const readablePieces = Object.fromEntries(
 
 function ChessBoard({
   boardOrientation,
+  lastMoveSquares = [],
   onSquareClick,
   playerColor,
   position,
   selectedSquare,
   themeMode,
 }) {
+  const moveSquareStyles = Object.fromEntries(
+    lastMoveSquares.map((square) => [
+      square,
+      {
+        backgroundColor: '#fef3c7',
+        boxShadow: 'inset 0 0 0 3px rgba(217, 119, 6, 0.22)',
+      },
+    ]),
+  )
+  const selectedSquareStyles = selectedSquare
+    ? {
+        [selectedSquare]: {
+          backgroundColor: '#fbbf24',
+          boxShadow: 'inset 0 0 0 4px rgba(17, 24, 39, 0.42)',
+        },
+      }
+    : {}
+
   function handleSquareClick(square) {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur()
@@ -66,14 +85,10 @@ function ChessBoard({
           lightSquareStyle: {
             backgroundColor: themeMode === 'dark' ? '#e5e7eb' : '#f0d9b5',
           },
-          squareStyles: selectedSquare
-            ? {
-                [selectedSquare]: {
-                  backgroundColor: '#fbbf24',
-                  boxShadow: 'inset 0 0 0 4px rgba(17, 24, 39, 0.42)',
-                },
-              }
-            : {},
+          squareStyles: {
+            ...moveSquareStyles,
+            ...selectedSquareStyles,
+          },
           boardStyle: {
             border: '1px solid rgba(148, 163, 184, 0.55)',
             boxShadow: '0 12px 24px rgba(15, 23, 42, 0.12)',
