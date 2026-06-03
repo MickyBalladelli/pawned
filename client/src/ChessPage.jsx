@@ -51,6 +51,7 @@ import ChessBoard from './ChessBoard'
 import ChessClock, { timeControlName } from './ChessClock'
 import ChessGameChat from './ChessGameChat'
 import ChessIcon from './ChessIcon'
+import ChessResultOverlay from './ChessResultOverlay'
 import { requestJson } from './requestJson'
 
 const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
@@ -382,6 +383,35 @@ function gameResultIcon(game, user = null) {
   }
 }
 
+function boardResult(game, user = null) {
+  if (!['checkmate', 'resigned', 'timeout', 'draw'].includes(game?.status)) {
+    return null
+  }
+
+  if (game.status === 'draw') {
+    return {
+      message: 'Draw',
+      tone: 'draw',
+    }
+  }
+
+  const playerColor = user ? getPlayerColor(game, user.id) : null
+
+  if (!playerColor || !game.winner_user_id) {
+    return {
+      message: statusLabel(game, user),
+      tone: 'default',
+    }
+  }
+
+  const won = Number(game.winner_user_id) === Number(user.id)
+
+  return {
+    message: statusLabel(game, user),
+    tone: won ? 'won' : 'lost',
+  }
+}
+
 function gameReasonIcon(game) {
   if (game?.status === 'checkmate') {
     return {
@@ -503,6 +533,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     fallbackBotThinkingStats(selectedGame, localThinkingStartedAt)
   ), [localThinkingStartedAt, selectedGame])
   const botThinkingStats = botThinkingMove?.bestMove?.stats || fallbackThinkingStats
+  const resultOverlay = boardResult(selectedGame, authUser)
   const defaultBoardOrientation = playerColor === 'black' ? 'black' : 'white'
   const boardOrientation = boardFlipped
     ? defaultBoardOrientation === 'white' ? 'black' : 'white'
@@ -1569,18 +1600,32 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     onTimeout={timeoutGame}
                   />
                 </Box>
-                <ChessBoard
-                  boardOrientation={boardOrientation}
-                  boardSquares={boardSquares}
-                  canMove={canMove}
-                  lastMoveSquares={lastMoveSquares}
-                  position={viewedFen}
-                  playerColor={playerColor}
-                  selectedSquare={selectedSquare}
-                  thinkingMoveSquares={thinkingMoveSquares}
-                  themeMode={themeMode}
-                  onSquareClick={handleSquareClick}
-                />
+                <Box
+                  sx={{
+                    position: 'relative',
+                    width: '100%',
+                    maxWidth: 520,
+                    mx: { xs: 'auto', lg: 0 },
+                  }}
+                >
+                  <ChessBoard
+                    boardOrientation={boardOrientation}
+                    boardSquares={boardSquares}
+                    canMove={canMove}
+                    lastMoveSquares={lastMoveSquares}
+                    position={viewedFen}
+                    playerColor={playerColor}
+                    selectedSquare={selectedSquare}
+                    thinkingMoveSquares={thinkingMoveSquares}
+                    themeMode={themeMode}
+                    onSquareClick={handleSquareClick}
+                  />
+                  <ChessResultOverlay
+                    key={`${selectedGame?.id}-${selectedGame?.status}-${selectedGame?.winner_user_id || 'none'}`}
+                    message={resultOverlay?.message}
+                    tone={resultOverlay?.tone}
+                  />
+                </Box>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', mt: 1 }}>
                   <Tooltip title="Flip board">
                     <Button
