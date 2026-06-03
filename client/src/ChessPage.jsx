@@ -15,6 +15,7 @@ import {
   DialogTitle,
   Checkbox,
   FormControlLabel,
+  IconButton,
   List,
   ListItemButton,
   ListItemText,
@@ -368,6 +369,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
   const [boardFlipped, setBoardFlipped] = useState(false)
+  const [leftPaneCollapsed, setLeftPaneCollapsed] = useState(false)
   const movesEndRef = useRef(null)
 
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
@@ -1051,23 +1053,51 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: { xs: '1fr', lg: '360px minmax(0, 1fr)' },
+        gridTemplateColumns: {
+          xs: leftPaneCollapsed ? '24px' : '1fr',
+          lg: leftPaneCollapsed ? '24px minmax(0, 1fr)' : '360px minmax(0, 1fr)',
+        },
         gap: 2,
         alignItems: 'start',
       }}
     >
       <Card
         sx={{
-          width: { xs: '100%', lg: 360 },
+          width: { xs: leftPaneCollapsed ? 24 : '100%', lg: leftPaneCollapsed ? 24 : 360 },
           maxWidth: '100%',
           maxHeight: { lg: 'calc(100vh - 190px)' },
           justifySelf: 'start',
           overflow: 'hidden',
+          position: 'relative',
+          transition: 'width 160ms ease',
+          minHeight: leftPaneCollapsed ? 42 : 0,
         }}
       >
+        <Tooltip title={leftPaneCollapsed ? 'Show games' : 'Hide games'}>
+          <IconButton
+            size="small"
+            onClick={() => setLeftPaneCollapsed((current) => !current)}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: leftPaneCollapsed ? -2 : 8,
+              zIndex: 2,
+              width: 24,
+              height: 24,
+              bgcolor: 'background.paper',
+              border: '1px solid',
+              borderColor: 'divider',
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+          >
+            {leftPaneCollapsed ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
+          </IconButton>
+        </Tooltip>
         <CardContent
           sx={{
-            display: 'flex',
+            display: leftPaneCollapsed ? 'none' : 'flex',
             flexDirection: 'column',
             maxHeight: { lg: 'calc(100vh - 190px)' },
             minHeight: 0,

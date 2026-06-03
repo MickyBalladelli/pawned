@@ -70,6 +70,7 @@ const pieceSquareTables = {
   ],
 }
 
+const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 const mateScore = 1000000
 const infinity = 100000000
 const timeout = Symbol('timeout')
@@ -84,6 +85,10 @@ function moveKey(move) {
 
 function positionKey(chess) {
   return chess.fen().split(' ').slice(0, 4).join(' ')
+}
+
+function squareName(rank, file) {
+  return `${files[file]}${8 - rank}`
 }
 
 function endgameWeight(board) {
@@ -126,6 +131,122 @@ function kingEndgameActivity(rank, file) {
   return Math.max(0, 32 - centerDistance * 8)
 }
 
+function pawnStructureScore(board, rank, file, color) {
+  let sameFilePawns = 0
+  let friendlyAdjacentPawns = 0
+  let blockingEnemyPawns = 0
+  const direction = color === 'w' ? -1 : 1
+
+  for (let scanRank = 0; scanRank < 8; scanRank += 1) {
+    const sameFilePiece = board[scanRank]?.[file]
+
+    if (sameFilePiece?.type === 'p' && sameFilePiece.color === color) {
+      sameFilePawns += 1
+    }
+
+    for (const adjacentFile of [file - 1, file + 1]) {
+      const adjacentPiece = board[scanRank]?.[adjacentFile]
+
+      if (adjacentPiece?.type === 'p' && adjacentPiece.color === color) {
+        friendlyAdjacentPawns += 1
+      }
+    }
+  }
+
+  for (let scanRank = rank + direction; scanRank >= 0 && scanRank < 8; scanRank += direction) {
+    for (const scanFile of [file - 1, file, file + 1]) {
+      const piece = board[scanRank]?.[scanFile]
+
+      if (piece?.type === 'p' && piece.color !== color) {
+        blockingEnemyPawns += 1
+      }
+    }
+  }
+
+  const advance = color === 'w' ? 6 - rank : rank - 1
+  let score = Math.max(0, advance) * 4
+
+  if (sameFilePawns > 1) {
+    score -= 18 * (sameFilePawns - 1)
+  }
+
+  if (friendlyAdjacentPawns === 0) {
+    score -= 14
+  }
+
+  if (blockingEnemyPawns === 0) {
+    score += 22 + Math.max(0, advance) * 8
+  }
+
+  return score
+}
+
+function filePawnCounts(board, file, color) {
+  let count = 0
+
+  for (let rank = 0; rank < 8; rank += 1) {
+    const piece = board[rank]?.[file]
+
+    if (piece?.type === 'p' && piece.color === color) {
+      count += 1
+    }
+  }
+
+  return count
+}
+
+function rookFileScore(board, file, color) {
+  const friendlyPawns = filePawnCounts(board, file, color)
+  const enemyPawns = filePawnCounts(board, file, color === 'w' ? 'b' : 'w')
+
+  if (friendlyPawns === 0 && enemyPawns === 0) {
+    return 28
+  }
+
+  if (friendlyPawns === 0) {
+    return 14
+  }
+
+  return 0
+}
+
+function attackedPieceScore(chess, square, piece) {
+  const enemyColor = piece.color === 'w' ? 'b' : 'w'
+  const isAttacked = chess.isAttacked(square, enemyColor)
+
+  if (!isAttacked) {
+    return 0
+  }
+
+  const isDefended = chess.isAttacked(square, piece.color)
+  const value = pieceValues[piece.type] || 0
+
+  if (!isDefended) {
+    return -Math.min(220, value * 0.45)
+  }
+
+  return -Math.min(80, value * 0.14)
+}
+
+function kingDangerScore(chess, rank, file, color) {
+  const enemyColor = color === 'w' ? 'b' : 'w'
+  let danger = 0
+
+  for (let scanRank = rank - 1; scanRank <= rank + 1; scanRank += 1) {
+    for (let scanFile = file - 1; scanFile <= file + 1; scanFile += 1) {
+      if (scanRank < 0 || scanRank > 7 || scanFile < 0 || scanFile > 7) {
+        continue
+      }
+
+      if (chess.isAttacked(squareName(scanRank, scanFile), enemyColor)) {
+        danger += 10
+      }
+    }
+  }
+
+  return -danger
+}
+
 function evaluateBoard(chess, botColor) {
   if (chess.isCheckmate()) {
     return chess.turn() === botColor ? -mateScore : mateScore
@@ -138,6 +259,10 @@ function evaluateBoard(chess, botColor) {
   let score = 0
   const board = chess.board()
   const endgame = endgameWeight(board)
+  const pieceCounts = {
+    w: { b: 0 },
+    b: { b: 0 },
+  }
 
   for (let rank = 0; rank < board.length; rank += 1) {
     for (let file = 0; file < board[rank].length; file += 1) {
@@ -150,13 +275,31 @@ function evaluateBoard(chess, botColor) {
       const value = pieceValues[piece.type] || 0
       const table = pieceSquareTables[piece.type] || []
       const tableScore = table[tableIndex(rank, file, piece.color)] || 0
+      const square = squareName(rank, file)
+      const pawnScore = piece.type === 'p' ? pawnStructureScore(board, rank, file, piece.color) : 0
+      const rookScore = piece.type === 'r' ? rookFileScore(board, file, piece.color) : 0
+      const attackedScore = attackedPieceScore(chess, square, piece)
       const kingScore = piece.type === 'k'
-        ? pawnShieldScore(board, rank, file, piece.color) * (1 - endgame) + kingEndgameActivity(rank, file) * endgame
+        ? pawnShieldScore(board, rank, file, piece.color) * (1 - endgame) +
+          kingEndgameActivity(rank, file) * endgame +
+          kingDangerScore(chess, rank, file, piece.color) * (1 - endgame)
         : 0
       const signed = piece.color === botColor ? 1 : -1
 
-      score += signed * (value + tableScore + kingScore)
+      if (piece.type === 'b') {
+        pieceCounts[piece.color].b += 1
+      }
+
+      score += signed * (value + tableScore + pawnScore + rookScore + attackedScore + kingScore)
     }
+  }
+
+  if (pieceCounts[botColor].b >= 2) {
+    score += 35
+  }
+
+  if (pieceCounts[botColor === 'w' ? 'b' : 'w'].b >= 2) {
+    score -= 35
   }
 
   const sideToMove = chess.turn()
@@ -328,13 +471,16 @@ function negamax(chess, depth, alpha, beta, botColor, state, ply) {
     return 0
   }
 
-  if (depth === 0) {
+  const extension = chess.inCheck() && ply < 14 ? 1 : 0
+  const effectiveDepth = depth + extension
+
+  if (effectiveDepth === 0) {
     return quiescence(chess, alpha, beta, botColor, state, ply)
   }
 
   const key = positionKey(chess)
   const entry = state.table.get(key)
-  const cached = transpositionLookup(state, key, depth, alpha, beta)
+  const cached = transpositionLookup(state, key, effectiveDepth, alpha, beta)
 
   if (cached !== null) {
     return cached
@@ -353,7 +499,7 @@ function negamax(chess, depth, alpha, beta, botColor, state, ply) {
     let score
 
     try {
-      score = -negamax(chess, depth - 1, -beta, -alpha, botColor, state, ply + 1)
+      score = -negamax(chess, effectiveDepth - 1, -beta, -alpha, botColor, state, ply + 1)
     } finally {
       chess.undo()
     }
@@ -369,13 +515,13 @@ function negamax(chess, depth, alpha, beta, botColor, state, ply) {
 
     if (alpha >= beta) {
       rememberKiller(state, ply, move)
-      rememberHistory(state, depth, move)
+      rememberHistory(state, effectiveDepth, move)
       break
     }
   }
 
   state.bestMoveKey = previousBestMoveKey
-  storeTransposition(state, key, depth, bestScore, originalAlpha, beta, bestMove)
+  storeTransposition(state, key, effectiveDepth, bestScore, originalAlpha, beta, bestMove)
 
   return bestScore
 }

@@ -17,7 +17,7 @@ const levelProfiles = {
   2400: { maxDepth: 7, timeLimitMs: 4200, nodeLimit: 1300000 },
   2600: { maxDepth: 7, timeLimitMs: 5600, nodeLimit: 1900000 },
   2800: { maxDepth: 8, timeLimitMs: 7500, nodeLimit: 2800000 },
-  [bossBotLevel]: { maxDepth: 10, timeLimitMs: 15000, nodeLimit: 8000000 },
+  [bossBotLevel]: { maxDepth: 13, timeLimitMs: 45000, nodeLimit: 30000000 },
 }
 
 function normalizeBotLevel(level) {
