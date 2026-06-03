@@ -41,7 +41,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Flag,
-  Refresh,
   SwapVert,
   Timer,
   Undo,
@@ -482,7 +481,7 @@ function setUrlSelectedGameId(gameId) {
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
 }
 
-function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, onError, onNotice }) {
+function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, onError, onHeaderActionsChange, onNotice }) {
   const [games, setGames] = useState([])
   const [openGames, setOpenGames] = useState([])
   const [activeGames, setActiveGames] = useState([])
@@ -582,6 +581,16 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setLoading(false)
     }
   }, [authHeaders, onError, selectedGameId])
+
+  useEffect(() => {
+    onHeaderActionsChange?.({
+      loading,
+      onNewGame: () => setCreateDialogOpen(true),
+      onRefresh: loadGames,
+    })
+
+    return () => onHeaderActionsChange?.(null)
+  }, [loadGames, loading, onHeaderActionsChange])
 
   const loadGame = useCallback(async (gameId) => {
     if (!gameId) {
@@ -1340,240 +1349,145 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   }
 
   return (
-    <Box
-      sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: leftPaneCollapsed ? '24px' : '1fr',
-          lg: leftPaneCollapsed ? '24px minmax(0, 1fr)' : '360px minmax(0, 1fr)',
-        },
-        gap: 2,
-        alignItems: 'start',
-      }}
-    >
-      <Card
+    <Stack spacing={2}>
+      <Box
         sx={{
-          width: { xs: leftPaneCollapsed ? 24 : '100%', lg: leftPaneCollapsed ? 24 : 360 },
-          maxWidth: '100%',
-          maxHeight: { lg: 'calc(100vh - 190px)' },
-          justifySelf: 'start',
-          overflow: 'hidden',
-          position: 'relative',
-          transition: 'width 160ms ease',
-          minHeight: leftPaneCollapsed ? 42 : 0,
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: leftPaneCollapsed ? '24px' : '1fr',
+            lg: leftPaneCollapsed ? '24px minmax(0, 1fr)' : '360px minmax(0, 1fr)',
+          },
+          gap: 2,
+          alignItems: 'start',
         }}
       >
-        <Tooltip title={leftPaneCollapsed ? 'Show games' : 'Hide games'}>
-          <IconButton
-            size="small"
-            onClick={() => setLeftPaneCollapsed((current) => !current)}
-            sx={{
-              position: 'absolute',
-              top: 8,
-              right: leftPaneCollapsed ? -2 : 8,
-              zIndex: 2,
-              width: 24,
-              height: 24,
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:hover': {
-                bgcolor: 'action.hover',
-              },
-            }}
-          >
-            {leftPaneCollapsed ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
-          </IconButton>
-        </Tooltip>
-        <CardContent
+        <Card
           sx={{
-            display: leftPaneCollapsed ? 'none' : 'flex',
-            flexDirection: 'column',
+            width: { xs: leftPaneCollapsed ? 24 : '100%', lg: leftPaneCollapsed ? 24 : 360 },
+            maxWidth: '100%',
             maxHeight: { lg: 'calc(100vh - 190px)' },
-            minHeight: 0,
+            justifySelf: 'start',
+            overflow: 'hidden',
+            position: 'relative',
+            transition: 'width 160ms ease',
+            minHeight: leftPaneCollapsed ? 42 : 0,
           }}
         >
-          <Stack spacing={1.5} sx={{ mb: 2 }}>
-            <Typography
-              variant="h5"
-              component="h2"
+          <Tooltip title={leftPaneCollapsed ? 'Show games' : 'Hide games'}>
+            <IconButton
+              size="small"
+              onClick={() => setLeftPaneCollapsed((current) => !current)}
               sx={{
-                color: themeMode === 'dark' ? 'text.primary' : '#05070a',
-                fontWeight: 900,
+                position: 'absolute',
+                top: 8,
+                right: leftPaneCollapsed ? -2 : 8,
+                zIndex: 2,
+                width: 24,
+                height: 24,
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': {
+                  bgcolor: 'action.hover',
+                },
               }}
             >
-              Chess
-            </Typography>
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => setCreateDialogOpen(true)}
-                sx={{ flex: 1 }}
-              >
-                New game
-              </Button>
-              <Tooltip title="Refresh games">
-                <span>
-                  <Button
-                    variant="outlined"
-                    startIcon={<Refresh />}
-                    onClick={loadGames}
-                    disabled={loading}
-                  >
-                    Refresh
-                  </Button>
-                </span>
-              </Tooltip>
-            </Stack>
-          </Stack>
-
-          <Divider sx={{ my: 2 }} />
-
-          <Tabs
-            value={gameListTab}
-            onChange={(event, value) => setGameListTab(value)}
-            variant="fullWidth"
+              {leftPaneCollapsed ? <ChevronRight fontSize="small" /> : <ChevronLeft fontSize="small" />}
+            </IconButton>
+          </Tooltip>
+          <CardContent
             sx={{
-              minHeight: 32,
-              mb: 1,
-              '& .MuiTab-root': {
-                minHeight: 32,
-                minWidth: 0,
-                px: { xs: 0.5, sm: 1 },
-                py: 0.25,
-                fontSize: { xs: '0.68rem', sm: '0.75rem' },
-              },
+              display: leftPaneCollapsed ? 'none' : 'flex',
+              flexDirection: 'column',
+              maxHeight: { lg: 'calc(100vh - 190px)' },
+              minHeight: 0,
             }}
           >
-            <Tab label="Active" value="active" />
-            <Tab label="Open" value="open" />
-            <Tab label="Live" value="watch" />
-            <Tab label="Done" value="completed" />
-          </Tabs>
+            <Tabs
+              value={gameListTab}
+              onChange={(event, value) => setGameListTab(value)}
+              variant="fullWidth"
+              sx={{
+                minHeight: 32,
+                mb: 1,
+                '& .MuiTab-root': {
+                  minHeight: 32,
+                  minWidth: 0,
+                  px: { xs: 0.5, sm: 1 },
+                  py: 0.25,
+                  fontSize: { xs: '0.68rem', sm: '0.75rem' },
+                },
+              }}
+            >
+              <Tab label="Active" value="active" />
+              <Tab label="Open" value="open" />
+              <Tab label="Live" value="watch" />
+              <Tab label="Done" value="completed" />
+            </Tabs>
 
-          <Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
-            {gameListTab === 'active' && (
-              loading ? (
-                <Stack sx={{ alignItems: 'center', py: 4 }}>
-                  <CircularProgress size={26} />
-                </Stack>
-              ) : (
-                renderGameList(myActiveGames, 'No active games')
-              )
-            )}
+            <Box sx={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', pr: 0.5 }}>
+              {gameListTab === 'active' && (
+                loading ? (
+                  <Stack sx={{ alignItems: 'center', py: 4 }}>
+                    <CircularProgress size={26} />
+                  </Stack>
+                ) : (
+                  renderGameList(myActiveGames, 'No active games')
+                )
+              )}
 
-            {gameListTab === 'open' && renderGameList(openGames, 'No open games', {
-              action: (game) => `Join as ${openColorForGame(game)}`,
-              disabled: () => busy,
-              onClick: (game) => joinGame(game.id),
-            })}
+              {gameListTab === 'open' && renderGameList(openGames, 'No open games', {
+                action: (game) => `Join as ${openColorForGame(game)}`,
+                disabled: () => busy,
+                onClick: (game) => joinGame(game.id),
+              })}
 
-            {gameListTab === 'watch' && renderGameList(watchGames, 'No live games', {
-              action: () => 'View',
-            })}
+              {gameListTab === 'watch' && renderGameList(watchGames, 'No live games', {
+                action: () => 'View',
+              })}
 
-            {gameListTab === 'completed' && (
-              <>
-                <Stack 
-                  direction="row" 
-                  spacing={1} 
-                  sx={{ 
-                    alignItems: 'center', 
-                    justifyContent: 'flex-end', 
-                    mb: 1,
-                    mr: 3, 
-                  }}
-                >
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={showMyCompletedOnly}
-                        onChange={(event) => setShowMyCompletedOnly(event.target.checked)}
-                      />
-                    }
-                    label="Mine"
-                    sx={{
-                      mr: 0,
-                      '& .MuiFormControlLabel-label': {
-                        fontSize: 12,
-                      },
+              {gameListTab === 'completed' && (
+                <>
+                  <Stack 
+                    direction="row" 
+                    spacing={1} 
+                    sx={{ 
+                      alignItems: 'center', 
+                      justifyContent: 'flex-end', 
+                      mb: 1,
+                      mr: 3, 
                     }}
-                  />
-                </Stack>
-                {renderGameList(visibleCompletedGames, 'No completed games', {
-                  compact: true,
-                  hideBotChip: true,
-                  allowDelete: true,
-                })}
-              </>
-            )}
-          </Box>
-        </CardContent>
-      </Card>
+                  >
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={showMyCompletedOnly}
+                          onChange={(event) => setShowMyCompletedOnly(event.target.checked)}
+                        />
+                      }
+                      label="Mine"
+                      sx={{
+                        mr: 0,
+                        '& .MuiFormControlLabel-label': {
+                          fontSize: 12,
+                        },
+                      }}
+                    />
+                  </Stack>
+                  {renderGameList(visibleCompletedGames, 'No completed games', {
+                    compact: true,
+                    hideBotChip: true,
+                    allowDelete: true,
+                  })}
+                </>
+              )}
+            </Box>
+          </CardContent>
+        </Card>
 
       <Card sx={{ minHeight: { xs: 520, md: 'calc(100vh - 190px)' } }}>
         <CardContent>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={1}
-            sx={{ alignItems: { xs: 'flex-start', md: 'center' }, justifyContent: 'space-between', mb: 2 }}
-          >
-            <Box>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5 }}>
-                <ChessIcon color="primary" />
-                <Typography
-                  variant="h5"
-                  component="h2"
-                  sx={{
-                    color: themeMode === 'dark' ? 'text.primary' : '#05070a',
-                    fontWeight: 900,
-                  }}
-                >
-                  {selectedGame ? gameTitle(selectedGame) : 'Board'}
-                </Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                {selectedGame ? matchupLabel(selectedGame) : 'Pick a game'}
-              </Typography>
-            </Box>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              <Chip label={statusLabel(selectedGame, authUser)} color={statusColor(selectedGame, authUser)} variant="outlined" />
-              {selectedGame && (
-                <Chip label={timeControlName(selectedGame.time_control_seconds)} variant="outlined" />
-              )}
-              <Chip label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
-              {selectedGame && !playerColor && (
-                <Chip label="Viewer" variant="outlined" />
-              )}
-              {selectedGame?.status === 'waiting' && playerColor && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={cancelGame}
-                  disabled={busy}
-                >
-                  Cancel
-                </Button>
-              )}
-              {selectedGame?.status === 'active' && playerColor && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={resignGame}
-                  disabled={busy}
-                >
-                  Resign
-                </Button>
-              )}
-            </Stack>
-          </Stack>
-
-          <Divider sx={{ mb: 2 }} />
-
           {!selectedGame ? (
             <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
               <Casino sx={{ fontSize: 42, color: 'text.secondary', mb: 1 }} />
@@ -1599,6 +1513,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   <ChessClock
                     game={selectedGame}
                     playerColor={playerColor}
+                    title={`Chess · ${gameTitle(selectedGame)}`}
                     onTimeout={timeoutGame}
                   />
                 </Box>
@@ -1692,53 +1607,123 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               </Box>
 
               <Stack spacing={1.5} sx={{ width: '100%', minWidth: 0 }}>
-                <Paper
-                  variant="outlined"
+                <Box
                   sx={{
-                    p: 2,
-                    maxHeight: { lg: 245 },
-                    overflow: 'auto',
+                    display: 'grid',
+                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                    gap: 1.5,
+                    alignItems: 'stretch',
                   }}
                 >
-                  <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
-                    Moves
-                  </Typography>
-                  {moves.length === 0 ? (
-                    <Typography color="text.secondary">No moves yet</Typography>
-                  ) : (
+                  <Paper variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
+                      Game details
+                    </Typography>
                     <Stack spacing={0.75}>
-                      {moves.map((move, index) => (
-                        <Stack
-                          key={`${move.move_number}-${move.san}`}
-                          direction="row"
-                          spacing={1}
-                          onClick={() => {
-                            setViewMoveIndex(index)
-                            setSelectedSquare(null)
-                          }}
-                          sx={{
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            borderRadius: 1,
-                            cursor: 'pointer',
-                            px: 0.75,
-                            py: 0.25,
-                            bgcolor: viewMoveIndex === index ? 'action.selected' : 'transparent',
-                            '&:hover': {
-                              bgcolor: 'action.hover',
-                            },
-                          }}
-                        >
-                          <Typography variant="body2" color="text.secondary">
-                            {move.move_number}. {move.color}
-                          </Typography>
-                          <Typography sx={{ fontWeight: 800 }}>{move.san}</Typography>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Status</Typography>
+                        <Chip size="small" label={statusLabel(selectedGame, authUser)} color={statusColor(selectedGame, authUser)} variant="outlined" />
+                      </Stack>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Time</Typography>
+                        <Chip size="small" label={timeControlName(selectedGame.time_control_seconds)} variant="outlined" />
+                      </Stack>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Connection</Typography>
+                        <Chip size="small" label={socketConnected ? 'Live' : 'Offline'} color={socketConnected ? 'success' : 'default'} variant="outlined" />
+                      </Stack>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">White</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{playerName(selectedGame, 'white')}</Typography>
+                      </Stack>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Black</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>{playerName(selectedGame, 'black')}</Typography>
+                      </Stack>
+                      {selectedGame && !playerColor && (
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Role</Typography>
+                          <Chip size="small" label="Viewer" variant="outlined" />
                         </Stack>
-                      ))}
-                      <Box ref={movesEndRef} />
+                      )}
+                      {selectedGame.is_bot_game && (
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Bot level</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{botLevelLabel(selectedGame.bot_level)}</Typography>
+                        </Stack>
+                      )}
+                      {selectedGame.status === 'waiting' && playerColor && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={cancelGame}
+                          disabled={busy}
+                        >
+                          Cancel game
+                        </Button>
+                      )}
+                      {selectedGame.status === 'active' && playerColor && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={resignGame}
+                          disabled={busy}
+                        >
+                          Resign
+                        </Button>
+                      )}
                     </Stack>
-                  )}
-                </Paper>
+                  </Paper>
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 2,
+                      maxHeight: { lg: 245 },
+                      overflow: 'auto',
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: 900, mb: 1 }}>
+                      Moves
+                    </Typography>
+                    {moves.length === 0 ? (
+                      <Typography color="text.secondary">No moves yet</Typography>
+                    ) : (
+                      <Stack spacing={0.75}>
+                        {moves.map((move, index) => (
+                          <Stack
+                            key={`${move.move_number}-${move.san}`}
+                            direction="row"
+                            spacing={1}
+                            onClick={() => {
+                              setViewMoveIndex(index)
+                              setSelectedSquare(null)
+                            }}
+                            sx={{
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              borderRadius: 1,
+                              cursor: 'pointer',
+                              px: 0.75,
+                              py: 0.25,
+                              bgcolor: viewMoveIndex === index ? 'action.selected' : 'transparent',
+                              '&:hover': {
+                                bgcolor: 'action.hover',
+                              },
+                            }}
+                          >
+                            <Typography variant="body2" color="text.secondary">
+                              {move.move_number}. {move.color}
+                            </Typography>
+                            <Typography sx={{ fontWeight: 800 }}>{move.san}</Typography>
+                          </Stack>
+                        ))}
+                        <Box ref={movesEndRef} />
+                      </Stack>
+                    )}
+                  </Paper>
+                </Box>
                 <ChessGameChat
                   authHeaders={authHeaders}
                   authUser={authUser}
@@ -1768,6 +1753,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           )}
         </CardContent>
       </Card>
+      </Box>
       <Dialog
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
@@ -1846,7 +1832,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Stack>
   )
 }
 

@@ -166,6 +166,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const [showSettings, setShowSettings] = useState(false)
   const [activeView, setActiveView] = useState(getInitialActiveView)
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null)
+  const [chessHeaderActions, setChessHeaderActions] = useState(null)
   const selectedChannelIdRef = useRef(null)
   const messagesEndRef = useRef(null)
   const messageInputRef = useRef(null)
@@ -827,6 +828,25 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 </Tooltip>
               </>
             )}
+            {activeView === 'chess' && chessHeaderActions && (
+              <>
+                <Button variant="contained" startIcon={<Add />} onClick={chessHeaderActions.onNewGame}>
+                  New game
+                </Button>
+                <Tooltip title="Refresh games">
+                  <span>
+                    <IconButton
+                      color="primary"
+                      onClick={chessHeaderActions.onRefresh}
+                      disabled={chessHeaderActions.loading}
+                      sx={{ alignSelf: { xs: 'flex-start', md: 'center' } }}
+                    >
+                      <Refresh />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </>
+            )}
             <Tooltip title={themeMode === 'dark' ? 'Light theme' : 'Dark theme'}>
               <IconButton color="primary" onClick={onToggleTheme}>
                 {themeMode === 'dark' ? <LightMode /> : <DarkMode />}
@@ -898,6 +918,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               socketConnected={socketConnected}
               themeMode={themeMode}
               onError={setError}
+              onHeaderActionsChange={setChessHeaderActions}
               onNotice={setNotice}
             />
           ) : (

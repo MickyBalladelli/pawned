@@ -89,7 +89,7 @@ function getClockTimes(game, now) {
   }
 }
 
-function ChessClock({ game, playerColor, onTimeout }) {
+function ChessClock({ game, playerColor, title, subtitle, onTimeout }) {
   const [now, setNow] = useState(Date.now())
   const timeoutSentRef = useRef(null)
   const times = useMemo(() => getClockTimes(game, now), [game, now])
@@ -123,15 +123,27 @@ function ChessClock({ game, playerColor, onTimeout }) {
     <Paper variant="outlined" sx={{ p: 1 }}>
       <Stack spacing={1}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', minWidth: 0 }}>
-            <Timer fontSize="small" color="action" />
-            <Typography variant="body2" sx={{ fontWeight: 800 }} noWrap>
-              {timeControlName(game.time_control_seconds)}
+          <Stack sx={{ minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 900, lineHeight: 1.1 }} noWrap>
+              {title || 'Chess'}
             </Typography>
+            {subtitle && (
+              <Typography variant="body2" color="text.secondary" noWrap>
+                {subtitle}
+              </Typography>
+            )}
           </Stack>
-          {playerColor && (
-            <Chip size="small" variant="outlined" label={`You: ${playerColor}`} />
-          )}
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexShrink: 0 }}>
+            <Chip
+              size="small"
+              icon={<Timer fontSize="small" />}
+              variant="outlined"
+              label={timeControlName(game.time_control_seconds)}
+            />
+            {playerColor && (
+              <Chip size="small" variant="outlined" label={`You: ${playerColor}`} />
+            )}
+          </Stack>
         </Stack>
         {['white', 'black'].map((color) => {
           const active = game.status === 'active' && game.turn_color === color
