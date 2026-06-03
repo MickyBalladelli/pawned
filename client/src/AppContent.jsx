@@ -757,12 +757,12 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         >
           <Box
             component="img"
-            src="/images/vela-chess.jpeg"
+            src="/images/pawned.png"
             alt="Vela"
             sx={{
-              width: { xs: '100%', sm: 180, md: 160 },
-              maxHeight: { xs: 92, md: 72 },
-              objectFit: 'cover',
+              width: { xs: '100%', sm: 120, md: 96 },
+              height: { xs: 120, sm: 92, md: 72 },
+              objectFit: 'contain',
               borderRadius: 2,
             }}
           />

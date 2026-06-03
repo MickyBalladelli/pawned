@@ -44,12 +44,13 @@ function LoginPage({
       <Stack spacing={3}>
         <Box
           component="img"
-          src="/images/vela-chess.jpeg"
+          src="/images/pawned.png"
           alt="Vela"
           sx={{
             width: '100%',
-            maxHeight: 220,
-            objectFit: 'cover',
+            maxHeight: 260,
+            aspectRatio: '591 / 567',
+            objectFit: 'contain',
             borderRadius: 2,
           }}
         />
