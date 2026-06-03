@@ -20,6 +20,7 @@ const readablePieces = Object.fromEntries(
 )
 
 function ChessBoard({
+  boardOrientation,
   onSquareClick,
   playerColor,
   position,
@@ -56,7 +57,7 @@ function ChessBoard({
           id: 'vela-chessboard',
           position,
           pieces: readablePieces,
-          boardOrientation: playerColor === 'black' ? 'black' : 'white',
+          boardOrientation: boardOrientation || (playerColor === 'black' ? 'black' : 'white'),
           allowDragging: false,
           showNotation: true,
           darkSquareStyle: {

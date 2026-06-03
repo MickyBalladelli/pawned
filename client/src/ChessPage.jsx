@@ -41,6 +41,7 @@ import {
   ChevronRight,
   Flag,
   Refresh,
+  SwapVert,
   Timer,
 } from '@mui/icons-material'
 import ChessBoard from './ChessBoard'
@@ -366,6 +367,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [moveError, setMoveError] = useState(null)
+  const [boardFlipped, setBoardFlipped] = useState(false)
   const movesEndRef = useRef(null)
 
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
@@ -376,6 +378,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     : moves[viewMoveIndex]?.fen_after
   const boardSquares = useMemo(() => parseFenBoard(viewedFen), [viewedFen])
   const isViewingHistory = viewMoveIndex !== null
+  const defaultBoardOrientation = playerColor === 'black' ? 'black' : 'white'
+  const boardOrientation = boardFlipped
+    ? defaultBoardOrientation === 'white' ? 'black' : 'white'
+    : defaultBoardOrientation
   const myActiveGames = useMemo(() => games.filter(isActiveGame), [games])
   const myCompletedGames = useMemo(() => games.filter(isCompletedGame), [games])
   const watchGames = useMemo(() => (
@@ -694,6 +700,11 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         setMoveError(null)
       },
     )
+  }
+
+  function flipBoard() {
+    setBoardFlipped((current) => !current)
+    setSelectedSquare(null)
   }
 
   function handleSquareClick(square) {
@@ -1268,6 +1279,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   />
                 </Box>
                 <ChessBoard
+                  boardOrientation={boardOrientation}
                   boardSquares={boardSquares}
                   canMove={canMove}
                   position={viewedFen}
@@ -1277,6 +1289,17 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   onSquareClick={handleSquareClick}
                 />
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+                  <Tooltip title="Flip board">
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<SwapVert />}
+                      onClick={flipBoard}
+                      sx={{ minWidth: 92 }}
+                    >
+                      Flip
+                    </Button>
+                  </Tooltip>
                   <Tooltip title="Previous move">
                     <span>
                       <Button
