@@ -62,6 +62,34 @@ const timeControls = [
   { label: 'Unlimited', value: 'unlimited' },
 ]
 const selectedGameStorageKey = 'vela.chess.selectedGameId'
+const newGameSettingsStorageKey = 'vela.chess.newGameSettings'
+
+function getStoredNewGameSettings() {
+  const defaults = {
+    color: 'white',
+    timeControl: 300,
+    botLevel: 800,
+    kind: 'human',
+  }
+
+  try {
+    const parsed = JSON.parse(localStorage.getItem(newGameSettingsStorageKey) || '{}')
+    const timeControlValues = new Set(timeControls.map((control) => control.value))
+
+    return {
+      color: parsed.color === 'black' ? 'black' : defaults.color,
+      timeControl: timeControlValues.has(parsed.timeControl) ? parsed.timeControl : defaults.timeControl,
+      botLevel: botLevels.includes(Number(parsed.botLevel)) ? Number(parsed.botLevel) : defaults.botLevel,
+      kind: parsed.kind === 'bot' ? 'bot' : defaults.kind,
+    }
+  } catch {
+    return defaults
+  }
+}
+
+function setStoredNewGameSettings(settings) {
+  localStorage.setItem(newGameSettingsStorageKey, JSON.stringify(settings))
+}
 
 function getAuthHeaders(authToken) {
   return { Authorization: `Bearer ${authToken}` }
@@ -358,9 +386,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [moves, setMoves] = useState([])
   const [viewMoveIndex, setViewMoveIndex] = useState(null)
   const [selectedSquare, setSelectedSquare] = useState(null)
-  const [newGameColor, setNewGameColor] = useState('white')
-  const [newGameTimeControl, setNewGameTimeControl] = useState(300)
-  const [botLevel, setBotLevel] = useState(800)
+  const [newGameColor, setNewGameColor] = useState(() => getStoredNewGameSettings().color)
+  const [newGameTimeControl, setNewGameTimeControl] = useState(() => getStoredNewGameSettings().timeControl)
+  const [botLevel, setBotLevel] = useState(() => getStoredNewGameSettings().botLevel)
+  const [newGameKind, setNewGameKind] = useState(() => getStoredNewGameSettings().kind)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [gameListTab, setGameListTab] = useState('active')
   const [expandedGameIds, setExpandedGameIds] = useState(new Set())
@@ -489,6 +518,15 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     setUrlSelectedGameId(selectedGameId)
     setBotThinkingMove(null)
   }, [selectedGameId])
+
+  useEffect(() => {
+    setStoredNewGameSettings({
+      color: newGameColor,
+      timeControl: newGameTimeControl,
+      botLevel,
+      kind: newGameKind,
+    })
+  }, [botLevel, newGameColor, newGameKind, newGameTimeControl])
 
   useEffect(() => {
     if (!socket || !selectedGameId) {
@@ -632,6 +670,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       setSelectedGameId(data.game.id)
       setGames((current) => [data.game, ...current])
+      setNewGameKind('human')
       onNotice('Chess game created')
       setCreateDialogOpen(false)
       loadGames()
@@ -661,6 +700,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setSelectedGame(data.game)
       setMoves(data.moves || [])
       setViewMoveIndex(null)
+      setNewGameKind('bot')
       onNotice(`Bot game created at ${botLevelLabel(data.game.bot_level || botLevel)}`)
       setCreateDialogOpen(false)
       loadGames()
@@ -1491,7 +1531,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
             </TextField>
 
             <Button
-              variant="contained"
+              variant={newGameKind === 'human' ? 'contained' : 'outlined'}
               startIcon={<Add />}
               onClick={createGame}
               disabled={busy}
@@ -1517,7 +1557,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               ))}
             </TextField>
             <Button
-              variant="outlined"
+              variant={newGameKind === 'bot' ? 'contained' : 'outlined'}
               startIcon={<ChessIcon />}
               onClick={createBotGame}
               disabled={busy}
