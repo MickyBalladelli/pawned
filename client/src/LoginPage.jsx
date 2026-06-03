@@ -65,7 +65,7 @@ function LoginPage({
                     Sign in
                   </Typography>
                 </Stack>
-                <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+                <Typography variant="h4" component="h1" color="text.primary" sx={{ fontWeight: 700 }}>
                   Pawned Login
                 </Typography>
               </Box>
