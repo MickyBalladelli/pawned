@@ -8,6 +8,7 @@ const {
   joinChessGame,
   listChessMoves,
   makeChessMove,
+  undoChessMove,
   resignChessGame,
   timeoutChessGame,
   cancelChessGame,
@@ -27,6 +28,11 @@ function emitMoveMade(io, result) {
   if (result.move) {
     io.to(`chess:game:${result.game.id}`).emit('chess:moveMade', result)
   }
+  emitGameUpdate(io, result.game)
+}
+
+function emitMovesReset(io, result) {
+  io.to(`chess:game:${result.game.id}`).emit('chess:movesReset', result)
   emitGameUpdate(io, result.game)
 }
 
@@ -165,6 +171,23 @@ function createChessRouter({ pool, authenticate, io }) {
     } catch (err) {
       const status = err.message === 'Game not found' ? 404 : 400
       res.status(status).json({ error: err.message || 'Failed to make chess move' })
+    }
+  })
+
+  router.post('/games/:id/undo', async (req, res) => {
+    try {
+      const result = await undoChessMove(pool, req.params.id, req.user)
+
+      emitBotThinking(io, {
+        gameId: result.game.id,
+        thinking: false,
+        bestMove: null,
+      })
+      emitMovesReset(io, result)
+      res.json(result)
+    } catch (err) {
+      const status = err.message === 'Game not found' ? 404 : 400
+      res.status(status).json({ error: err.message || 'Failed to undo chess move' })
     }
   })
 

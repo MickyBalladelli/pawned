@@ -2,6 +2,7 @@ const {
   getChessGame,
   listChessMoves,
   makeChessMove,
+  undoChessMove,
   resignChessGame,
   timeoutChessGame,
   cancelChessGame,
@@ -22,6 +23,11 @@ function emitMoveMade(io, result) {
   if (result.move) {
     io.to(chessRoom(result.game.id)).emit('chess:moveMade', result)
   }
+  emitGameUpdate(io, result.game)
+}
+
+function emitMovesReset(io, result) {
+  io.to(chessRoom(result.game.id)).emit('chess:movesReset', result)
   emitGameUpdate(io, result.game)
 }
 
@@ -137,6 +143,29 @@ function registerChessSockets(io, socket, { pool }) {
       await playAndEmitBotTurn(pool, io, result.game.id)
     } catch (err) {
       callback?.({ error: err.message || 'Failed to make chess move' })
+    }
+  })
+
+  socket.on('chess:undo', async (data, callback) => {
+    const { gameId } = data || {}
+
+    if (!gameId) {
+      callback?.({ error: 'Game id is required' })
+      return
+    }
+
+    try {
+      const result = await undoChessMove(pool, gameId, socket.data.user)
+
+      emitBotThinking(io, {
+        gameId: result.game.id,
+        thinking: false,
+        bestMove: null,
+      })
+      emitMovesReset(io, result)
+      callback?.(result)
+    } catch (err) {
+      callback?.({ error: err.message || 'Failed to undo chess move' })
     }
   })
 

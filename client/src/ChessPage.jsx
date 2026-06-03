@@ -44,6 +44,7 @@ import {
   Refresh,
   SwapVert,
   Timer,
+  Undo,
 } from '@mui/icons-material'
 import { Chess } from 'chess.js'
 import ChessBoard from './ChessBoard'
@@ -480,6 +481,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
   const playerColor = getPlayerColor(selectedGame, authUser.id)
   const canMove = Boolean(selectedGame?.status === 'active' && playerColor === selectedGame.turn_color)
+  const canUndo = Boolean(selectedGame?.status === 'active' && playerColor && moves.length > 0)
   const viewedFen = viewMoveIndex === null
     ? selectedGame?.fen
     : moves[viewMoveIndex]?.fen_after
@@ -741,6 +743,19 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setMoveError(null)
     }
 
+    const handleMovesReset = (result) => {
+      if (Number(result.game?.id) !== Number(selectedGameId)) {
+        return
+      }
+
+      setBotThinkingMove(null)
+      setSelectedGame(result.game)
+      setMoves(result.moves || [])
+      setViewMoveIndex(null)
+      setSelectedSquare(null)
+      setMoveError(null)
+    }
+
     const handleBotThinking = (update) => {
       if (Number(update.gameId) !== Number(selectedGameId)) {
         return
@@ -756,6 +771,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
     socket.on('chess:gameUpdated', handleGameUpdated)
     socket.on('chess:moveMade', handleMoveMade)
+    socket.on('chess:movesReset', handleMovesReset)
     socket.on('chess:botThinking', handleBotThinking)
     socket.on('chess:gameDeleted', ({ id }) => {
       setGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
@@ -773,6 +789,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     return () => {
       socket.off('chess:gameUpdated', handleGameUpdated)
       socket.off('chess:moveMade', handleMoveMade)
+      socket.off('chess:movesReset', handleMovesReset)
       socket.off('chess:botThinking', handleBotThinking)
       socket.off('chess:gameDeleted')
     }
@@ -1006,6 +1023,58 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       loadGames()
     } catch (err) {
       onError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function undoMove() {
+    if (!selectedGame) {
+      return
+    }
+
+    setBusy(true)
+
+    try {
+      if (socket && socketConnected) {
+        socket.timeout(5000).emit('chess:undo', { gameId: selectedGame.id }, (err, response) => {
+          setBusy(false)
+
+          if (err) {
+            setMoveError('Undo timed out')
+            return
+          }
+
+          if (response?.error) {
+            setMoveError(response.error)
+            return
+          }
+
+          setBotThinkingMove(null)
+          setSelectedGame(response.game)
+          setMoves(response.moves || [])
+          setViewMoveIndex(null)
+          setSelectedSquare(null)
+          setMoveError(null)
+          loadGames()
+        })
+        return
+      }
+
+      const data = await requestJson(`/api/chess/games/${selectedGame.id}/undo`, {
+        method: 'POST',
+        headers: authHeaders,
+      })
+
+      setBotThinkingMove(null)
+      setSelectedGame(data.game)
+      setMoves(data.moves || [])
+      setViewMoveIndex(null)
+      setSelectedSquare(null)
+      setMoveError(null)
+      loadGames()
+    } catch (err) {
+      setMoveError(err.message)
     } finally {
       setBusy(false)
     }
@@ -1512,7 +1581,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   themeMode={themeMode}
                   onSquareClick={handleSquareClick}
                 />
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap', mt: 1 }}>
                   <Tooltip title="Flip board">
                     <Button
                       size="small"
@@ -1549,6 +1618,20 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                         sx={{ minWidth: 112 }}
                       >
                         Next
+                      </Button>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Undo move">
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Undo />}
+                        onClick={undoMove}
+                        disabled={!canUndo || busy}
+                        sx={{ minWidth: 98 }}
+                      >
+                        Undo
                       </Button>
                     </span>
                   </Tooltip>

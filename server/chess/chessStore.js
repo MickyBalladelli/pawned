@@ -646,6 +646,95 @@ async function makeChessMove(pool, gameId, user, moveInput = {}) {
   }
 }
 
+async function undoChessMove(pool, gameId, user) {
+  const client = await pool.connect()
+
+  try {
+    await client.query('BEGIN')
+
+    const result = await client.query('SELECT * FROM chess_games WHERE id = $1 FOR UPDATE', [gameId])
+    const game = mapGame(result.rows[0])
+
+    if (!game) {
+      throw new Error('Game not found')
+    }
+
+    if (game.status !== 'active') {
+      throw new Error('Game is not active')
+    }
+
+    if (!colorForUser(game, user.id)) {
+      throw new Error('You are not a player in this game')
+    }
+
+    const movesResult = await client.query(
+      `
+        SELECT *
+        FROM chess_moves
+        WHERE game_id = $1
+        ORDER BY move_number ASC, id ASC
+      `,
+      [game.id]
+    )
+    const moves = movesResult.rows
+
+    if (moves.length === 0) {
+      throw new Error('No moves to undo')
+    }
+
+    const bot = game.is_bot_game ? await getChessBotUser(pool) : null
+    const lastMove = moves[moves.length - 1]
+    let keepCount = moves.length - 1
+
+    if (bot && Number(lastMove.user_id) === Number(bot.id)) {
+      keepCount = Math.max(0, moves.length - 2)
+    } else if (Number(lastMove.user_id) !== Number(user.id)) {
+      throw new Error('You can only undo your last move')
+    }
+
+    const previousMove = keepCount > 0 ? moves[keepCount - 1] : null
+    const fen = previousMove?.fen_after || startingFen
+    const turnColor = currentTurnColor(fen)
+    const now = new Date()
+
+    await client.query(
+      `
+        DELETE FROM chess_moves
+        WHERE game_id = $1
+          AND move_number > $2
+      `,
+      [game.id, keepCount]
+    )
+
+    await client.query(
+      `
+        UPDATE chess_games
+        SET fen = $1,
+            status = 'active',
+            turn_color = $2,
+            winner_user_id = NULL,
+            ended_at = NULL,
+            clock_started_at = CASE WHEN time_control_seconds IS NOT NULL THEN $3::timestamp ELSE NULL END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $4
+      `,
+      [fen, turnColor, now, game.id]
+    )
+
+    await client.query('COMMIT')
+
+    return {
+      game: await getChessGame(pool, game.id),
+      moves: await listChessMoves(pool, game.id),
+    }
+  } catch (err) {
+    await client.query('ROLLBACK')
+    throw err
+  } finally {
+    client.release()
+  }
+}
+
 async function resignChessGame(pool, gameId, user) {
   const client = await pool.connect()
 
@@ -845,6 +934,7 @@ module.exports = {
   joinChessGame,
   listChessMoves,
   makeChessMove,
+  undoChessMove,
   resignChessGame,
   timeoutChessGame,
   cancelChessGame,
