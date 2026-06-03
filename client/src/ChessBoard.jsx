@@ -26,6 +26,7 @@ function ChessBoard({
   playerColor,
   position,
   selectedSquare,
+  thinkingMoveSquares = [],
   themeMode,
 }) {
   const moveSquareStyles = Object.fromEntries(
@@ -45,6 +46,15 @@ function ChessBoard({
         },
       }
     : {}
+  const thinkingSquareStyles = Object.fromEntries(
+    thinkingMoveSquares.map((square) => [
+      square,
+      {
+        backgroundColor: '#bfdbfe',
+        boxShadow: 'inset 0 0 0 3px rgba(37, 99, 235, 0.32)',
+      },
+    ]),
+  )
 
   function handleSquareClick(square) {
     if (document.activeElement instanceof HTMLElement) {
@@ -87,6 +97,7 @@ function ChessBoard({
           },
           squareStyles: {
             ...moveSquareStyles,
+            ...thinkingSquareStyles,
             ...selectedSquareStyles,
           },
           boardStyle: {

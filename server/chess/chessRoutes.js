@@ -29,8 +29,14 @@ function emitMoveMade(io, result) {
   emitGameUpdate(io, result.game)
 }
 
+function emitBotThinking(io, update) {
+  io.to(`chess:game:${update.gameId}`).emit('chess:botThinking', update)
+}
+
 async function playAndEmitBotTurn(pool, io, gameId) {
-  const botResult = await playBotTurn(pool, gameId)
+  const botResult = await playBotTurn(pool, gameId, {
+    onThinking: (update) => emitBotThinking(io, update),
+  })
 
   if (botResult) {
     await emitMoveAndOpening(pool, io, botResult)

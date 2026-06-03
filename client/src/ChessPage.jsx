@@ -370,6 +370,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const [moveError, setMoveError] = useState(null)
   const [boardFlipped, setBoardFlipped] = useState(false)
   const [leftPaneCollapsed, setLeftPaneCollapsed] = useState(false)
+  const [botThinkingMove, setBotThinkingMove] = useState(null)
   const movesEndRef = useRef(null)
 
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
@@ -383,6 +384,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const highlightedMove = isViewingHistory ? moves[viewMoveIndex] : moves[moves.length - 1]
   const lastMoveSquares = highlightedMove
     ? [highlightedMove.from_square, highlightedMove.to_square].filter(Boolean)
+    : []
+  const thinkingMoveSquares = !isViewingHistory && Number(botThinkingMove?.gameId) === Number(selectedGameId)
+    ? [botThinkingMove.bestMove?.from, botThinkingMove.bestMove?.to].filter(Boolean)
     : []
   const defaultBoardOrientation = playerColor === 'black' ? 'black' : 'white'
   const boardOrientation = boardFlipped
@@ -483,6 +487,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   useEffect(() => {
     setStoredSelectedGameId(selectedGameId)
     setUrlSelectedGameId(selectedGameId)
+    setBotThinkingMove(null)
   }, [selectedGameId])
 
   useEffect(() => {
@@ -561,6 +566,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         return
       }
 
+      setBotThinkingMove(null)
       setSelectedGame(result.game)
       if (result.move) {
         setMoves((current) => addMoveOnce(current, result.move))
@@ -570,8 +576,22 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       setMoveError(null)
     }
 
+    const handleBotThinking = (update) => {
+      if (Number(update.gameId) !== Number(selectedGameId)) {
+        return
+      }
+
+      if (!update.thinking || !update.bestMove) {
+        setBotThinkingMove(null)
+        return
+      }
+
+      setBotThinkingMove(update)
+    }
+
     socket.on('chess:gameUpdated', handleGameUpdated)
     socket.on('chess:moveMade', handleMoveMade)
+    socket.on('chess:botThinking', handleBotThinking)
     socket.on('chess:gameDeleted', ({ id }) => {
       setGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
       setOpenGames((current) => current.filter((game) => Number(game.id) !== Number(id)))
@@ -588,6 +608,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     return () => {
       socket.off('chess:gameUpdated', handleGameUpdated)
       socket.off('chess:moveMade', handleMoveMade)
+      socket.off('chess:botThinking', handleBotThinking)
       socket.off('chess:gameDeleted')
     }
   }, [authUser.id, loadGames, selectedGameId, socket])
@@ -1320,6 +1341,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   position={viewedFen}
                   playerColor={playerColor}
                   selectedSquare={selectedSquare}
+                  thinkingMoveSquares={thinkingMoveSquares}
                   themeMode={themeMode}
                   onSquareClick={handleSquareClick}
                 />

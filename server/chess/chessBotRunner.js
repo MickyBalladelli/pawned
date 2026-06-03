@@ -7,6 +7,12 @@ const {
   makeChessMove,
 } = require('./chessStore')
 
+function nextTick() {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
+}
+
 function getBotColor(game, botUserId) {
   if (Number(game.white_user_id) === Number(botUserId)) {
     return 'white'
@@ -19,7 +25,7 @@ function getBotColor(game, botUserId) {
   return null
 }
 
-async function playBotTurn(pool, gameId) {
+async function playBotTurn(pool, gameId, options = {}) {
   const bot = await getChessBotUser(pool)
   const game = await getChessGame(pool, gameId)
 
@@ -35,17 +41,48 @@ async function playBotTurn(pool, gameId) {
 
   const moves = await listChessMoves(pool, game.id)
   const chess = new Chess(game.fen)
-  const move = chooseBotMove(
-    chess,
-    moves.map((item) => item.san),
-    game.bot_level
-  )
+  options.onThinking?.({
+    gameId: game.id,
+    thinking: true,
+    bestMove: null,
+  })
+  await nextTick()
 
-  if (!move) {
-    return null
+  try {
+    const move = await chooseBotMove(
+      chess,
+      moves.map((item) => item.san),
+      game.bot_level,
+      {
+        onBestMove: (bestMove) => {
+          options.onThinking?.({
+            gameId: game.id,
+            thinking: true,
+            bestMove: {
+              from: bestMove.from,
+              to: bestMove.to,
+              promotion: bestMove.promotion || null,
+              depth: bestMove.depth,
+              nodes: bestMove.nodes,
+              score: bestMove.score,
+            },
+          })
+        },
+      }
+    )
+
+    if (!move) {
+      return null
+    }
+
+    return await makeChessMove(pool, game.id, bot, move)
+  } finally {
+    options.onThinking?.({
+      gameId: game.id,
+      thinking: false,
+      bestMove: null,
+    })
   }
-
-  return makeChessMove(pool, game.id, bot, move)
 }
 
 module.exports = {

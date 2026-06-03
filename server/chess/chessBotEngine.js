@@ -75,6 +75,12 @@ const mateScore = 1000000
 const infinity = 100000000
 const timeout = Symbol('timeout')
 
+function nextTick() {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
+}
+
 function tableIndex(rank, file, color) {
   return color === 'w' ? rank * 8 + file : (7 - rank) * 8 + file
 }
@@ -582,6 +588,64 @@ function chooseEngineMove(chess, options = {}) {
       if (result.move) {
         best = { ...result, depth }
         state.bestMoveKey = moveKey(result.move)
+        options.onBestMove?.({
+          ...result.move,
+          score: result.score,
+          depth,
+          nodes: state.nodes,
+        })
+      }
+    } catch (err) {
+      if (err !== timeout) {
+        throw err
+      }
+
+      break
+    }
+  }
+
+  return {
+    ...best.move,
+    score: best.score,
+    depth: best.depth,
+    nodes: state.nodes,
+  }
+}
+
+async function chooseEngineMoveAsync(chess, options = {}) {
+  const moves = chess.moves({ verbose: true })
+
+  if (moves.length === 0) {
+    return null
+  }
+
+  const botColor = chess.turn()
+  const state = {
+    deadline: Date.now() + (options.timeLimitMs || 900),
+    nodeLimit: options.nodeLimit || 250000,
+    nodes: 0,
+    table: new Map(),
+    killers: [],
+    history: new Map(),
+    bestMoveKey: null,
+  }
+  const maxDepth = options.maxDepth || 5
+  let best = { move: moves[0], score: -infinity, depth: 0 }
+
+  for (let depth = 1; depth <= maxDepth; depth += 1) {
+    try {
+      const result = searchRoot(chess, depth, botColor, state)
+
+      if (result.move) {
+        best = { ...result, depth }
+        state.bestMoveKey = moveKey(result.move)
+        options.onBestMove?.({
+          ...result.move,
+          score: result.score,
+          depth,
+          nodes: state.nodes,
+        })
+        await nextTick()
       }
     } catch (err) {
       if (err !== timeout) {
@@ -602,5 +666,6 @@ function chooseEngineMove(chess, options = {}) {
 
 module.exports = {
   chooseEngineMove,
+  chooseEngineMoveAsync,
   evaluateBoard,
 }

@@ -1,5 +1,5 @@
 const openingBook = require('../../client/src/data/chessOpenings.json')
-const { chooseEngineMove } = require('./chessBotEngine')
+const { chooseEngineMoveAsync } = require('./chessBotEngine')
 
 const bossBotLevel = 9999
 const botLevels = [600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, bossBotLevel]
@@ -44,10 +44,13 @@ function getOpeningMatches(history) {
   })
 }
 
-function chooseBotMove(chess, moveHistory, level) {
+async function chooseBotMove(chess, moveHistory, level, options = {}) {
   const selectedLevel = level === undefined ? moveHistory : level
-  const profile = getLevelProfile(selectedLevel)
-  const searchMove = chooseEngineMove(chess, profile)
+  const profile = {
+    ...getLevelProfile(selectedLevel),
+    onBestMove: options.onBestMove,
+  }
+  const searchMove = await chooseEngineMoveAsync(chess, profile)
 
   if (!searchMove) {
     return null

@@ -24,6 +24,10 @@ function emitMoveMade(io, result) {
   emitGameUpdate(io, result.game)
 }
 
+function emitBotThinking(io, update) {
+  io.to(chessRoom(update.gameId)).emit('chess:botThinking', update)
+}
+
 function emitChessNotice(io, game, user, type) {
   if (!game.chat_channel_id) {
     return
@@ -45,7 +49,9 @@ function emitChessNotice(io, game, user, type) {
 }
 
 async function playAndEmitBotTurn(pool, io, gameId) {
-  const botResult = await playBotTurn(pool, gameId)
+  const botResult = await playBotTurn(pool, gameId, {
+    onThinking: (update) => emitBotThinking(io, update),
+  })
 
   if (botResult) {
     await emitMoveAndOpening(pool, io, botResult)
