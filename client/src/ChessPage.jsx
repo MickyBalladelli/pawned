@@ -407,7 +407,9 @@ function boardResult(game, user = null) {
   const won = Number(game.winner_user_id) === Number(user.id)
 
   return {
-    message: statusLabel(game, user),
+    message: game.status === 'resigned'
+      ? won ? 'Won by resignation' : 'Lost by resignation'
+      : statusLabel(game, user),
     tone: won ? 'won' : 'lost',
   }
 }
@@ -1623,6 +1625,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                   <ChessResultOverlay
                     key={`${selectedGame?.id}-${selectedGame?.status}-${selectedGame?.winner_user_id || 'none'}`}
                     message={resultOverlay?.message}
+                    resultKey={`${selectedGame?.id}-${selectedGame?.status}-${selectedGame?.winner_user_id || 'none'}`}
                     tone={resultOverlay?.tone}
                   />
                 </Box>

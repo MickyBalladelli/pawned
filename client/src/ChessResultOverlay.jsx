@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Box, Typography } from '@mui/material'
 
-function ChessResultOverlay({ message, tone = 'default' }) {
+function ChessResultOverlay({ message, tone = 'default', resultKey }) {
   const [visible, setVisible] = useState(Boolean(message))
 
   useEffect(() => {
@@ -11,10 +11,10 @@ function ChessResultOverlay({ message, tone = 'default' }) {
     }
 
     setVisible(true)
-    const timeout = window.setTimeout(() => setVisible(false), 2600)
+    const timeout = window.setTimeout(() => setVisible(false), 4200)
 
     return () => window.clearTimeout(timeout)
-  }, [message])
+  }, [message, resultKey])
 
   if (!message) {
     return null
