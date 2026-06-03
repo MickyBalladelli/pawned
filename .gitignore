@@ -161,8 +161,6 @@ vite.config.ts.timestamp-*
 *.csproj
 *.sln
 
-# Accidental local Unreal template project
-unreal-client/Vela/
 
 builds/
 build/
