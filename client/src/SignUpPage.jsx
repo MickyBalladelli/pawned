@@ -3,15 +3,13 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   CircularProgress,
-  Container,
   Stack,
   TextField,
   Typography,
 } from '@mui/material'
-import { PersonAdd } from '@mui/icons-material'
+import { ArrowBack, PersonAdd } from '@mui/icons-material'
+import AuthSplitPage from './AuthSplitPage'
 import PasswordField from './PasswordField'
 import { requestJson } from './requestJson'
 
@@ -89,102 +87,91 @@ function SignUpPage({
     ' '
 
   return (
-    <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
-      <Stack spacing={3}>
-        <Box
-          component="img"
-          src="/images/pawned.png"
-          alt="Pawned"
-          sx={{
-            width: '100%',
-            maxHeight: 260,
-            aspectRatio: '591 / 567',
-            objectFit: 'contain',
-            borderRadius: 2,
-          }}
+    <AuthSplitPage
+      topAction={
+        <Button
+          type="button"
+          variant="text"
+          startIcon={<ArrowBack />}
+          onClick={onBackToLogin}
+        >
+          Back to sign in
+        </Button>
+      }
+    >
+      <Stack component="form" spacing={2.5} onSubmit={handleSubmit}>
+        <Box sx={{ textAlign: 'left' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+            <PersonAdd color="primary" />
+            <Typography variant="overline" color="text.secondary">
+              Sign up
+            </Typography>
+          </Stack>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+            Create Account
+          </Typography>
+        </Box>
+
+        {error && (
+          <Alert severity="error" onClose={onClearError}>
+            {error}
+          </Alert>
+        )}
+
+        {result && (
+          <Alert severity="success">
+            {result.message}
+          </Alert>
+        )}
+
+        <TextField
+          label="Email"
+          type="email"
+          value={form.email}
+          onChange={(event) => updateField('email', event.target.value)}
+          size="small"
+          fullWidth
+          required
         />
-
-        <Card>
-          <CardContent component="form" onSubmit={handleSubmit}>
-            <Stack spacing={2.5}>
-              <Box sx={{ textAlign: 'left' }}>
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
-                  <PersonAdd color="primary" />
-                  <Typography variant="overline" color="text.secondary">
-                    Sign up
-                  </Typography>
-                </Stack>
-                <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-                  Create Pawned Account
-                </Typography>
-              </Box>
-
-              {error && (
-                <Alert severity="error" onClose={onClearError}>
-                  {error}
-                </Alert>
-              )}
-
-              {result && (
-                <Alert severity="success">
-                  {result.message}
-                </Alert>
-              )}
-
-              <TextField
-                label="Email"
-                type="email"
-                value={form.email}
-                onChange={(event) => updateField('email', event.target.value)}
-                size="small"
-                fullWidth
-                required
-              />
-              <TextField
-                label="Username"
-                value={form.username}
-                onChange={(event) => updateField('username', event.target.value)}
-                error={usernameState.available === false}
-                helperText={usernameHelperText}
-                InputProps={{
-                  endAdornment: usernameState.checking ? <CircularProgress size={18} /> : null,
-                }}
-                size="small"
-                fullWidth
-                required
-              />
-              <PasswordField
-                label="Password"
-                value={form.password}
-                onChange={(event) => updateField('password', event.target.value)}
-                helperText="At least 6 characters"
-                fullWidth
-                required
-              />
-              <PasswordField
-                label="Confirm password"
-                value={form.confirmPassword}
-                onChange={(event) => updateField('confirmPassword', event.target.value)}
-                error={!passwordsMatch}
-                helperText={passwordsMatch ? ' ' : 'Passwords do not match'}
-                fullWidth
-                required
-              />
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={signingUp || usernameState.available === false || !passwordsMatch}
-              >
-                {signingUp ? 'Creating account' : 'Create account'}
-              </Button>
-              <Button type="button" variant="text" onClick={onBackToLogin}>
-                Back to sign in
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
+        <TextField
+          label="Username"
+          value={form.username}
+          onChange={(event) => updateField('username', event.target.value)}
+          error={usernameState.available === false}
+          helperText={usernameHelperText}
+          InputProps={{
+            endAdornment: usernameState.checking ? <CircularProgress size={18} /> : null,
+          }}
+          size="small"
+          fullWidth
+          required
+        />
+        <PasswordField
+          label="Password"
+          value={form.password}
+          onChange={(event) => updateField('password', event.target.value)}
+          helperText="At least 6 characters"
+          fullWidth
+          required
+        />
+        <PasswordField
+          label="Confirm password"
+          value={form.confirmPassword}
+          onChange={(event) => updateField('confirmPassword', event.target.value)}
+          error={!passwordsMatch}
+          helperText={passwordsMatch ? ' ' : 'Passwords do not match'}
+          fullWidth
+          required
+        />
+        <Button
+          type="submit"
+          variant="contained"
+          disabled={signingUp || usernameState.available === false || !passwordsMatch}
+        >
+          {signingUp ? 'Creating account' : 'Create account'}
+        </Button>
       </Stack>
-    </Container>
+    </AuthSplitPage>
   )
 }
 
