@@ -271,6 +271,10 @@ async function listChessGames(pool, user, scope = 'mine') {
   } else if (scope === 'completed') {
     where = "WHERE g.deleted_at IS NULL AND g.status IN ('checkmate', 'draw', 'resigned', 'timeout', 'canceled')"
   } else {
+    if (!user) {
+      return []
+    }
+
     params.push(user.id)
     where = 'WHERE g.deleted_at IS NULL AND (g.white_user_id = $1 OR g.black_user_id = $1)'
   }
@@ -913,7 +917,7 @@ async function deleteChessGame(pool, gameId, user) {
 }
 
 function canDeleteChessGame(game, user) {
-  if (!game || game.deleted_at || !['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game.status)) {
+  if (!game || !user || game.deleted_at || !['checkmate', 'draw', 'resigned', 'timeout', 'canceled'].includes(game.status)) {
     return false
   }
 

@@ -20,7 +20,7 @@ function App() {
   const [authError, setAuthError] = useState(null)
   const [authView, setAuthView] = useState(() => {
     const params = new URLSearchParams(window.location.search)
-    return params.has('token') && window.location.pathname === '/verify-email' ? 'verify' : 'login'
+    return params.has('token') && window.location.pathname === '/verify-email' ? 'verify' : 'guest'
   })
   const [signingUp, setSigningUp] = useState(false)
   const [signupError, setSignupError] = useState(null)
@@ -149,6 +149,7 @@ function App() {
     }
 
     clearAuth()
+    setAuthView('guest')
   }
 
   useEffect(() => {
@@ -194,7 +195,7 @@ function App() {
     )
   }
 
-  if (!authUser) {
+  if (!authUser && authView !== 'guest') {
     if (authView === 'verify') {
       return (
         <ThemeProvider theme={theme}>
@@ -248,6 +249,7 @@ function App() {
         authUser={authUser}
         themeMode={themeMode}
         onLogout={handleLogout}
+        onShowLogin={() => setAuthView('login')}
         onToggleTheme={toggleThemeMode}
         onUserUpdated={setAuthUser}
       />

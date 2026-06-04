@@ -65,20 +65,28 @@ async function emitMoveAndOpening(pool, io, result) {
   await postChessOpeningMessage(pool, io, result.game.id)
 }
 
-function createChessRouter({ pool, authenticate, io }) {
+function createChessRouter({ pool, authenticate, optionalAuthenticate, io }) {
   const router = express.Router()
 
-  router.use(authenticate)
+  function requireAuth(req, res, next) {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' })
+    }
 
-  router.get('/bot-levels', (req, res) => {
+    next()
+  }
+
+  const readAuth = optionalAuthenticate || authenticate
+
+  router.get('/bot-levels', readAuth, (req, res) => {
     res.json({ levels: botLevels })
   })
 
-  router.get('/openings', (req, res) => {
+  router.get('/openings', readAuth, (req, res) => {
     res.json(openingBook)
   })
 
-  router.get('/games', async (req, res) => {
+  router.get('/games', readAuth, async (req, res) => {
     try {
       const games = await listChessGames(pool, req.user, req.query.scope)
       res.json({ games })
@@ -88,7 +96,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games', async (req, res) => {
+  router.post('/games', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await createChessGame(pool, req.user, {
         color: req.body?.color,
@@ -105,7 +113,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/bot-games', async (req, res) => {
+  router.post('/bot-games', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await createBotChessGame(pool, req.user, {
         color: req.body?.color,
@@ -123,7 +131,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.get('/games/:id', async (req, res) => {
+  router.get('/games/:id', readAuth, async (req, res) => {
     try {
       const game = await getChessGameForUser(pool, req.params.id, req.user)
 
@@ -143,7 +151,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/join', async (req, res) => {
+  router.post('/games/:id/join', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await joinChessGame(pool, req.params.id, req.user, {
         color: req.body?.color,
@@ -157,7 +165,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/moves', async (req, res) => {
+  router.post('/games/:id/moves', authenticate, requireAuth, async (req, res) => {
     try {
       const result = await makeChessMove(pool, req.params.id, req.user, {
         from: req.body?.from,
@@ -174,7 +182,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/undo', async (req, res) => {
+  router.post('/games/:id/undo', authenticate, requireAuth, async (req, res) => {
     try {
       const result = await undoChessMove(pool, req.params.id, req.user)
 
@@ -191,7 +199,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/resign', async (req, res) => {
+  router.post('/games/:id/resign', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await resignChessGame(pool, req.params.id, req.user)
       emitGameUpdate(io, game)
@@ -202,7 +210,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/timeout', async (req, res) => {
+  router.post('/games/:id/timeout', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await timeoutChessGame(pool, req.params.id, req.user)
       emitGameUpdate(io, game)
@@ -213,7 +221,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/cancel', async (req, res) => {
+  router.post('/games/:id/cancel', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await cancelChessGame(pool, req.params.id, req.user)
       emitGameUpdate(io, game)
@@ -224,7 +232,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.post('/games/:id/close-chat', async (req, res) => {
+  router.post('/games/:id/close-chat', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await closeChessGameChat(pool, req.params.id, req.user)
       emitGameUpdate(io, game)
@@ -235,7 +243,7 @@ function createChessRouter({ pool, authenticate, io }) {
     }
   })
 
-  router.delete('/games/:id', async (req, res) => {
+  router.delete('/games/:id', authenticate, requireAuth, async (req, res) => {
     try {
       const game = await deleteChessGame(pool, req.params.id, req.user)
       io.emit('chess:gameDeleted', { id: game.id })

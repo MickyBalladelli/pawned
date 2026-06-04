@@ -248,6 +248,38 @@ async function authenticate(req, res, next) {
   }
 }
 
+async function optionalAuthenticate(req, res, next) {
+  const token = getAuthToken(req)
+
+  if (!token) {
+    req.user = null
+    next()
+    return
+  }
+
+  try {
+    const session = await getSession(token)
+
+    if (!session) {
+      req.user = null
+      next()
+      return
+    }
+
+    const result = await pool.query(
+      `SELECT ${userSelectColumns} FROM users WHERE id = $1 AND is_verified = true AND is_blocked = false`,
+      [session.userId]
+    )
+
+    req.user = result.rows[0] || null
+    req.authToken = token
+    next()
+  } catch (err) {
+    console.error('Error optionally authenticating user:', err)
+    res.status(500).json({ error: 'Failed to authenticate user' })
+  }
+}
+
 function requireAdmin(req, res, next) {
   if (!isAdminUser(req.user)) {
     return res.status(403).json({ error: 'Admin access required' });
@@ -373,7 +405,7 @@ app.get('/verify-email', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'));
 });
 
-app.use('/api/chess', createChessRouter({ pool, authenticate, io }))
+app.use('/api/chess', createChessRouter({ pool, authenticate, optionalAuthenticate, io }))
 
 app.post('/api/auth/login', async (req, res) => {
   const { username, password } = req.body;

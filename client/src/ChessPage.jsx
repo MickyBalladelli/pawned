@@ -109,7 +109,7 @@ function setStoredNewGameSettings(settings) {
 }
 
 function getAuthHeaders(authToken) {
-  return { Authorization: `Bearer ${authToken}` }
+  return authToken ? { Authorization: `Bearer ${authToken}` } : {}
 }
 
 function botLevelLabel(level) {
@@ -510,7 +510,8 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const movesEndRef = useRef(null)
 
   const authHeaders = useMemo(() => getAuthHeaders(authToken), [authToken])
-  const playerColor = getPlayerColor(selectedGame, authUser.id)
+  const playerColor = getPlayerColor(selectedGame, authUser?.id)
+  const canPlay = Boolean(authUser)
   const canMove = Boolean(selectedGame?.status === 'active' && playerColor === selectedGame.turn_color)
   const canUndo = Boolean(selectedGame?.status === 'active' && playerColor && moves.length > 0)
   const viewedFen = viewMoveIndex === null
@@ -539,11 +540,15 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   const boardOrientation = boardFlipped
     ? defaultBoardOrientation === 'white' ? 'black' : 'white'
     : defaultBoardOrientation
-  const myActiveGames = useMemo(() => games.filter(isActiveGame), [games])
-  const myCompletedGames = useMemo(() => games.filter(isCompletedGame), [games])
+  const myActiveGames = useMemo(() => (
+    authUser ? games.filter(isActiveGame) : activeGames
+  ), [activeGames, authUser, games])
+  const myCompletedGames = useMemo(() => (
+    authUser ? games.filter(isCompletedGame) : []
+  ), [authUser, games])
   const watchGames = useMemo(() => (
-    activeGames.filter((game) => !getPlayerColor(game, authUser.id))
-  ), [activeGames, authUser.id])
+    activeGames.filter((game) => !getPlayerColor(game, authUser?.id))
+  ), [activeGames, authUser])
   const visibleCompletedGames = useMemo(() => {
     if (showMyCompletedOnly) {
       return myCompletedGames
@@ -574,23 +579,25 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
 
       if (!selectedGameId && mine.games?.[0]) {
         setSelectedGameId(mine.games[0].id)
+      } else if (!selectedGameId && !authUser && active.games?.[0]) {
+        setSelectedGameId(active.games[0].id)
       }
     } catch (err) {
       onError(err.message)
     } finally {
       setLoading(false)
     }
-  }, [authHeaders, onError, selectedGameId])
+  }, [authHeaders, authUser, onError, selectedGameId])
 
   useEffect(() => {
     onHeaderActionsChange?.({
       loading,
-      onNewGame: () => setCreateDialogOpen(true),
+      onNewGame: authUser ? () => setCreateDialogOpen(true) : null,
       onRefresh: loadGames,
     })
 
     return () => onHeaderActionsChange?.(null)
-  }, [loadGames, loading, onHeaderActionsChange])
+  }, [authUser, loadGames, loading, onHeaderActionsChange])
 
   const loadGame = useCallback(async (gameId) => {
     if (!gameId) {
@@ -728,7 +735,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
     const handleGameUpdated = (game) => {
       loadGames()
 
-      if (getPlayerColor(game, authUser.id)) {
+      if (getPlayerColor(game, authUser?.id)) {
         setGames((current) => {
           const exists = current.some((item) => item.id === game.id)
           const next = exists ? current.map((item) => item.id === game.id ? game : item) : [game, ...current]
@@ -835,13 +842,17 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
       socket.off('chess:botThinking', handleBotThinking)
       socket.off('chess:gameDeleted')
     }
-  }, [authUser.id, loadGames, selectedGameId, socket])
+  }, [authUser, loadGames, selectedGameId, socket])
 
   useEffect(() => {
     movesEndRef.current?.scrollIntoView({ block: 'nearest' })
   }, [moves.length])
 
   async function createGame() {
+    if (!canPlay) {
+      return
+    }
+
     setBusy(true)
 
     try {
@@ -868,6 +879,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   }
 
   async function createBotGame() {
+    if (!canPlay) {
+      return
+    }
+
     setBusy(true)
 
     try {
@@ -898,6 +913,10 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
   }
 
   async function joinGame(gameId) {
+    if (!canPlay) {
+      return
+    }
+
     setBusy(true)
 
     try {
@@ -1437,9 +1456,9 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
               )}
 
               {gameListTab === 'open' && renderGameList(openGames, 'No open games', {
-                action: (game) => `Join as ${openColorForGame(game)}`,
+                action: (game) => canPlay ? `Join as ${openColorForGame(game)}` : 'View',
                 disabled: () => busy,
-                onClick: (game) => joinGame(game.id),
+                onClick: (game) => canPlay ? joinGame(game.id) : setSelectedGameId(game.id),
               })}
 
               {gameListTab === 'watch' && renderGameList(watchGames, 'No live games', {
@@ -1491,7 +1510,7 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
           {!selectedGame ? (
             <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}>
               <Casino sx={{ fontSize: 42, color: 'text.secondary', mb: 1 }} />
-              <Typography color="text.secondary">Select or create game</Typography>
+              <Typography color="text.secondary">{canPlay ? 'Select or create game' : 'Select game'}</Typography>
             </Paper>
           ) : (
             <Box
@@ -1724,15 +1743,17 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
                     )}
                   </Paper>
                 </Box>
-                <ChessGameChat
-                  authHeaders={authHeaders}
-                  authUser={authUser}
-                  game={selectedGame}
-                  socket={socket}
-                  socketConnected={socketConnected}
-                  onError={onError}
-                  onGameUpdated={handleSelectedGameUpdated}
-                />
+                {authUser && (
+                  <ChessGameChat
+                    authHeaders={authHeaders}
+                    authUser={authUser}
+                    game={selectedGame}
+                    socket={socket}
+                    socketConnected={socketConnected}
+                    onError={onError}
+                    onGameUpdated={handleSelectedGameUpdated}
+                  />
+                )}
                 {botThinkingStats && !isViewingHistory && (
                   <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                     <Chip size="small" label={`${botThinkingStats.workerCount} threads`} variant="outlined" />

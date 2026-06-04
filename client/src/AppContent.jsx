@@ -132,10 +132,14 @@ function getInitial(username) {
   return username?.trim().charAt(0).toUpperCase() || '?'
 }
 
-function getInitialActiveView() {
+function getInitialActiveView(authUser) {
   const params = new URLSearchParams(window.location.search)
 
   if (params.has('chessGame')) {
+    return 'chess'
+  }
+
+  if (!authUser) {
     return 'chess'
   }
 
@@ -143,7 +147,7 @@ function getInitialActiveView() {
   return ['chat', 'chess', 'training', 'users'].includes(storedView) ? storedView : 'chat'
 }
 
-function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, onUserUpdated }) {
+function AppContent({ authToken, authUser, themeMode, onLogout, onShowLogin, onToggleTheme, onUserUpdated }) {
   const [channels, setChannels] = useState([])
   const [selectedChannelId, setSelectedChannelId] = useState(null)
   const [messages, setMessages] = useState([])
@@ -164,7 +168,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   const [notice, setNotice] = useState(null)
   const [error, setError] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
-  const [activeView, setActiveView] = useState(getInitialActiveView)
+  const [activeView, setActiveView] = useState(() => getInitialActiveView(authUser))
   const [accountMenuAnchor, setAccountMenuAnchor] = useState(null)
   const [chessHeaderActions, setChessHeaderActions] = useState(null)
   const selectedChannelIdRef = useRef(null)
@@ -211,8 +215,19 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     }
   }, [activeView, isAdmin])
 
+  useEffect(() => {
+    if (!authUser && activeView !== 'chess') {
+      setActiveView('chess')
+      localStorage.setItem(activeViewStorageKey, 'chess')
+    }
+  }, [activeView, authUser])
+
   function handleActiveViewChange(event, value) {
     if (!value) {
+      return
+    }
+
+    if (!authUser && value !== 'chess') {
       return
     }
 
@@ -227,6 +242,13 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }
 
   const loadChannels = useCallback(async () => {
+    if (!authUser) {
+      setChannels([])
+      setSelectedChannelId(null)
+      setLoadingChannels(false)
+      return
+    }
+
     setLoadingChannels(true)
     setError(null)
 
@@ -249,7 +271,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
     } finally {
       setLoadingChannels(false)
     }
-  }, [getAuthHeaders])
+  }, [authUser, getAuthHeaders])
 
   const loadMessages = useCallback(async (channelId) => {
     if (!channelId) {
@@ -291,6 +313,12 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }, [selectedChannelId])
 
   useEffect(() => {
+    if (!authToken || !authUser) {
+      setSocket(null)
+      setSocketConnected(false)
+      return undefined
+    }
+
     let active = true
     let liveSocket
 
@@ -350,7 +378,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         })
 
         liveSocket.on('channelPresence', (notice) => {
-          if (authUser.show_channel_presence === false) {
+          if (authUser?.show_channel_presence === false) {
             return
           }
 
@@ -400,7 +428,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
         })
 
         liveSocket.on('userUpdated', (user) => {
-          if (Number(user.id) !== Number(authUser.id)) {
+          if (Number(user.id) !== Number(authUser?.id)) {
             return
           }
 
@@ -436,7 +464,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
       setSocket(null)
       setSocketConnected(false)
     }
-  }, [authToken, authUser.id, authUser.show_channel_presence, loadChannels, onLogout, onUserUpdated])
+  }, [authToken, authUser, loadChannels, onLogout, onUserUpdated])
 
   useEffect(() => {
     const load = Promise.resolve().then(() => loadMessages(selectedChannelId))
@@ -643,7 +671,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
   }
 
   async function handleBlockUser(userId) {
-    if (!isModerator || !userId || Number(userId) === Number(authUser.id)) {
+    if (!isModerator || !userId || Number(userId) === Number(authUser?.id)) {
       return
     }
 
@@ -786,9 +814,9 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
               },
             }}
           >
-            <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />
+            {authUser && <Tab icon={<Forum />} iconPosition="start" value="chat" label="Chat" />}
             <Tab icon={<ChessIcon />} iconPosition="start" value="chess" label="Chess" />
-            <Tab icon={<School />} iconPosition="start" value="training" label="Training" />
+            {authUser && <Tab icon={<School />} iconPosition="start" value="training" label="Training" />}
             {isAdmin && <Tab icon={<People />} iconPosition="start" value="users" label="Users" />}
           </Tabs>
           <Box sx={{ flex: 1, textAlign: { xs: 'left', md: 'left' } }}>
@@ -809,7 +837,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            {activeView === 'chat' && (
+            {authUser && activeView === 'chat' && (
               <>
                 <Button variant="contained" startIcon={<Add />} onClick={startCreate}>
                   {isAdmin ? 'New channel' : 'New private'}
@@ -828,7 +856,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 </Tooltip>
               </>
             )}
-            {activeView === 'chess' && chessHeaderActions && (
+            {authUser && activeView === 'chess' && chessHeaderActions && (
               <>
                 <Button variant="contained" startIcon={<Add />} onClick={chessHeaderActions.onNewGame}>
                   New game
@@ -852,32 +880,40 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onToggleTheme, o
                 {themeMode === 'dark' ? <LightMode /> : <DarkMode />}
               </IconButton>
             </Tooltip>
-            <Tooltip title="Account">
-              <IconButton
-                onClick={(event) => setAccountMenuAnchor(event.currentTarget)}
-                sx={{ p: 0.25 }}
-              >
-                <Avatar
-                  src={authUser.avatar_url || undefined}
-                  sx={{ width: 36, height: 36, fontSize: 15, fontWeight: 800, bgcolor: 'primary.main' }}
+            {authUser ? (
+              <>
+                <Tooltip title="Account">
+                  <IconButton
+                    onClick={(event) => setAccountMenuAnchor(event.currentTarget)}
+                    sx={{ p: 0.25 }}
+                  >
+                    <Avatar
+                      src={authUser.avatar_url || undefined}
+                      sx={{ width: 36, height: 36, fontSize: 15, fontWeight: 800, bgcolor: 'primary.main' }}
+                    >
+                      {getInitial(authUser.username)}
+                    </Avatar>
+                  </IconButton>
+                </Tooltip>
+                <Menu
+                  anchorEl={accountMenuAnchor}
+                  open={Boolean(accountMenuAnchor)}
+                  onClose={() => setAccountMenuAnchor(null)}
+                  anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+                  transformOrigin={{ vertical: 'top', horizontal: 'right' }}
                 >
-                  {getInitial(authUser.username)}
-                </Avatar>
-              </IconButton>
-            </Tooltip>
-            <Menu
-              anchorEl={accountMenuAnchor}
-              open={Boolean(accountMenuAnchor)}
-              onClose={() => setAccountMenuAnchor(null)}
-              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-            >
-              <MenuItem onClick={handleShowSettings}>
-                <Settings fontSize="small" sx={{ mr: 1 }} />
-                Settings
-              </MenuItem>
-              <MenuItem onClick={handleLogout}>Sign out</MenuItem>
-            </Menu>
+                  <MenuItem onClick={handleShowSettings}>
+                    <Settings fontSize="small" sx={{ mr: 1 }} />
+                    Settings
+                  </MenuItem>
+                  <MenuItem onClick={handleLogout}>Sign out</MenuItem>
+                </Menu>
+              </>
+            ) : (
+              <Button variant="contained" onClick={onShowLogin}>
+                Login
+              </Button>
+            )}
           </Stack>
         </Stack>
 
