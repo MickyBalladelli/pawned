@@ -10,7 +10,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { Lock } from '@mui/icons-material'
+import { ArrowBack, Lock } from '@mui/icons-material'
 import PasswordField from './PasswordField'
 import ResendVerificationButton from './ResendVerificationButton'
 
@@ -25,6 +25,7 @@ function LoginPage({
   onClearError,
   onLogin,
   onResendVerification,
+  onReturnMain,
   onShowSignUp,
 }) {
   const [authForm, setAuthForm] = useState({ username: '', password: '' })
@@ -42,6 +43,17 @@ function LoginPage({
   return (
     <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
       <Stack spacing={3}>
+        <Box sx={{ alignSelf: 'flex-start' }}>
+          <Button
+            type="button"
+            variant="text"
+            startIcon={<ArrowBack />}
+            onClick={onReturnMain}
+          >
+            Main page
+          </Button>
+        </Box>
+
         <Box
           component="img"
           src="/images/pawned.png"

@@ -235,6 +235,7 @@ function App() {
           onClearError={() => setAuthError(null)}
           onLogin={handleLogin}
           onResendVerification={(identifier) => handleResendVerification(identifier, true)}
+          onReturnMain={() => setAuthView('guest')}
           onShowSignUp={() => setAuthView('signup')}
         />
       </ThemeProvider>
