@@ -537,9 +537,6 @@ app.post('/api/auth/signup', async (req, res) => {
     return res.status(400).json({ error: 'Passwords do not match' })
   }
 
-  const verificationToken = createVerificationToken()
-  const verificationTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24)
-
   try {
     const existing = await pool.query(
       'SELECT username, email FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($2)',
@@ -560,22 +557,15 @@ app.post('/api/auth/signup', async (req, res) => {
           email,
           username,
           password_hash,
-          is_verified,
-          verification_token,
-          verification_token_expires_at
+          is_verified
         )
-        VALUES ($1, $2, $3, false, $4, $5)
+        VALUES ($1, $2, $3, true)
       `,
-      [email, username, `sha256:${hashPassword(password)}`, verificationToken, verificationTokenExpiresAt]
+      [email, username, `sha256:${hashPassword(password)}`]
     )
 
-    const verificationLink = getVerificationLink(req, verificationToken)
-    verificationTokens.set(verificationToken, { email, expiresAt: verificationTokenExpiresAt })
-    await sendVerificationEmail(email, verificationLink)
-
     res.status(201).json({
-      message: 'Account pending approval. Check your email to verify.',
-      verificationLink: process.env.NODE_ENV === 'production' ? undefined : verificationLink,
+      message: 'Account created. You can sign in now.',
     })
   } catch (err) {
     console.error('Error signing up:', err)

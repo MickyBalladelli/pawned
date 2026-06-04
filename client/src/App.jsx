@@ -212,11 +212,9 @@ function App() {
           <SignUpPage
             error={signupError}
             result={signupResult}
-            resendingVerification={resendingVerification}
             signingUp={signingUp}
             onBackToLogin={() => setAuthView('login')}
             onClearError={() => setSignupError(null)}
-            onResendVerification={handleResendVerification}
             onSignUp={handleSignUp}
           />
         </ThemeProvider>
