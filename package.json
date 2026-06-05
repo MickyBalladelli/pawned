@@ -2,8 +2,10 @@
   "name": "pawned",
   "private": true,
   "scripts": {
-    "build": "npm --prefix client run build",
+    "build": "npm --prefix client install --include=dev && npm --prefix server install && npm --prefix client run build",
     "init-db": "npm --prefix server run init-db",
+    "postinstall": "npm --prefix client install --include=dev && npm --prefix server install",
+    "start": "npm --prefix server start",
     "vercel-build": "npm --prefix client run build"
   }
 }

@@ -391,6 +391,10 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 app.use(express.json({ limit: '2mb' }));
 
 // Routes
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true })
+})
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../client/dist/index.html'))
 })
