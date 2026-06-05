@@ -22,7 +22,7 @@ const io = socketIo(server, {
     origin: "*",
     methods: ["GET", "POST"]
   }
-});
+})
 
 // PostgreSQL connection pool
 const pool = createDatabasePool()
@@ -382,10 +382,15 @@ pool.query('SELECT NOW()', (err, res) => {
   } else {
     console.log('Database connected successfully');
   }
-});
+})
 
-// Serve static files from client build directory
-app.use(express.static(path.join(__dirname, '../client/dist')));
+const clientDistPath = path.join(__dirname, '../client/dist')
+const clientIndexPath = path.join(clientDistPath, 'index.html')
+const hasClientBuild = require('fs').existsSync(clientIndexPath)
+
+if (hasClientBuild) {
+  app.use(express.static(clientDistPath))
+}
 
 // Middleware for parsing JSON
 app.use(express.json({ limit: '2mb' }));
@@ -396,11 +401,19 @@ app.get('/api/health', (req, res) => {
 })
 
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'))
+  if (!hasClientBuild) {
+    return res.json({ ok: true, service: 'pawned-api' })
+  }
+
+  res.sendFile(clientIndexPath)
 })
 
 app.get('/verify-email', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  if (!hasClientBuild) {
+    return res.redirect('/')
+  }
+
+  res.sendFile(clientIndexPath)
 });
 
 app.use('/api/chess', createChessRouter({ pool, authenticate, optionalAuthenticate, io }))
