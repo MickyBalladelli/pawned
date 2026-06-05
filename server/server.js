@@ -29,6 +29,8 @@ const pool = createDatabasePool()
 
 const sessions = new Map();
 const verificationTokens = new Map()
+const maxLoginFailures = 3
+const loginLockMs = 5 * 60 * 1000
 const mailTransport = nodemailer.createTransport({
   sendmail: true,
   newline: 'unix',
@@ -72,6 +74,56 @@ function hashPassword(password) {
 
 function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+function getLoginAttemptKey(username) {
+  return username.trim().toLowerCase()
+}
+
+async function getLoginLock(username) {
+  const result = await pool.query(
+    `
+      SELECT CEIL(EXTRACT(EPOCH FROM locked_until - CURRENT_TIMESTAMP)) AS retry_after_seconds
+      FROM auth_login_attempts
+      WHERE username_key = $1
+        AND locked_until > CURRENT_TIMESTAMP
+    `,
+    [getLoginAttemptKey(username)]
+  )
+  const retryAfterSeconds = Number(result.rows[0]?.retry_after_seconds || 0)
+
+  return retryAfterSeconds > 0 ? { retryAfterSeconds } : null
+}
+
+async function recordFailedLogin(username) {
+  const key = getLoginAttemptKey(username)
+  const currentResult = await pool.query(
+    'SELECT failures, locked_until FROM auth_login_attempts WHERE username_key = $1',
+    [key]
+  )
+  const current = currentResult.rows[0]
+  const failures = current?.locked_until && current.locked_until <= new Date()
+    ? maxLoginFailures
+    : Number(current?.failures || 0) + 1
+  const lockedUntil = failures >= maxLoginFailures ? new Date(Date.now() + loginLockMs) : null
+
+  await pool.query(
+    `
+      INSERT INTO auth_login_attempts (username_key, failures, locked_until, updated_at)
+      VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+      ON CONFLICT (username_key) DO UPDATE
+      SET failures = EXCLUDED.failures,
+          locked_until = EXCLUDED.locked_until,
+          updated_at = CURRENT_TIMESTAMP
+    `,
+    [key, failures, lockedUntil]
+  )
+
+  return lockedUntil ? lockedUntil.getTime() : null
+}
+
+async function clearFailedLogins(username) {
+  await pool.query('DELETE FROM auth_login_attempts WHERE username_key = $1', [getLoginAttemptKey(username)])
 }
 
 async function getSession(token) {
@@ -419,13 +471,24 @@ app.get('/verify-email', (req, res) => {
 app.use('/api/chess', createChessRouter({ pool, authenticate, optionalAuthenticate, io }))
 
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body
+  const usernameValue = username?.trim()
 
-  if (!username?.trim()) {
-    return res.status(400).json({ error: 'Username is required' });
+  if (!usernameValue) {
+    return res.status(400).json({ error: 'Username is required' })
   }
 
   try {
+    const lock = await getLoginLock(usernameValue)
+
+    if (lock) {
+      res.set('Retry-After', String(lock.retryAfterSeconds))
+      return res.status(429).json({
+        error: 'Too many failed login attempts. Try again in 5 minutes.',
+        retryAfterSeconds: lock.retryAfterSeconds,
+      })
+    }
+
     const result = await pool.query(
       `
         SELECT id,
@@ -444,14 +507,28 @@ app.post('/api/auth/login', async (req, res) => {
         FROM users
         WHERE LOWER(username) = LOWER($1)
       `,
-      [username.trim()]
-    );
+      [usernameValue]
+    )
 
-    const user = result.rows[0];
+    const user = result.rows[0]
 
     if (!user || !passwordMatches(password, user.password_hash)) {
-      return res.status(401).json({ error: 'Invalid username or password' });
+      const lockedUntil = await recordFailedLogin(usernameValue)
+
+      if (lockedUntil) {
+        const retryAfterSeconds = Math.ceil((lockedUntil - Date.now()) / 1000)
+
+        res.set('Retry-After', String(retryAfterSeconds))
+        return res.status(429).json({
+          error: 'Too many failed login attempts. Try again in 5 minutes.',
+          retryAfterSeconds,
+        })
+      }
+
+      return res.status(401).json({ error: 'Invalid username or password' })
     }
+
+    await clearFailedLogins(usernameValue)
 
     if (user.is_blocked) {
       return res.status(403).json({ error: 'Account blocked' })
@@ -484,8 +561,8 @@ app.post('/api/auth/login', async (req, res) => {
       })
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
-    await saveSession(token, user.id);
+    const token = crypto.randomBytes(32).toString('hex')
+    await saveSession(token, user.id)
 
     res.json({
       token,
@@ -1574,6 +1651,15 @@ async function createTables() {
       )
     `)
 
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auth_login_attempts (
+        username_key TEXT PRIMARY KEY,
+        failures INTEGER NOT NULL DEFAULT 0,
+        locked_until TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
+
     const defaultAdminPasswordHash = `sha256:${hashPassword(process.env.DEFAULT_ADMIN_PASSWORD || 'admin')}`;
 
     await pool.query(
@@ -1656,6 +1742,7 @@ async function createTables() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)');
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_login_attempts_locked_until ON auth_login_attempts(locked_until)');
     await createChessTables(pool)
     
     console.log('Database tables created successfully');

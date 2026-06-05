@@ -78,6 +78,15 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `)
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS auth_login_attempts (
+        username_key TEXT PRIMARY KEY,
+        failures INTEGER NOT NULL DEFAULT 0,
+        locked_until TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `)
     
     // Create messages table
     await pool.query(`
@@ -176,6 +185,7 @@ async function initializeDatabase() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)')
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)')
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)')
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_login_attempts_locked_until ON auth_login_attempts(locked_until)')
     await createChessTables(pool)
     
     console.log('Database initialized successfully');
