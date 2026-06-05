@@ -28,7 +28,7 @@ function App() {
   const [resendingVerification, setResendingVerification] = useState(false)
   const [resendVerificationMessage, setResendVerificationMessage] = useState(null)
   const [authVerificationLink, setAuthVerificationLink] = useState(null)
-  const [themeMode, setThemeMode] = useState(() => localStorage.getItem(themeModeKey) || 'light')
+  const [themeMode, setThemeMode] = useState(() => localStorage.getItem(themeModeKey) || 'dark')
 
   const theme = useMemo(() => createTheme({
     palette: {
