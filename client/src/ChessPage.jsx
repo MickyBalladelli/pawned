@@ -572,15 +572,20 @@ function ChessPage({ authToken, authUser, socket, socketConnected, themeMode, on
         requestJson('/api/chess/games?scope=completed', { headers: authHeaders }),
       ])
 
-      setGames(mine.games || [])
-      setOpenGames(open.games || [])
-      setActiveGames(active.games || [])
-      setCompletedGames(completed.games || [])
+      const mineGames = mine?.games || []
+      const openGames = open?.games || []
+      const activeGames = active?.games || []
+      const completedGames = completed?.games || []
 
-      if (!selectedGameId && mine.games?.[0]) {
-        setSelectedGameId(mine.games[0].id)
-      } else if (!selectedGameId && !authUser && active.games?.[0]) {
-        setSelectedGameId(active.games[0].id)
+      setGames(mineGames)
+      setOpenGames(openGames)
+      setActiveGames(activeGames)
+      setCompletedGames(completedGames)
+
+      if (!selectedGameId && mineGames[0]) {
+        setSelectedGameId(mineGames[0].id)
+      } else if (!selectedGameId && !authUser && activeGames[0]) {
+        setSelectedGameId(activeGames[0].id)
       }
     } catch (err) {
       onError(err.message)
