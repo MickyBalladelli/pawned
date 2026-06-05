@@ -1483,10 +1483,12 @@ io.on('connection', async (socket) => {
 });
 
 // Start the server
-const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`Pawned server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 4000
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`Pawned server running on port ${PORT}`)
+  })
+}
 
 // Create database tables if they don't exist
 async function createTables() {
