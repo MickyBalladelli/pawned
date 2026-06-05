@@ -57,6 +57,7 @@ import ChessIcon from './ChessIcon'
 import ChessPage from './ChessPage'
 import TrainingPage from './TrainingPage'
 import UsersPage from './UsersPage'
+import { getSocketClientUrl, getSocketConnectionTarget } from './deploymentUrls'
 import { requestJson } from './requestJson'
 
 const emptyForm = {
@@ -98,7 +99,7 @@ function loadSocketIoClient() {
   if (!socketIoClientPromise) {
     socketIoClientPromise = new Promise((resolve, reject) => {
       const script = document.createElement('script')
-      script.src = '/socket.io/socket.io.js'
+      script.src = getSocketClientUrl()
       script.async = true
       script.onload = () => {
         if (window.io) {
@@ -328,7 +329,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onShowLogin, onT
           return
         }
 
-        liveSocket = ioClient({
+        liveSocket = ioClient(getSocketConnectionTarget(), {
           auth: { token: authToken },
           transports: ['websocket', 'polling'],
         })

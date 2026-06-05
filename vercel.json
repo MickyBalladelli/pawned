@@ -1,0 +1,19 @@
+{
+  "buildCommand": "npm --prefix client run build",
+  "installCommand": "npm --prefix client install",
+  "outputDirectory": "client/dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "/api/socket.io/:path*"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/index.html"
+    }
+  ]
+}

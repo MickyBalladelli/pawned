@@ -1,5 +1,7 @@
+import { getApiUrl } from './deploymentUrls'
+
 export async function requestJson(url, options) {
-  const response = await fetch(url, {
+  const response = await fetch(getApiUrl(url), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
