@@ -1,14 +1,8 @@
 // Database initialization script for Pawned MMO game
-const { Pool } = require('pg');
+const { createDatabasePool } = require('../database')
 
 // PostgreSQL connection pool
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'pawned',
-  password: 'postgres',
-  port: 5432,
-});
+const pool = createDatabasePool()
 
 function hashPassword(password) {
   return require('crypto').createHash('sha256').update(password).digest('hex');

@@ -4,13 +4,13 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const { Pool } = require('pg');
 const path = require('path');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer')
 const createChessRouter = require('./chess/chessRoutes')
 const registerChessSockets = require('./chess/chessSockets')
 const { createChessTables } = require('./chess/chessStore')
+const { createDatabasePool } = require('./database')
 
 // Initialize Express app
 const app = express();
@@ -25,13 +25,7 @@ const io = socketIo(server, {
 });
 
 // PostgreSQL connection pool
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'pawned',
-  password: 'postgres',
-  port: 5432,
-});
+const pool = createDatabasePool()
 
 const sessions = new Map();
 const verificationTokens = new Map()
