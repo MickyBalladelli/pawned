@@ -2,7 +2,7 @@ services:
   - type: web
     name: pawned
     runtime: node
-    buildCommand: npm --prefix client install --include=dev && npm --prefix server install && npm --prefix client run build
+    buildCommand: npm --prefix server install
     startCommand: npm --prefix server start
     healthCheckPath: /api/health
     envVars:
