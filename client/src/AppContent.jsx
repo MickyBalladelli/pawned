@@ -50,6 +50,7 @@ import {
   People
 } from '@mui/icons-material'
 import AccountSettingsPage from './AccountSettingsPage'
+import BrandMark from './BrandMark'
 import ChannelSettingsToggles from './ChannelSettingsToggles'
 import ChannelMessageList from './ChannelMessageList'
 import ChannelMembershipDialog from './ChannelMembershipDialog'
@@ -789,17 +790,7 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onShowLogin, onT
           spacing={1.5}
           sx={{ alignItems: { xs: 'stretch', md: 'center' } }}
         >
-          <Box
-            component="img"
-            src="/images/pawned.png"
-            alt="Pawned"
-            sx={{
-              width: { xs: '100%', sm: 120, md: 96 },
-              height: { xs: 120, sm: 92, md: 72 },
-              objectFit: 'contain',
-              borderRadius: 2,
-            }}
-          />
+          <BrandMark />
           <Tabs
             value={activeView}
             onChange={handleActiveViewChange}
