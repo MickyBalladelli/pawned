@@ -454,7 +454,12 @@ function AppContent({ authToken, authUser, themeMode, onLogout, onShowLogin, onT
         setSocket(liveSocket)
       })
       .catch((err) => {
-        setError(err.message)
+        setSocket(null)
+        setSocketConnected(false)
+
+        if (!['Socket client unavailable', 'Failed to load socket client'].includes(err.message)) {
+          setError(err.message)
+        }
       })
 
     return () => {
