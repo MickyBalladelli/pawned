@@ -1,5 +1,6 @@
 // Database initialization script for Pawned MMO game
 const { createDatabasePool } = require('../database')
+const { createChessTables } = require('../chess/chessStore')
 
 // PostgreSQL connection pool
 const pool = createDatabasePool()
@@ -41,7 +42,9 @@ async function initializeDatabase() {
         verification_token TEXT UNIQUE,
         verification_token_expires_at TIMESTAMP,
         verified_at TIMESTAMP,
+        avatar_url TEXT,
         show_channel_presence BOOLEAN DEFAULT TRUE,
+        show_chess_opening BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -55,6 +58,7 @@ async function initializeDatabase() {
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT')
     await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_channel_presence BOOLEAN DEFAULT TRUE')
+    await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS show_chess_opening BOOLEAN DEFAULT TRUE')
     await pool.query('UPDATE users SET is_verified = true WHERE is_verified IS NULL')
     await pool.query("UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'vip', 'developer', 'moderator', 'admin')")
     await pool.query("UPDATE users SET role = 'admin' WHERE is_admin = true AND role = 'user'")
@@ -62,6 +66,7 @@ async function initializeDatabase() {
     await pool.query("UPDATE users SET is_admin = true WHERE role IN ('admin', 'developer')")
     await pool.query('UPDATE users SET is_blocked = false WHERE is_blocked IS NULL')
     await pool.query('UPDATE users SET show_channel_presence = true WHERE show_channel_presence IS NULL')
+    await pool.query('UPDATE users SET show_chess_opening = true WHERE show_chess_opening IS NULL')
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL')
     await pool.query('ALTER TABLE channels ADD COLUMN IF NOT EXISTS is_read_only BOOLEAN DEFAULT FALSE')
     await pool.query('UPDATE channels SET is_read_only = false WHERE is_read_only IS NULL')
@@ -171,6 +176,7 @@ async function initializeDatabase() {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_channel_id ON channel_membership_requests(channel_id)')
     await pool.query('CREATE INDEX IF NOT EXISTS idx_membership_requests_user_id ON channel_membership_requests(user_id)')
     await pool.query('CREATE UNIQUE INDEX IF NOT EXISTS idx_membership_requests_channel_user ON channel_membership_requests(channel_id, user_id)')
+    await createChessTables(pool)
     
     console.log('Database initialized successfully');
   } catch (err) {

@@ -24,9 +24,19 @@ function loadLocalEnv() {
 
 function createDatabasePool() {
   loadLocalEnv()
+  const connectionString = process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/pawned'
+  const useSsl = connectionString.includes('sslmode=require')
+  let poolConnectionString = connectionString
+
+  if (useSsl) {
+    const databaseUrl = new URL(connectionString)
+    databaseUrl.searchParams.delete('sslmode')
+    poolConnectionString = databaseUrl.toString()
+  }
 
   return new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgres://postgres:postgres@localhost:5432/pawned'
+    connectionString: poolConnectionString,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined
   })
 }
 

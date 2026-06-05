@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix client run build",
+    "init-db": "npm --prefix server run init-db",
     "vercel-build": "npm --prefix client run build"
   }
 }
