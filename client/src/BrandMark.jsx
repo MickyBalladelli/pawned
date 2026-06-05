@@ -28,9 +28,12 @@ function BrandMark() {
           component="div"
           sx={{
             color: 'text.primary',
-            fontSize: { xs: 22, md: 24 },
-            fontWeight: 900,
-            lineHeight: 1,
+            fontFamily: 'Georgia, Cambria, Times New Roman, serif',
+            fontSize: { xs: 26, md: 29 },
+            fontWeight: 800,
+            lineHeight: 0.95,
+            letterSpacing: 0,
+            fontStyle: 'italic',
           }}
         >
           Pawned
